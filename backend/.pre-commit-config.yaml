@@ -1,0 +1,27 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.1.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^backend
+      - id: end-of-file-fixer
+        files: ^backend
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.9
+    hooks:
+      - id: ruff
+        args: [ --fix ]
+        files: ^backend
+      - id: ruff-format
+        files: ^backend
+
+#  - repo: https://github.com/pre-commit/mirrors-mypy
+#    rev: v1.10.0
+#    hooks:
+#      - id: mypy
+#        files: ^backend
+#        # `exclude` option will work only from here.
+#        # The rest of mypy configuration can be moved to pyproject.toml
+#        exclude: '(backend/tests/)'
+#        args: [--config-file, backend/pyproject.toml]
