@@ -13,4 +13,3 @@ admin.site.register(User)
 admin.site.register(TeaRating)
 admin.site.register(TeaQuality)
 admin.site.register(TeaQualityAssignment)
-

@@ -8,7 +8,6 @@ function App() {
   return (
     <Router>
       <Header />
-
       <main className="px-10">
         <AppRouter />
       </main>
