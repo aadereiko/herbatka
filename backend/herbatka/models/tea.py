@@ -9,7 +9,7 @@ class Tea(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="teas")
-    tea_ingredients = models.ManyToManyField(TeaIngredient, related_name="teas")
+    tea_ingredients = models.ManyToManyField(TeaIngredient, related_name="teas", blank=True)
 
     def _str_(self):
         return self.name

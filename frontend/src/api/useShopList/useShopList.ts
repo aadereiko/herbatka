@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import api, { QueryConfig } from "@/api/api";
+import api, { QueryConfig } from "@/api/api.ts";
 import { Shop } from "@/components/types/shop.ts";
 
 const getShopList = async () => {

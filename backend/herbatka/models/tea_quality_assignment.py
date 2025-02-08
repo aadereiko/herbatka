@@ -4,7 +4,7 @@ from .tea import Tea
 
 
 class TeaQualityAssignment(models.Model):
-    values = models.JSONField()
+    value = models.CharField(max_length=255)
 
     tea_quality = models.ForeignKey(
         TeaQuality, on_delete=models.CASCADE, related_name="quality_assignments"

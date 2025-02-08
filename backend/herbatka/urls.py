@@ -32,7 +32,7 @@ urlpatterns = [
     path("users/", UserList.as_view()),
     path("users/<int:pk>/", UserDetail.as_view()),
     path("shops/", ShopList.as_view()),
-    path("shops/<int:pk>/", ShopDetail.as_view()),
+    path("shops/<int:pk>/", ShopDetail.as_view(), name='shop-detail'),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

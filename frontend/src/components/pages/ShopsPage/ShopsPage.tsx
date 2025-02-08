@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button.tsx";
-import useShopList from "@/api/useShopList.tsx";
+import useShopList from "@/api/useShopList/useShopList.ts";
 import ShopCard from "@/components/pages/ShopsPage/ShopCard.tsx";
 
 const ShopsPage = () => {
@@ -12,8 +12,6 @@ const ShopsPage = () => {
 
       <div>
         <div>
-          <Button variant="solid">Add shop</Button>
-
           <div className="flex flex-col">
             {shops?.map((shop) => <ShopCard key={shop.id} {...shop} />)}
           </div>
