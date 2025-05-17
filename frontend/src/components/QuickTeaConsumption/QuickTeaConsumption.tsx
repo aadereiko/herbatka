@@ -38,6 +38,7 @@ export const QuickTeaConsumption: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (data: { teaId: number; notes: string }) =>
       teaConsumptionApi.createTeaConsumption(data.teaId, {
+        tea: data.teaId,
         consumed_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
         notes: data.notes,
       }),
@@ -52,7 +53,11 @@ export const QuickTeaConsumption: React.FC = () => {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedTeaId) return;
-    createMutation.mutate({ teaId: parseInt(selectedTeaId), notes });
+    
+    const teaId = Number(selectedTeaId);
+    if (isNaN(teaId)) return;
+    
+    createMutation.mutate({ teaId, notes });
   };
 
   if (!user) {
@@ -63,11 +68,11 @@ export const QuickTeaConsumption: React.FC = () => {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button
-          variant="ghost"
-          size="sm"
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+          variant="outline"
+          size="md"
+          className="flex items-center gap-2 text-primary-dark border-gray-200 hover:border-primary-dark hover:text-primary-dark text-base font-medium transition-colors bg-white"
         >
-          <LuCoffee className="w-4 h-4" />
+          <LuCoffee className="w-5 h-5" />
           Log Tea
         </Button>
       </DialogTrigger>

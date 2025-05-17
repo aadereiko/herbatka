@@ -1,4 +1,3 @@
-import React from "react";
 import { Link, useParams } from "react-router-dom";
 import useTeaById from "@/api/useTeaById/useTeaById.ts";
 import capitalize from "lodash/capitalize";

@@ -9,15 +9,19 @@ export interface TeaConsumption {
     brand: string;
   };
   consumed_at: string;
-  notes: string;
+  notes: string | null;
 }
 
 export interface TeaConsumptionStats {
   total_consumptions: number;
-  most_consumed_teas: Array<{
-    tea__name: string;
+  most_consumed_tea: {
+    id: number;
+    name: string;
+    brand: string;
     count: number;
-  }>;
+  } | null;
+  streak: number;
+  average_per_day: number;
   recent_consumptions: TeaConsumption[];
 }
 

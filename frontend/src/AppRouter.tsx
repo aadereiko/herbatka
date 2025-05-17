@@ -12,10 +12,12 @@ import AddIngredientPage from "@/components/pages/AddIngredientPage/AddIngredien
 import SignInPage from "@/components/pages/SignInPage/SignInPage.tsx";
 import SignUpPage from "@/components/pages/SignUpPage/SignUpPage.tsx";
 import ProfilePage from "@/components/pages/ProfilePage/ProfilePage.tsx";
+import HomePage from "@/components/pages/HomePage/HomePage.tsx";
 
 const AppRouter = () => {
   return (
     <Routes>
+      <Route path="/" element={<HomePage />} />
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/profile" element={<ProfilePage />} />
