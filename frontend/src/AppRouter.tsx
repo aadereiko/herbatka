@@ -5,15 +5,23 @@ import ShopPage from "@/components/pages/ShopPage/ShopPage.tsx";
 import TeaQualitiesPage from "@/components/pages/TeaQualitiesPage/TeaQualitiesPage.tsx";
 import TeasPage from "@/components/pages/TeasPage/TeasPage.tsx";
 import TeaPage from "@/components/pages/TeaPage/TeaPage.tsx";
+import AddTeaPage from "@/components/pages/AddTeaPage/AddTeaPage.tsx";
+import AddShopPage from "@/components/pages/AddShopPage/AddShopPage.tsx";
+import IngredientsPage from "@/components/pages/IngredientsPage/IngredientsPage.tsx";
+import AddIngredientPage from "@/components/pages/AddIngredientPage/AddIngredientPage.tsx";
 
 const AppRouter = () => {
   return (
     <Routes>
       <Route path="/shops" element={<ShopsPage />} />
+      <Route path="/shops/add" element={<AddShopPage />} />
       <Route path="/shops/:id" element={<ShopPage />} />
       <Route path="/tea-qualities" element={<TeaQualitiesPage />} />
       <Route path="/teas" element={<TeasPage />} />
       <Route path="/teas/:id" element={<TeaPage />} />
+      <Route path="/teas/add" element={<AddTeaPage />} />
+      <Route path="/ingredients" element={<IngredientsPage />} />
+      <Route path="/ingredients/add" element={<AddIngredientPage />} />
 
       {/*<Route path="/about" element={<About />} />*/}
       {/*<Route path="/contact" element={<Contact />} />*/}

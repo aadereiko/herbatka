@@ -4,15 +4,13 @@ import { TeaQuality } from "@/components/types/teaQuality.ts";
 
 interface ServerTeaQuality {
   name: string;
-  possible_values: {
-    values: string[];
-  };
+  possible_values: (string | number)[];
 }
 
 const transformTeaQuality = (serverT: ServerTeaQuality) => {
   return {
     name: serverT.name,
-    possibleValues: serverT.possible_values.values,
+    possibleValues: serverT.possible_values,
   } as TeaQuality;
 };
 
