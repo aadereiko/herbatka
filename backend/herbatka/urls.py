@@ -18,6 +18,10 @@ from .views import (
     UserDetail,
     ShopList,
     ShopDetail,
+    TeaSearch,
+    TeaConsumptionList,
+    TeaConsumptionDetail,
+    TeaConsumptionStats
 )
 from .views.auth_views import RegisterView, UserProfileView
 
@@ -47,6 +51,12 @@ urlpatterns = [
     path("users/<int:pk>/", UserDetail.as_view()),
     path("shops/", ShopList.as_view()),
     path("shops/<int:pk>/", ShopDetail.as_view(), name='shop-detail'),
+
+    # Tea consumption
+    path('teas/<int:tea_id>/consumption/', TeaConsumptionList.as_view(), name='tea-consumption-list'),
+    path('teas/<int:tea_id>/consumption/<int:pk>/', TeaConsumptionDetail.as_view(), name='tea-consumption-detail'),
+    path('consumption/', TeaConsumptionList.as_view(), name='user-consumption-list'),
+    path('consumption/stats/', TeaConsumptionStats.as_view(), name='user-consumption-stats'),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

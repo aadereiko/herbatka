@@ -3,6 +3,9 @@ import { LuCoffee, LuUser, LuLogOut, LuSettings } from "react-icons/lu";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
+import QuickTeaConsumption from "@/components/QuickTeaConsumption/QuickTeaConsumption";
+import { useQuery } from "@tanstack/react-query";
+import { teaApi, Tea } from "@/api/tea";
 
 const navLinks = [
   { to: "/shops", label: "Shops" },
@@ -17,6 +20,12 @@ const Header = () => {
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const { data: teas } = useQuery<Tea[]>({
+    queryKey: ['teas'],
+    queryFn: teaApi.getTeas,
+    enabled: !!user,
+  });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -65,6 +74,11 @@ const Header = () => {
                 </li>
               );
             })}
+            {user && (
+              <li>
+                <QuickTeaConsumption />
+              </li>
+            )}
           </ul>
         </nav>
 
