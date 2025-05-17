@@ -6,6 +6,7 @@ import Tag from "@/components/shared/Tag/Tag.tsx";
 import { getDefaultColorByIndex } from "@/lib/colors.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { LuStore, LuPencil, LuTrash2 } from "react-icons/lu";
+import TeaRating from "@/components/TeaRating/TeaRating";
 
 const TeaPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -98,6 +99,14 @@ const TeaPage = () => {
 
         {/* Additional Info Section */}
         <div className="space-y-8">
+          {/* Ratings Section */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Ratings & Reviews
+            </h2>
+            <TeaRating teaId={tea.id} />
+          </div>
+
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
               Additional Information

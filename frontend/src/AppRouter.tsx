@@ -9,10 +9,16 @@ import AddTeaPage from "@/components/pages/AddTeaPage/AddTeaPage.tsx";
 import AddShopPage from "@/components/pages/AddShopPage/AddShopPage.tsx";
 import IngredientsPage from "@/components/pages/IngredientsPage/IngredientsPage.tsx";
 import AddIngredientPage from "@/components/pages/AddIngredientPage/AddIngredientPage.tsx";
+import SignInPage from "@/components/pages/SignInPage/SignInPage.tsx";
+import SignUpPage from "@/components/pages/SignUpPage/SignUpPage.tsx";
+import ProfilePage from "@/components/pages/ProfilePage/ProfilePage.tsx";
 
 const AppRouter = () => {
   return (
     <Routes>
+      <Route path="/signin" element={<SignInPage />} />
+      <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/profile" element={<ProfilePage />} />
       <Route path="/shops" element={<ShopsPage />} />
       <Route path="/shops/add" element={<AddShopPage />} />
       <Route path="/shops/:id" element={<ShopPage />} />

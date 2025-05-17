@@ -1,12 +1,10 @@
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
-class User(models.Model):
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField(unique=True)
-    password = models.CharField(max_length=128)
+class User(AbstractUser):
+    avatar_url = models.URLField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    avatar_url = models.URLField(blank=True)
 
-    def _str_(self):
+    def __str__(self):
         return self.username
