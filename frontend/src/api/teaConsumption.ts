@@ -20,7 +20,6 @@ export interface TeaConsumptionStats {
     brand: string;
     count: number;
   } | null;
-  streak: number;
   average_per_day: number;
   recent_consumptions: TeaConsumption[];
 }

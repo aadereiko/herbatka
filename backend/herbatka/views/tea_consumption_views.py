@@ -64,30 +64,16 @@ class TeaConsumptionStats(APIView):
         # Get most consumed tea
         most_consumed_tea = (
             consumptions
-            .values('tea__id', 'tea__name', 'tea__shop__name')
+            .values('tea__id', 'tea__name')
             .annotate(count=Count('id'))
             .order_by('-count')
             .first()
         )
         
-        # Calculate streak
-        today = timezone.now().date()
-        streak = 0
-        current_date = today
-        
-        # Get all consumption dates for the user
-        consumption_dates = set(
-            consumptions.values_list('consumed_at__date', flat=True)
-        )
-        
-        while current_date in consumption_dates:
-            streak += 1
-            current_date -= timedelta(days=1)
-        
         # Calculate average consumptions per day
         first_consumption = consumptions.order_by('consumed_at').first()
         if first_consumption:
-            days_since_first = (today - first_consumption.consumed_at.date()).days + 1
+            days_since_first = (timezone.now().date() - first_consumption.consumed_at.date()).days + 1
             average_per_day = total_consumptions / days_since_first if days_since_first > 0 else 0
         else:
             average_per_day = 0
@@ -100,10 +86,8 @@ class TeaConsumptionStats(APIView):
             'most_consumed_tea': {
                 'id': most_consumed_tea['tea__id'],
                 'name': most_consumed_tea['tea__name'],
-                'brand': most_consumed_tea['tea__shop__name'],
                 'count': most_consumed_tea['count']
             } if most_consumed_tea else None,
-            'streak': streak,
             'average_per_day': round(average_per_day, 1),
             'recent_consumptions': TeaConsumptionSerializer(recent_consumptions, many=True).data
         }) 

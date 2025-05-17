@@ -35,6 +35,7 @@ export const TeaConsumptionComponent: React.FC<TeaConsumptionProps> = ({
       teaConsumptionApi.createTeaConsumption(teaId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaConsumptions', teaId] });
+      queryClient.invalidateQueries({ queryKey: ['teaConsumptionStats'] });
       setIsAdding(false);
       setFormData({
         consumed_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
@@ -49,6 +50,7 @@ export const TeaConsumptionComponent: React.FC<TeaConsumptionProps> = ({
       teaConsumptionApi.updateTeaConsumption(teaId, id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaConsumptions', teaId] });
+      queryClient.invalidateQueries({ queryKey: ['teaConsumptionStats'] });
       setEditingId(null);
     },
   });
@@ -59,6 +61,7 @@ export const TeaConsumptionComponent: React.FC<TeaConsumptionProps> = ({
       teaConsumptionApi.deleteTeaConsumption(teaId, id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaConsumptions', teaId] });
+      queryClient.invalidateQueries({ queryKey: ['teaConsumptionStats'] });
     },
   });
 

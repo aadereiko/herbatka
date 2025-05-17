@@ -12,6 +12,7 @@ const navLinks = [
   { to: "/tea-qualities", label: "Qualities" },
   { to: "/teas", label: "Teas" },
   { to: "/ingredients", label: "Ingredients" },
+  { to: "/ratings", label: "Ratings" },
 ];
 
 const Header = () => {

@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { teaConsumptionApi, TeaConsumption, TeaConsumptionStats } from '@/api/teaConsumption';
-import { LuCoffee, LuTrendingUp, LuCalendar, LuClock, LuTrash2 } from 'react-icons/lu';
+import { LuCoffee, LuTrendingUp, LuClock, LuTrash2 } from 'react-icons/lu';
 import { toast } from 'sonner';
 
 const HomePage: React.FC = () => {
@@ -45,8 +45,8 @@ const HomePage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          {[...Array(3)].map((_, i) => (
             <div key={i} className="bg-gray-100 h-32 rounded-lg animate-pulse" />
           ))}
         </div>
@@ -69,7 +69,7 @@ const HomePage: React.FC = () => {
       </div>
 
       {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {/* Total Consumptions */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
           <div className="flex items-center gap-4">
@@ -97,21 +97,6 @@ const HomePage: React.FC = () => {
                 {stats?.most_consumed_tea 
                   ? `${stats.most_consumed_tea.name} (${stats.most_consumed_tea.brand})`
                   : 'No data'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Current Streak */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-4">
-            <div className="bg-primary/10 p-3 rounded-full">
-              <LuCalendar className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Current Streak</p>
-              <p className="text-2xl font-semibold text-gray-900 mt-1">
-                {stats?.streak || 0} days
               </p>
             </div>
           </div>

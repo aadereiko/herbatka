@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button.tsx";
 import { ShopWithTeas } from "@/components/types/shop.ts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/api";
+import { ShopAddresses } from "@/components/ShopAddresses/ShopAddresses";
+import { LuMapPin } from "react-icons/lu";
 
 const ShopPage = () => {
   const navigate = useNavigate();
@@ -70,51 +72,69 @@ const ShopPage = () => {
                 </div>
               </div>
               
-              <div className="space-y-2 text-gray-600 mb-6">
-                <p className="flex items-center gap-2">
-                  <span className="font-medium">Address:</span>
-                  {shop.street}
-                </p>
-                <p className="flex items-center gap-2">
-                  <span className="font-medium">City:</span>
-                  {shop.city}, {shop.postal_code}
-                </p>
-                <p className="flex items-center gap-2">
-                  <span className="font-medium">Country:</span>
-                  {shop.country}
-                </p>
-                {shop.email && (
-                  <p className="flex items-center gap-2">
-                    <span className="font-medium">Email:</span>
-                    <a href={`mailto:${shop.email}`} className="text-primary-dark hover:underline">
-                      {shop.email}
-                    </a>
-                  </p>
+              <div className="space-y-4 text-gray-600 mb-6">
+                {shop.primary_address && (
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <LuMapPin className="w-5 h-5 text-primary" />
+                      <h3 className="font-medium text-gray-900">Primary Address</h3>
+                    </div>
+                    <div className="space-y-1 ml-7">
+                      <p className="text-gray-900">{shop.primary_address.street}</p>
+                      <p className="text-gray-600">
+                        {shop.primary_address.city}, {shop.primary_address.postal_code}
+                      </p>
+                      <p className="text-gray-600">{shop.primary_address.country}</p>
+                    </div>
+                  </div>
                 )}
-                {shop.number && (
-                  <p className="flex items-center gap-2">
-                    <span className="font-medium">Phone:</span>
-                    <a href={`tel:${shop.number}`} className="text-primary-dark hover:underline">
-                      {shop.number}
-                    </a>
-                  </p>
-                )}
-                {shop.url && (
-                  <p className="flex items-center gap-2">
-                    <span className="font-medium">Website:</span>
-                    <a 
-                      href={shop.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-primary-dark hover:underline"
-                    >
-                      Visit website
-                    </a>
-                  </p>
-                )}
+
+                <div className="space-y-2">
+                  {shop.email && (
+                    <p className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">Email:</span>
+                      <a href={`mailto:${shop.email}`} className="text-primary-dark hover:underline">
+                        {shop.email}
+                      </a>
+                    </p>
+                  )}
+                  {shop.number && (
+                    <p className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">Phone:</span>
+                      <a href={`tel:${shop.number}`} className="text-primary-dark hover:underline">
+                        {shop.number}
+                      </a>
+                    </p>
+                  )}
+                  {shop.url && (
+                    <p className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">Website:</span>
+                      <a 
+                        href={shop.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-primary-dark hover:underline"
+                      >
+                        Visit website
+                      </a>
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* All Addresses Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-8 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Addresses</h2>
+            <Button variant="outline" className="flex items-center gap-2">
+              <LuMapPin className="w-4 h-4" />
+              Add Address
+            </Button>
+          </div>
+          <ShopAddresses shopId={shop.id} />
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-8">
@@ -125,7 +145,7 @@ const ShopPage = () => {
             </Link>
           </div>
 
-          {shop.teas.length > 0 ? (
+          {shop.teas?.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {shop.teas.map((tea: { id: number; name: string }) => (
                 <Link

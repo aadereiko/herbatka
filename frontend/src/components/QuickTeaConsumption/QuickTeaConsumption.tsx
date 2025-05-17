@@ -44,6 +44,7 @@ export const QuickTeaConsumption: React.FC = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teaConsumptions'] });
+      queryClient.invalidateQueries({ queryKey: ['teaConsumptionStats'] });
       setIsOpen(false);
       setNotes('');
       setSelectedTeaId('');

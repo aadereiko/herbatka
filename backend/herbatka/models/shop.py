@@ -3,15 +3,17 @@ from django.db import models
 
 class Shop(models.Model):
     name = models.CharField(max_length=255)
-    street = models.CharField(max_length=255)
-    city = models.CharField(max_length=255)
-    state = models.CharField(max_length=255, blank=True, null=True)
-    postal_code = models.CharField(max_length=20)
-    country = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
     email = models.EmailField(blank=True, null=True)
-    number = models.CharField(blank=True, null=True)
-    url = models.URLField(blank=True, null=True)
-    img_url = models.URLField(blank=True)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    website_url = models.URLField(blank=True, null=True)
+    img_url = models.URLField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated_at = models.DateTimeField(auto_now=True)
 
-    def _str_(self):
+    def __str__(self):
         return self.name
+
+    @property
+    def primary_address(self):
+        return self.addresses.filter(is_primary=True).first() or self.addresses.first()

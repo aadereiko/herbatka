@@ -13,6 +13,7 @@ import SignInPage from "@/components/pages/SignInPage/SignInPage.tsx";
 import SignUpPage from "@/components/pages/SignUpPage/SignUpPage.tsx";
 import ProfilePage from "@/components/pages/ProfilePage/ProfilePage.tsx";
 import HomePage from "@/components/pages/HomePage/HomePage.tsx";
+import RatingsPage from "@/components/pages/RatingsPage/RatingsPage.tsx";
 
 const AppRouter = () => {
   return (
@@ -21,6 +22,7 @@ const AppRouter = () => {
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/ratings" element={<RatingsPage />} />
       <Route path="/shops" element={<ShopsPage />} />
       <Route path="/shops/add" element={<AddShopPage />} />
       <Route path="/shops/:id" element={<ShopPage />} />
