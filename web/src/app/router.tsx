@@ -15,6 +15,7 @@ import { TeaListPage } from '../features/catalog/TeaListPage'
 import { HomePage } from '../features/home/HomePage'
 import { HouseholdDetailPage } from '../features/household/HouseholdDetailPage'
 import { HouseholdListPage } from '../features/household/HouseholdListPage'
+import { MyReviewsPage } from '../features/review/MyReviewsPage'
 import { StockItemPage } from '../features/stock/StockItemPage'
 import { ForbiddenPage } from './ForbiddenPage'
 
@@ -100,6 +101,18 @@ export function AppRoutes() {
       <Route path="/teas" element={<TeaListPage />} />
       <Route path="/teas/:slug" element={<TeaDetailPage />} />
       <Route path="/ingredients" element={<IngredientListPage />} />
+
+      {/* Reading reviews needs no account; the list of *yours* is the one page in this
+          feature that does. `/reviews/mine` is the endpoint's own name, and a URL that
+          matches the API is one less thing to remember. */}
+      <Route
+        path="/reviews/mine"
+        element={
+          <RequireAuth>
+            <MyReviewsPage />
+          </RequireAuth>
+        }
+      />
 
       {/* Households are the opposite of the catalog: a shared shelf is only meaningful
           for somebody with an account, and the API answers 404 rather than 403 for a

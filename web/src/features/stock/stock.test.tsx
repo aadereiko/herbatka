@@ -103,6 +103,9 @@ const senchaTea: TeaSummary = {
   brand: null,
   is_approved: true,
   primary_ingredients: ['Green tea'],
+  average_score: null,
+  review_count: 0,
+  my_score: null,
 }
 
 function pageOf<T>(items: T[], extra: Partial<Page<T>> = {}): Page<T> {

@@ -1,5 +1,9 @@
 import type { StockEvent } from '../../lib/household'
 
+/** Dates are not a stock concern — M4 needs the same two on every review — so they live
+ *  in `lib/format.ts` now and are re-exported here, unchanged, for the shelf's callers. */
+export { formatDay, formatMoment } from '../../lib/format'
+
 /**
  * 42 → "42 g", 12.5 → "12.5 g", 12.0 → "12 g".
  *
@@ -17,26 +21,6 @@ export function formatGrams(grams: number): string {
 export function formatDelta(grams: number): string {
   if (grams === 0) return '±0 g'
   return grams > 0 ? `+${formatGrams(grams)}` : `−${formatGrams(Math.abs(grams))}`
-}
-
-/** An ISO timestamp or date as something readable, and the raw string back if it is not
- *  parseable — a broken date should not take the page down with it. */
-export function formatDay(iso: string | null): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-export function formatMoment(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 /** `price_paid_minor` is minor units — 1250 with currency GBP is £12.50. Rendered with

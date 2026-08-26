@@ -39,6 +39,11 @@ const jasminePearls: TeaSummary = {
   brand: { id: 'brand-1', slug: 'jing', name: 'Jing' },
   is_approved: true,
   primary_ingredients: ['Green tea', 'Jasmine'],
+  // M4 widened both tea schemas with the rating rollup. Unrated, here, unless a test
+  // says otherwise: null and 0 are what an untouched tea actually comes back as.
+  average_score: null,
+  review_count: 0,
+  my_score: null,
 }
 
 const jasminePearlsDetail: TeaDetail = {
@@ -53,6 +58,10 @@ const jasminePearlsDetail: TeaDetail = {
     { ingredient: greenLeaf, percentage: 60, is_primary: true },
     { ingredient: jasmineFlower, percentage: 40, is_primary: false },
   ],
+  my_review: null,
+  average_aroma: null,
+  average_flavour: null,
+  average_aftertaste: null,
 }
 
 function pageOf<T>(items: T[], extra: Partial<Page<T>> = {}): Page<T> {
@@ -257,6 +266,10 @@ test('the detail page lists ingredients and the brewing spec', async () => {
   mockFetch({
     'POST /auth/refresh': () => json({ detail: 'Missing refresh cookie' }, 401),
     'GET /catalog/teas/jasmine-pearls': () => json(jasminePearlsDetail),
+    // M4 hung reviews off the bottom of this page. Registered so the request this test
+    // now makes is a request the harness knows about — an unhandled one rejects loudly,
+    // which is the point of the router.
+    'GET /catalog/teas/jasmine-pearls/reviews': () => json(pageOf([])),
   })
   renderApp('/teas/jasmine-pearls')
 

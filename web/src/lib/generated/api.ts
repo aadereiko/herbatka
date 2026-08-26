@@ -185,6 +185,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/teas/{slug}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reviews
+         * @description Public: you can read what people think before deciding to make an account.
+         */
+        get: operations["list_reviews_api_v1_catalog_teas__slug__reviews_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/teas/{slug}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Write Review
+         * @description PUT, not POST: one review per person per tea, so writing it is idempotent.
+         */
+        put: operations["write_review_api_v1_catalog_teas__slug__review_put"];
+        post?: never;
+        /** Delete Review */
+        delete: operations["delete_review_api_v1_catalog_teas__slug__review_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/teas": {
         parameters: {
             query?: never;
@@ -497,6 +538,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reviews/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Reviews
+         * @description Your own reviews, each carrying the tea it belongs to.
+         *
+         *     Not served from /catalog: this is a view of *you*, and it spans every tea rather
+         *     than living under one of them.
+         */
+        get: operations["list_my_reviews_api_v1_reviews_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -753,6 +817,38 @@ export interface components {
              */
             joined_at: string;
         };
+        /** MyReview */
+        MyReview: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            author: components["schemas"]["ReviewAuthor"];
+            /** Score */
+            score: number;
+            /** Aroma */
+            aroma: number | null;
+            /** Flavour */
+            flavour: number | null;
+            /** Aftertaste */
+            aftertaste: number | null;
+            /** Body */
+            body: string | null;
+            /** Brewed At */
+            brewed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            tea: components["schemas"]["TeaRef"];
+        };
         /** Page[BrandOut] */
         Page_BrandOut_: {
             /** Items */
@@ -770,6 +866,32 @@ export interface components {
         Page_IngredientOut_: {
             /** Items */
             items: components["schemas"]["IngredientOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Pages */
+            pages: number;
+        };
+        /** Page[MyReview] */
+        Page_MyReview_: {
+            /** Items */
+            items: components["schemas"]["MyReview"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Pages */
+            pages: number;
+        };
+        /** Page[Review] */
+        Page_Review_: {
+            /** Items */
+            items: components["schemas"]["Review"][];
             /** Total */
             total: number;
             /** Page */
@@ -816,6 +938,71 @@ export interface components {
             password: string;
             /** Display Name */
             display_name: string;
+        };
+        /** Review */
+        Review: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            author: components["schemas"]["ReviewAuthor"];
+            /** Score */
+            score: number;
+            /** Aroma */
+            aroma: number | null;
+            /** Flavour */
+            flavour: number | null;
+            /** Aftertaste */
+            aftertaste: number | null;
+            /** Body */
+            body: string | null;
+            /** Brewed At */
+            brewed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ReviewAuthor */
+        ReviewAuthor: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Url */
+            avatar_url: string | null;
+        };
+        /**
+         * ReviewInput
+         * @description A full replacement, not a merge.
+         *
+         *     Every field is sent on each write, so "remove the aroma score I gave" is
+         *     expressible. A merge-patch would make an omitted field ambiguous between "leave it"
+         *     and "clear it".
+         */
+        ReviewInput: {
+            /** Score */
+            score: number;
+            /** Aroma */
+            aroma?: number | null;
+            /** Flavour */
+            flavour?: number | null;
+            /** Aftertaste */
+            aftertaste?: number | null;
+            /** Body */
+            body?: string | null;
+            /** Brewed At */
+            brewed_at?: string | null;
         };
         /**
          * StockAdjust
@@ -1036,6 +1223,12 @@ export interface components {
             is_approved: boolean;
             /** Primary Ingredients */
             primary_ingredients: string[];
+            /** Average Score */
+            average_score: number | null;
+            /** Review Count */
+            review_count: number;
+            /** My Score */
+            my_score: number | null;
             /** Description */
             description: string | null;
             /** Origin Country */
@@ -1053,6 +1246,13 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Average Aroma */
+            average_aroma: number | null;
+            /** Average Flavour */
+            average_flavour: number | null;
+            /** Average Aftertaste */
+            average_aftertaste: number | null;
+            my_review: components["schemas"]["Review"] | null;
         };
         /** TeaIngredientIn */
         TeaIngredientIn: {
@@ -1124,6 +1324,12 @@ export interface components {
             is_approved: boolean;
             /** Primary Ingredients */
             primary_ingredients: string[];
+            /** Average Score */
+            average_score: number | null;
+            /** Review Count */
+            review_count: number;
+            /** My Score */
+            my_score: number | null;
         };
         /** TeaUpdate */
         TeaUpdate: {
@@ -1548,6 +1754,104 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Page_BrandOut_"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reviews_api_v1_catalog_teas__slug__reviews_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_Review_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    write_review_api_v1_catalog_teas__slug__review_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Review"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_review_api_v1_catalog_teas__slug__review_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -2450,6 +2754,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockItemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_reviews_api_v1_reviews_mine_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MyReview_"];
                 };
             };
             /** @description Validation Error */

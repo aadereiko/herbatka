@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0 · M1 · M2 · M3 done**. Next up: M4 — ratings and reviews.
+Status: **M0 · M1 · M2 · M3 · M4 done**. Next up: M5 — friends.
 
 ---
 
@@ -244,10 +244,22 @@ update and rollback on 409, `?low=1` in the URL, owner-only invites panel.
 sees the same number; brewing 500 g shows "Only 27.5 g left in that tin" and the
 displayed amount returns.
 
-### M4 — Ratings and reviews
+### M4 — Ratings and reviews ✅
 `review` with subscores. Write/edit your review from a tea page. Aggregate average and
 count on tea cards and detail. Your own rating shown distinctly from the crowd average.
-**Done when:** tea detail shows "8.2 avg · 14 reviews · you rated 9".
+**Done.** `review` with a unique (user_id, tea_id) — one editable opinion per person
+per tea, written with PUT. Scores 1–10 plus optional aroma/flavour/aftertaste. Averages
+and the viewer's own score are folded into the tea list and detail in one grouped join,
+not a correlated subquery per row; an unrated tea reports `null`, never 0. `/reviews/mine`
+lists your own. 136 backend + 70 frontend tests.
+
+Two things this milestone forced, both worth keeping in mind for M5:
+- **Anything the response varies by must be in the query key.** The tea queries are keyed
+  by viewer, or a signed-out response gets cached under the key a signed-in visitor reads.
+- **Public routes must wait for auth to settle.** `/teas/:slug` is not behind
+  `RequireAuth`, so on a cold load it fetched before the silent refresh finished and
+  cached the anonymous answer. Found in a browser, not by a test; there is now a
+  regression test that fails without the fix.
 
 ### M5 — Friends
 `friendship` with request/accept/block. Friend search by display name or email.

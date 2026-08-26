@@ -49,22 +49,26 @@ async def list_teas(
     teas, total = await catalog_service.list_teas(
         db, approved=approved, page=paging.page, size=paging.size
     )
-    return Page.build([tea_summary(t) for t in teas], total, paging.page, paging.size)
+    return Page.build(
+        [tea_summary(tea, ratings) for tea, ratings in teas], total, paging.page, paging.size
+    )
 
 
 @router.post("/teas", response_model=TeaDetail, status_code=status.HTTP_201_CREATED)
 async def create_tea(payload: TeaCreate, admin: AdminUser, db: DbSession) -> TeaDetail:
     try:
-        tea = await catalog_service.create_tea(db, payload, created_by=admin, approved=True)
+        tea, ratings = await catalog_service.create_tea(
+            db, payload, created_by=admin, approved=True
+        )
     except NotFound as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return tea_detail(tea)
+    return tea_detail(tea, ratings)
 
 
 @router.patch("/teas/{tea_id}", response_model=TeaDetail)
 async def update_tea(tea_id: uuid.UUID, payload: TeaUpdate, db: DbSession) -> TeaDetail:
     try:
-        return tea_detail(await catalog_service.update_tea(db, tea_id, payload))
+        return tea_detail(*await catalog_service.update_tea(db, tea_id, payload))
     except NotFound as exc:
         raise _not_found(exc) from exc
 
@@ -72,7 +76,7 @@ async def update_tea(tea_id: uuid.UUID, payload: TeaUpdate, db: DbSession) -> Te
 @router.post("/teas/{tea_id}/approve", response_model=TeaDetail)
 async def approve_tea(tea_id: uuid.UUID, db: DbSession) -> TeaDetail:
     try:
-        return tea_detail(await catalog_service.approve_tea(db, tea_id))
+        return tea_detail(*await catalog_service.approve_tea(db, tea_id))
     except NotFound as exc:
         raise _not_found(exc) from exc
 

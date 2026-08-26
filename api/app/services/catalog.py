@@ -1,12 +1,15 @@
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, and_, func, select
+from sqlalchemy import false as sa_false
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from app.core.slug import slugify
 from app.models.catalog import Brand, Ingredient, Tea, TeaIngredient
+from app.models.review import Review
 from app.models.user import User
 from app.schemas.catalog import (
     BrandCreate,
@@ -18,6 +21,85 @@ from app.schemas.catalog import (
     TeaUpdate,
 )
 from app.services.errors import IngredientInUse, NotFound
+
+
+@dataclass(frozen=True)
+class TeaRatings:
+    """Rating aggregates for one tea, as the API presents them.
+
+    average_score is None rather than 0 when nobody has rated the tea: "0.0" reads as a
+    terrible tea, not an unrated one, and the distinction has to survive all the way to
+    the card.
+    """
+
+    average_score: float | None = None
+    review_count: int = 0
+    my_score: int | None = None
+    average_aroma: float | None = None
+    average_flavour: float | None = None
+    average_aftertaste: float | None = None
+
+
+def _round(value: object) -> float | None:
+    return None if value is None else round(float(value), 1)  # type: ignore[arg-type]
+
+
+def _rating_subquery():
+    """One grouped pass over review, joined once — not a correlated subquery per row.
+
+    A page of 24 teas would otherwise fire 24 AVG queries; grouping first keeps it to a
+    single extra scan no matter how large the page.
+    """
+    return (
+        select(
+            Review.tea_id.label("tea_id"),
+            func.avg(Review.score).label("avg_score"),
+            func.count(Review.id).label("review_count"),
+            func.avg(Review.aroma).label("avg_aroma"),
+            func.avg(Review.flavour).label("avg_flavour"),
+            func.avg(Review.aftertaste).label("avg_aftertaste"),
+        )
+        .group_by(Review.tea_id)
+        .subquery()
+    )
+
+
+def _with_ratings(query: Select, viewer_id: uuid.UUID | None):
+    """Attach the aggregate columns, plus the viewer's own score when signed in.
+
+    The viewer's score comes from an outer join rather than a second request: the unique
+    (user_id, tea_id) guarantees at most one row, so it cannot multiply the results.
+    """
+    agg = _rating_subquery()
+    mine = aliased(Review)
+
+    query = query.add_columns(
+        agg.c.avg_score,
+        agg.c.review_count,
+        agg.c.avg_aroma,
+        agg.c.avg_flavour,
+        agg.c.avg_aftertaste,
+        mine.score.label("my_score"),
+    ).outerjoin(agg, agg.c.tea_id == Tea.id)
+
+    if viewer_id is not None:
+        query = query.outerjoin(mine, and_(mine.tea_id == Tea.id, mine.user_id == viewer_id))
+    else:
+        # Still selected, so the row shape is identical whether or not anyone is signed
+        # in; an impossible join condition keeps it NULL.
+        query = query.outerjoin(mine, and_(mine.tea_id == Tea.id, sa_false()))
+    return query
+
+
+def _ratings_from_row(row: object) -> TeaRatings:
+    return TeaRatings(
+        average_score=_round(row.avg_score),
+        review_count=row.review_count or 0,
+        my_score=row.my_score,
+        average_aroma=_round(row.avg_aroma),
+        average_flavour=_round(row.avg_flavour),
+        average_aftertaste=_round(row.avg_aftertaste),
+    )
 
 
 async def _unique_slug(
@@ -188,9 +270,10 @@ async def list_teas(
     ingredient_slug: str | None = None,
     brand_slug: str | None = None,
     approved: bool | None = True,
+    viewer_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 24,
-) -> tuple[list[Tea], int]:
+) -> tuple[list[tuple[Tea, TeaRatings]], int]:
     query = select(Tea).options(*_TEA_LOADS).order_by(Tea.name)
 
     if approved is not None:
@@ -211,24 +294,38 @@ async def list_teas(
             .exists()
         )
 
-    return await _paginate(db, query, page, size)
+    # Counted before the rating joins are attached: the aggregates change the row's
+    # shape, never how many teas match.
+    total = await db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
+
+    rows = await db.execute(_with_ratings(query, viewer_id).offset((page - 1) * size).limit(size))
+    return [(row[0], _ratings_from_row(row)) for row in rows.unique().all()], total
 
 
-async def get_tea_by_slug(db: AsyncSession, slug: str, *, include_unapproved: bool = False) -> Tea:
+async def get_tea_by_slug(
+    db: AsyncSession,
+    slug: str,
+    *,
+    include_unapproved: bool = False,
+    viewer_id: uuid.UUID | None = None,
+) -> tuple[Tea, TeaRatings]:
     query = select(Tea).options(*_TEA_LOADS).where(Tea.slug == slug)
     if not include_unapproved:
         query = query.where(Tea.is_approved.is_(True))
-    tea = await db.scalar(query)
-    if tea is None:
+    row = (await db.execute(_with_ratings(query, viewer_id))).unique().first()
+    if row is None:
         raise NotFound("tea")
-    return tea
+    return row[0], _ratings_from_row(row)
 
 
-async def get_tea(db: AsyncSession, tea_id: uuid.UUID) -> Tea:
-    tea = await db.scalar(select(Tea).options(*_TEA_LOADS).where(Tea.id == tea_id))
-    if tea is None:
+async def get_tea(
+    db: AsyncSession, tea_id: uuid.UUID, *, viewer_id: uuid.UUID | None = None
+) -> tuple[Tea, TeaRatings]:
+    query = select(Tea).options(*_TEA_LOADS).where(Tea.id == tea_id)
+    row = (await db.execute(_with_ratings(query, viewer_id))).unique().first()
+    if row is None:
         raise NotFound("tea")
-    return tea
+    return row[0], _ratings_from_row(row)
 
 
 async def _resolve_ingredients(

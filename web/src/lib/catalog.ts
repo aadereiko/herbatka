@@ -91,6 +91,7 @@ export type TeaIngredient = components['schemas']['TeaIngredientOut']
 export type TeaSummary = components['schemas']['TeaSummary']
 export type TeaDetail = components['schemas']['TeaDetail']
 
+
 /* ------------------------------------------------------------------ write payloads */
 
 export type TeaIngredientInput = components['schemas']['TeaIngredientIn']

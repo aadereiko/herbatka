@@ -87,6 +87,11 @@ export function HomePage() {
           </h2>
           <ShelfLink to="/teas" title="Browse teas" blurb="Search, filter and suggest new ones." />
           <ShelfLink
+            to="/reviews/mine"
+            title="Your reviews"
+            blurb="What you thought of everything you have tried."
+          />
+          <ShelfLink
             to="/ingredients"
             title="Ingredients"
             blurb="What the catalog is described with."

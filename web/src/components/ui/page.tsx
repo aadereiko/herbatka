@@ -48,6 +48,14 @@ function SiteNav() {
         <NavLink to="/ingredients" className={navClass}>
           Ingredients
         </NavLink>
+        {/* After the catalog it belongs to, and signed-in only: /reviews/mine is behind
+            RequireAuth, and an entry that only ever leads to a login screen is worse
+            than no entry. */}
+        {user && (
+          <NavLink to="/reviews/mine" className={navClass} data-testid="nav-my-reviews">
+            My reviews
+          </NavLink>
+        )}
         {user?.role === 'admin' && (
           <NavLink to="/admin" className={navClass} data-testid="nav-admin">
             Admin

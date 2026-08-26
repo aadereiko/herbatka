@@ -48,6 +48,9 @@ const pendingTea: TeaSummary = {
   brand: null,
   is_approved: false,
   primary_ingredients: ['Assam'],
+  average_score: null,
+  review_count: 0,
+  my_score: null,
 }
 
 const approvedTea: TeaDetail = {
@@ -60,6 +63,10 @@ const approvedTea: TeaDetail = {
   grams_per_100ml: null,
   ingredients: [],
   created_at: '2026-02-01T10:00:00Z',
+  my_review: null,
+  average_aroma: null,
+  average_flavour: null,
+  average_aftertaste: null,
 }
 
 function pageOf<T>(items: T[], extra: Partial<Page<T>> = {}): Page<T> {

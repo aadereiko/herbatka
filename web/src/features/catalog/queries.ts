@@ -13,6 +13,7 @@ import type {
   TeaSummary,
 } from '../../lib/catalog'
 import { toQuery } from '../../lib/query-string'
+import { useAuth } from '../auth/auth-context'
 
 /**
  * Query keys as data rather than string literals sprinkled across components: the admin
@@ -34,6 +35,25 @@ export const catalogKeys = {
   brandList: (params: BrandListParams) => ['catalog', 'brands', params] as const,
 }
 
+/**
+ * Tea responses depend on who is asking — `my_score` and `my_review` are the viewer's
+ * own. Two things follow, and both are bugs if you skip them:
+ *
+ *  - The viewer belongs in the query key. Otherwise a signed-out response is cached
+ *    under the same key a signed-in visitor reads, and signing out then in as somebody
+ *    else shows them the previous person's rating.
+ *  - The query must wait for auth to settle. `/teas/:slug` is public, so it renders and
+ *    fetches immediately on a cold load — before AuthProvider's silent refresh has
+ *    finished — and would cache the anonymous answer for a signed-in user.
+ *
+ * The viewer segment goes last, so `teaLists` and `teaDetail(slug)` still work as
+ * invalidation prefixes.
+ */
+function useViewer() {
+  const { user, isLoading } = useAuth()
+  return { viewer: user?.id ?? 'anon', authReady: !isLoading }
+}
+
 export const fetchTeas = (params: TeaListParams) =>
   api<Page<TeaSummary>>(`/catalog/teas${toQuery(params)}`)
 
@@ -53,18 +73,21 @@ export const fetchBrands = (params: BrandListParams) =>
  * skeleton is the right thing to show.
  */
 export function useTeaList(params: TeaListParams) {
+  const { viewer, authReady } = useViewer()
   return useQuery({
-    queryKey: catalogKeys.teaList(params),
+    queryKey: [...catalogKeys.teaList(params), viewer],
     queryFn: () => fetchTeas(params),
     placeholderData: keepPreviousData,
+    enabled: authReady,
   })
 }
 
 export function useTeaDetail(slug: string) {
+  const { viewer, authReady } = useViewer()
   return useQuery({
-    queryKey: catalogKeys.teaDetail(slug),
+    queryKey: [...catalogKeys.teaDetail(slug), viewer],
     queryFn: () => fetchTea(slug),
-    enabled: slug !== '',
+    enabled: slug !== '' && authReady,
   })
 }
 

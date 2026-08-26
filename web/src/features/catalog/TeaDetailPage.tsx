@@ -12,6 +12,7 @@ import {
 import { ApiError, describeApiError } from '../../lib/api'
 import type { TeaIngredient } from '../../lib/catalog'
 import { CAFFEINE_LEVEL_LABELS, INGREDIENT_CATEGORY_LABELS, TEA_TYPE_LABELS } from '../../lib/catalog'
+import { TeaReviewsPanel } from '../review/TeaReviewsPanel'
 import { formatBrewTime } from './format'
 import { useTeaDetail } from './queries'
 
@@ -152,6 +153,10 @@ export function TeaDetailPage() {
               </ul>
             )}
           </Panel>
+
+          {/* Below what the tea *is*, above nothing: what it is like is the reason to
+              come back to this page a second time. */}
+          <TeaReviewsPanel tea={tea} />
         </div>
 
         {hasBrewing && (

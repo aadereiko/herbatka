@@ -1,8 +1,11 @@
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from app.schemas.review import Review
 
 TeaType = Literal["green", "black", "oolong", "puerh", "white", "herbal", "rooibos", "blend"]
 CaffeineLevel = Literal["none", "low", "medium", "high"]
@@ -84,6 +87,14 @@ class TeaSummary(BaseModel):
     # without the client fetching every tea's full ingredient list.
     primary_ingredients: list[str]
 
+    # null, never 0, when nobody has rated it — "0.0" reads as a terrible tea rather
+    # than an unrated one.
+    average_score: float | None
+    review_count: int
+    # The caller's own score, kept separate from the crowd average so the UI can show
+    # "8.2 average · you rated 9" instead of blending the two.
+    my_score: int | None
+
 
 class TeaDetail(TeaSummary):
     description: str | None
@@ -93,6 +104,17 @@ class TeaDetail(TeaSummary):
     grams_per_100ml: float | None
     ingredients: list[TeaIngredientOut]
     created_at: datetime
+
+    average_aroma: float | None
+    average_flavour: float | None
+    average_aftertaste: float | None
+    # Forward-referenced: schemas.review imports TeaRef by way of schemas.household,
+    # which imports TeaType from here. A TYPE_CHECKING-only import keeps that cycle out
+    # of runtime; schemas.review calls TeaDetail.model_rebuild() to resolve it.
+    # No default: the field is always present in a detail response, so making it
+    # optional would generate `my_review?: Review | null` and push a needless undefined
+    # branch onto every client.
+    my_review: "Review | None"
 
 
 class TeaCreate(BaseModel):
@@ -124,8 +146,11 @@ class TeaUpdate(BaseModel):
     ingredients: list[TeaIngredientIn] | None = None
 
 
-def _summary_fields(tea: Any) -> dict[str, Any]:
+def _summary_fields(tea: Any, ratings: Any) -> dict[str, Any]:
     return {
+        "average_score": ratings.average_score,
+        "review_count": ratings.review_count,
+        "my_score": ratings.my_score,
         "id": tea.id,
         "slug": tea.slug,
         "name": tea.name,
@@ -143,14 +168,18 @@ def _summary_fields(tea: Any) -> dict[str, Any]:
     }
 
 
-def tea_summary(tea: Any) -> TeaSummary:
+def tea_summary(tea: Any, ratings: Any) -> TeaSummary:
     """Build the list-card view. Assumes brand and ingredient_links are eager-loaded."""
-    return TeaSummary(**_summary_fields(tea))
+    return TeaSummary(**_summary_fields(tea, ratings))
 
 
-def tea_detail(tea: Any) -> TeaDetail:
+def tea_detail(tea: Any, ratings: Any, my_review: Any = None) -> TeaDetail:
     return TeaDetail(
-        **_summary_fields(tea),
+        **_summary_fields(tea, ratings),
+        average_aroma=ratings.average_aroma,
+        average_flavour=ratings.average_flavour,
+        average_aftertaste=ratings.average_aftertaste,
+        my_review=my_review,
         description=tea.description,
         origin_country=tea.origin_country,
         brew_temp_c=tea.brew_temp_c,

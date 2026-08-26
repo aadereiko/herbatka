@@ -57,6 +57,33 @@ async def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+async def get_optional_user(
+    db: DbSession,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> User | None:
+    """The viewer, if there is one. Never raises.
+
+    The catalog is browsable signed out, but a signed-in visitor should see their own
+    rating on each card. Failing closed to None — on a missing, malformed or expired
+    token — means a stale token degrades to the anonymous view instead of turning the
+    public catalog into a 401.
+    """
+    if credentials is None:
+        return None
+    payload = decode_access_token(credentials.credentials)
+    if payload is None:
+        return None
+    try:
+        user_id = uuid.UUID(payload["sub"])
+    except (KeyError, ValueError):
+        return None
+    user = await get_user_by_id(db, user_id)
+    return user if user is not None and user.is_active else None
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
+
 async def get_current_admin(user: CurrentUser) -> User:
     if user.role != "admin":
         raise HTTPException(

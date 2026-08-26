@@ -19,6 +19,7 @@ from app.models.household import (
     StockEventKindEnum,
     StockItem,
 )
+from app.models.review import Review
 from app.models.user import AuthIdentity, AuthProvider, RefreshToken, User, UserRole
 
 __all__ = [
@@ -34,6 +35,7 @@ __all__ = [
     "IngredientCategoryEnum",
     "MemberRoleEnum",
     "RefreshToken",
+    "Review",
     "StockEvent",
     "StockEventKindEnum",
     "StockItem",
