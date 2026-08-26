@@ -1,0 +1,32 @@
+name: herbatka
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-herbatka}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-herbatka}
+      POSTGRES_DB: ${POSTGRES_DB:-herbatka}
+    ports:
+      # Host-side port comes from .env (1731x block). Inside the network it
+      # stays on the default 5432 — see PLAN.md "Port allocation".
+      - "${POSTGRES_PORT:-17312}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-herbatka} -d ${POSTGRES_DB:-herbatka}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  adminer:
+    image: adminer:latest
+    profiles: ["tools"]
+    ports:
+      - "${ADMINER_PORT:-17313}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

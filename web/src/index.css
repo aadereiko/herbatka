@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Tea-leaf greens as the brand ramp; Tailwind v4 reads these as --color-* tokens,
+     so `bg-brand-600` and `text-brand-100` just work without a config file. */
+  --color-brand-50: oklch(0.97 0.02 145);
+  --color-brand-100: oklch(0.94 0.04 145);
+  --color-brand-200: oklch(0.88 0.07 145);
+  --color-brand-300: oklch(0.8 0.1 145);
+  --color-brand-400: oklch(0.71 0.13 145);
+  --color-brand-500: oklch(0.63 0.14 145);
+  --color-brand-600: oklch(0.53 0.13 145);
+  --color-brand-700: oklch(0.44 0.11 145);
+  --color-brand-800: oklch(0.36 0.09 145);
+  --color-brand-900: oklch(0.3 0.07 145);
+}
+
+html {
+  color-scheme: light dark;
+}

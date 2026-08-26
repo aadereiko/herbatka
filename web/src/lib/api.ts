@@ -1,0 +1,174 @@
+import type { components } from './generated/api'
+import { clearAccessToken, getAccessToken, setAccessToken } from './token'
+
+/**
+ * Thin fetch wrapper. Everything goes through /api, which Vite proxies to the
+ * API in dev and a reverse proxy handles in production — so no base URL, and no
+ * CORS preflight in the browser during development.
+ *
+ * It also owns the whole access-token lifecycle: attaching the bearer header, and the
+ * single silent refresh that a 401 triggers. Funnelling every call through one function
+ * is what keeps that in one place instead of spread across every component.
+ */
+export class ApiError extends Error {
+  // A plain field plus an assignment, not a `readonly status` constructor parameter
+  // property: the scaffold enables `erasableSyntaxOnly`, which bans TypeScript syntax
+  // that emits runtime code, so type-stripping alone can run the file.
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+// Sourced from the API's own OpenAPI schema via `npm run types`, never hand-written.
+// Rename a field in a Pydantic model and this breaks at compile time instead of at
+// runtime in a component.
+export type Health = components['schemas']['HealthResponse']
+
+export type User = components['schemas']['UserOut']
+export type UserRole = User['role']
+export type Session = components['schemas']['TokenResponse']
+export type RegisterInput = components['schemas']['RegisterRequest']
+export type LoginInput = components['schemas']['LoginRequest']
+
+/**
+ * The four endpoints that must never trigger the refresh-and-retry branch. A 401 from
+ * login means "wrong password" and from refresh means "your cookie is gone" — retrying
+ * either is pointless, and letting /auth/refresh refresh itself is the infinite loop.
+ */
+const NO_REFRESH_PATHS = new Set(['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'])
+
+function send(path: string, init?: RequestInit): Promise<Response> {
+  const token = getAccessToken()
+  return fetch(`/api/v1${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
+  })
+}
+
+/** FastAPI puts the human-readable reason in `detail`, as a string or as a list of
+ *  validation objects. Dumping raw JSON at the user is never the right answer. */
+async function readErrorMessage(response: Response): Promise<string> {
+  const body = await response.text()
+  if (!body) return response.statusText
+
+  try {
+    const { detail } = JSON.parse(body) as { detail?: unknown }
+    if (typeof detail === 'string') return detail
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((item) =>
+          typeof item === 'object' && item !== null && 'msg' in item ? String(item.msg) : '',
+        )
+        .filter(Boolean)
+      if (messages.length > 0) return messages.join(', ')
+    }
+  } catch {
+    // Not JSON. The raw body is still more useful than the status text.
+  }
+
+  return body
+}
+
+let inFlightRefresh: Promise<Session | null> | null = null
+
+async function runRefresh(): Promise<Session | null> {
+  try {
+    const response = await send('/auth/refresh', { method: 'POST' })
+    if (!response.ok) {
+      clearAccessToken()
+      return null
+    }
+    const session = (await response.json()) as Session
+    setAccessToken(session.access_token)
+    return session
+  } catch {
+    // Network failure. Treat it as "no session" rather than crashing every caller.
+    clearAccessToken()
+    return null
+  } finally {
+    inFlightRefresh = null
+  }
+}
+
+/**
+ * Exchange the httpOnly refresh cookie for a new access token, resolving to null when
+ * there is no live session.
+ *
+ * Deduplicated: five queries that 401 at the same moment await one shared promise and
+ * the browser makes exactly one refresh call. Five parallel refreshes would not just be
+ * wasteful — with rotating refresh tokens, four of them race onto an already-rotated
+ * cookie and log the user out. The slot is cleared once it settles, so the *next* 401
+ * after this one gets a fresh attempt.
+ */
+export function refreshSession(): Promise<Session | null> {
+  inFlightRefresh ??= runRefresh()
+  return inFlightRefresh
+}
+
+export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  let response = await send(path, init)
+
+  // Exactly one retry, and only for calls that are not themselves auth calls. If the
+  // refresh fails it has already cleared the token, and the original 401 propagates.
+  if (response.status === 401 && !NO_REFRESH_PATHS.has(path)) {
+    const session = await refreshSession()
+    if (session) response = await send(path, init)
+  }
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await readErrorMessage(response))
+  }
+
+  return response.status === 204 ? (undefined as T) : ((await response.json()) as T)
+}
+
+/** What to show a user when a call failed: the server's own words when it bothered to
+ *  send any, a plain sentence when the request never reached it. */
+export function describeApiError(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.message || 'Something went wrong. Please try again.'
+  }
+  return 'Could not reach the server. Please try again.'
+}
+
+export const getHealth = () => api<Health>('/health')
+
+export async function login(email: string, password: string): Promise<Session> {
+  const session = await api<Session>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  })
+  setAccessToken(session.access_token)
+  return session
+}
+
+export async function register(input: RegisterInput): Promise<Session> {
+  const session = await api<Session>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  setAccessToken(session.access_token)
+  return session
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await api<void>('/auth/logout', { method: 'POST' })
+  } finally {
+    // Whatever the server said, this browser is signed out. The cookie is the server's
+    // to clear; the access token is ours, and holding on to it after a failed logout
+    // would be the worst of both worlds.
+    clearAccessToken()
+  }
+}
+
+export const getMe = () => api<User>('/auth/me')
