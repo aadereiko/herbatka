@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0 done · M1 done**. Next up: M2 — catalog and admin.
+Status: **M0 · M1 · M2 done**. Next up: M3 — households and stock.
 
 ---
 
@@ -216,11 +216,18 @@ token, deduplicated silent refresh in `lib/api.ts`, `RequireAuth` / `RequireAdmi
 login and register pages. 23 backend + 9 frontend tests. Verified in a browser:
 register, hard-refresh while staying signed in, sign out, redirect back to `/login`.
 
-### M2 — Catalog (read) + admin (write)
+### M2 — Catalog (read) + admin (write) ✅
 `ingredient`, `brand`, `tea`, `tea_ingredient`. Public list/detail with pagination,
 text search, and filters by type + ingredient. Admin CRUD behind `require_admin`.
 Seed script with ~30 real ingredients and ~20 teas so the app is never empty.
-**Done when:** an admin creates a tea with ingredients and a signed-out visitor sees it.
+**Done.** `brand` / `ingredient` / `tea` / `tea_ingredient`; public browse with search,
+type/ingredient/brand filters and capped pagination, all working signed out; user
+submissions land unapproved; admin CRUD and an approval queue behind a router-level
+guard; 39 ingredients, 7 brands and 23 teas in an idempotent seed. Frontend filters
+round-trip through the URL, so a filtered view is linkable and survives reload.
+64 backend + 26 frontend tests. Verified in a browser: submit as a user → approve as
+an admin → visible to a signed-out visitor; deleting an in-use ingredient shows the
+server's 409 inline; a non-admin gets the 403 page.
 
 ### M3 — Households and stock
 `household`, `household_member`, `household_invite`, `stock_item`, `stock_event`.

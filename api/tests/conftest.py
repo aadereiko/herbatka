@@ -116,3 +116,85 @@ async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient]:
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def user_headers(client: AsyncClient) -> dict[str, str]:
+    """A registered, signed-in ordinary user."""
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "drinker@example.com",
+            "password": "oolong-please-7",
+            "display_name": "Drinker",
+        },
+    )
+    assert response.status_code == 201, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+@pytest.fixture
+async def admin_headers(client: AsyncClient, db: AsyncSession) -> dict[str, str]:
+    """An admin. Registered through the API, then promoted directly in the database.
+
+    The token is minted *after* the promotion because the role is baked into the JWT —
+    a token issued before the change would still say "user".
+    """
+    from sqlalchemy import select
+
+    from app.core.security import create_access_token
+    from app.models.user import User
+
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "boss@example.com", "password": "sencha-boss-11", "display_name": "Boss"},
+    )
+    assert response.status_code == 201, response.text
+
+    user = await db.scalar(select(User).where(User.email == "boss@example.com"))
+    assert user is not None
+    user.role = "admin"
+    await db.flush()
+
+    token, _ = create_access_token(user.id, "admin")
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def catalog_fixtures(db: AsyncSession) -> dict[str, object]:
+    """A tiny hand-built catalog. Deliberately not the seed data.
+
+    Tests assert on exact counts, and pinning those to the seed file would mean every
+    new tea added to the starter catalog breaks unrelated tests.
+    """
+    from app.models.catalog import Brand, Ingredient, Tea, TeaIngredient
+
+    brand = Brand(slug="test-brand", name="Test Brand", country="Poland", website=None)
+    mint = Ingredient(slug="mint", name="Mint", category="herb", is_caffeinated=False)
+    green = Ingredient(slug="green-leaf", name="Green leaf", category="leaf", is_caffeinated=True)
+    db.add_all([brand, mint, green])
+    await db.flush()
+
+    approved = Tea(
+        slug="mint-green",
+        name="Mint Green",
+        tea_type="green",
+        caffeine_level="medium",
+        brand_id=brand.id,
+        is_approved=True,
+        ingredient_links=[
+            TeaIngredient(ingredient_id=green.id, percentage=70, is_primary=True, position=0),
+            TeaIngredient(ingredient_id=mint.id, percentage=30, is_primary=True, position=1),
+        ],
+    )
+    pending = Tea(
+        slug="secret-blend",
+        name="Secret Blend",
+        tea_type="black",
+        caffeine_level="high",
+        is_approved=False,
+    )
+    db.add_all([approved, pending])
+    await db.flush()
+
+    return {"brand": brand, "mint": mint, "green": green, "approved": approved, "pending": pending}

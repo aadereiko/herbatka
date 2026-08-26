@@ -113,10 +113,254 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/teas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Teas */
+        get: operations["list_teas_api_v1_catalog_teas_get"];
+        put?: never;
+        /**
+         * Submit Tea
+         * @description A signed-in user proposes a tea; it stays invisible until an admin approves it.
+         */
+        post: operations["submit_tea_api_v1_catalog_teas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/teas/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Tea */
+        get: operations["get_tea_api_v1_catalog_teas__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/ingredients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ingredients */
+        get: operations["list_ingredients_api_v1_catalog_ingredients_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/brands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Brands */
+        get: operations["list_brands_api_v1_catalog_brands_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/teas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Teas
+         * @description Unlike the public list, this can show unapproved teas — the moderation queue.
+         */
+        get: operations["list_teas_api_v1_admin_teas_get"];
+        put?: never;
+        /** Create Tea */
+        post: operations["create_tea_api_v1_admin_teas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/teas/{tea_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Tea */
+        delete: operations["delete_tea_api_v1_admin_teas__tea_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Tea */
+        patch: operations["update_tea_api_v1_admin_teas__tea_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/teas/{tea_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Tea */
+        post: operations["approve_tea_api_v1_admin_teas__tea_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ingredients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Ingredient */
+        post: operations["create_ingredient_api_v1_admin_ingredients_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ingredients/{ingredient_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Ingredient */
+        delete: operations["delete_ingredient_api_v1_admin_ingredients__ingredient_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Ingredient */
+        patch: operations["update_ingredient_api_v1_admin_ingredients__ingredient_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/brands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Brand */
+        post: operations["create_brand_api_v1_admin_brands_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/brands/{brand_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Brand */
+        delete: operations["delete_brand_api_v1_admin_brands__brand_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Brand */
+        patch: operations["update_brand_api_v1_admin_brands__brand_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BrandCreate */
+        BrandCreate: {
+            /** Name */
+            name: string;
+            /** Country */
+            country?: string | null;
+            /** Website */
+            website?: string | null;
+        };
+        /** BrandOut */
+        BrandOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Country */
+            country: string | null;
+            /** Website */
+            website: string | null;
+        };
+        /** BrandRef */
+        BrandRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+        };
+        /** BrandUpdate */
+        BrandUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Website */
+            website?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -137,6 +381,55 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** IngredientCreate */
+        IngredientCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "other";
+            /**
+             * Is Caffeinated
+             * @default false
+             */
+            is_caffeinated: boolean;
+            /** Description */
+            description?: string | null;
+        };
+        /** IngredientOut */
+        IngredientOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "other";
+            /** Is Caffeinated */
+            is_caffeinated: boolean;
+            /** Description */
+            description: string | null;
+        };
+        /** IngredientUpdate */
+        IngredientUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Category */
+            category?: ("leaf" | "herb" | "flower" | "spice" | "fruit" | "other") | null;
+            /** Is Caffeinated */
+            is_caffeinated?: boolean | null;
+            /** Description */
+            description?: string | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -146,6 +439,45 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** Page[BrandOut] */
+        Page_BrandOut_: {
+            /** Items */
+            items: components["schemas"]["BrandOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Pages */
+            pages: number;
+        };
+        /** Page[IngredientOut] */
+        Page_IngredientOut_: {
+            /** Items */
+            items: components["schemas"]["IngredientOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Pages */
+            pages: number;
+        };
+        /** Page[TeaSummary] */
+        Page_TeaSummary_: {
+            /** Items */
+            items: components["schemas"]["TeaSummary"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Pages */
+            pages: number;
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -158,6 +490,161 @@ export interface components {
             password: string;
             /** Display Name */
             display_name: string;
+        };
+        /** TeaCreate */
+        TeaCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Tea Type
+             * @enum {string}
+             */
+            tea_type: "green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend";
+            /**
+             * Caffeine Level
+             * @default medium
+             * @enum {string}
+             */
+            caffeine_level: "none" | "low" | "medium" | "high";
+            /** Brand Id */
+            brand_id?: string | null;
+            /** Origin Country */
+            origin_country?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Image Url */
+            image_url?: string | null;
+            /** Brew Temp C */
+            brew_temp_c?: number | null;
+            /** Brew Seconds */
+            brew_seconds?: number | null;
+            /** Grams Per 100Ml */
+            grams_per_100ml?: number | null;
+            /** Ingredients */
+            ingredients?: components["schemas"]["TeaIngredientIn"][];
+        };
+        /** TeaDetail */
+        TeaDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /**
+             * Tea Type
+             * @enum {string}
+             */
+            tea_type: "green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend";
+            /**
+             * Caffeine Level
+             * @enum {string}
+             */
+            caffeine_level: "none" | "low" | "medium" | "high";
+            /** Image Url */
+            image_url: string | null;
+            brand: components["schemas"]["BrandRef"] | null;
+            /** Is Approved */
+            is_approved: boolean;
+            /** Primary Ingredients */
+            primary_ingredients: string[];
+            /** Description */
+            description: string | null;
+            /** Origin Country */
+            origin_country: string | null;
+            /** Brew Temp C */
+            brew_temp_c: number | null;
+            /** Brew Seconds */
+            brew_seconds: number | null;
+            /** Grams Per 100Ml */
+            grams_per_100ml: number | null;
+            /** Ingredients */
+            ingredients: components["schemas"]["TeaIngredientOut"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** TeaIngredientIn */
+        TeaIngredientIn: {
+            /**
+             * Ingredient Id
+             * Format: uuid
+             */
+            ingredient_id: string;
+            /** Percentage */
+            percentage?: number | null;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary: boolean;
+        };
+        /** TeaIngredientOut */
+        TeaIngredientOut: {
+            ingredient: components["schemas"]["IngredientOut"];
+            /** Percentage */
+            percentage: number | null;
+            /** Is Primary */
+            is_primary: boolean;
+        };
+        /** TeaSummary */
+        TeaSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /**
+             * Tea Type
+             * @enum {string}
+             */
+            tea_type: "green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend";
+            /**
+             * Caffeine Level
+             * @enum {string}
+             */
+            caffeine_level: "none" | "low" | "medium" | "high";
+            /** Image Url */
+            image_url: string | null;
+            brand: components["schemas"]["BrandRef"] | null;
+            /** Is Approved */
+            is_approved: boolean;
+            /** Primary Ingredients */
+            primary_ingredients: string[];
+        };
+        /** TeaUpdate */
+        TeaUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Tea Type */
+            tea_type?: ("green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend") | null;
+            /** Caffeine Level */
+            caffeine_level?: ("none" | "low" | "medium" | "high") | null;
+            /** Brand Id */
+            brand_id?: string | null;
+            /** Origin Country */
+            origin_country?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Image Url */
+            image_url?: string | null;
+            /** Brew Temp C */
+            brew_temp_c?: number | null;
+            /** Brew Seconds */
+            brew_seconds?: number | null;
+            /** Grams Per 100Ml */
+            grams_per_100ml?: number | null;
+            /** Ingredients */
+            ingredients?: components["schemas"]["TeaIngredientIn"][] | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -384,6 +871,528 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
+    list_teas_api_v1_catalog_teas_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                tea_type?: ("green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend") | null;
+                ingredient?: string | null;
+                brand?: string | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TeaSummary_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_tea_api_v1_catalog_teas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeaDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tea_api_v1_catalog_teas__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeaDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ingredients_api_v1_catalog_ingredients_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                category?: ("leaf" | "herb" | "flower" | "spice" | "fruit" | "other") | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_IngredientOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_brands_api_v1_catalog_brands_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_BrandOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_teas_api_v1_admin_teas_get: {
+        parameters: {
+            query?: {
+                approved?: boolean | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TeaSummary_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_tea_api_v1_admin_teas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeaDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_tea_api_v1_admin_teas__tea_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_tea_api_v1_admin_teas__tea_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeaDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_tea_api_v1_admin_teas__tea_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeaDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ingredient_api_v1_admin_ingredients_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngredientCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngredientOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ingredient_api_v1_admin_ingredients__ingredient_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ingredient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_ingredient_api_v1_admin_ingredients__ingredient_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ingredient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngredientUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngredientOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_brand_api_v1_admin_brands_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_brand_api_v1_admin_brands__brand_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brand_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_brand_api_v1_admin_brands__brand_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brand_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

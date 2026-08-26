@@ -1,7 +1,20 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 import { useAuth } from '../auth/auth-context'
 import { HealthCard } from '../health/HealthCard'
+
+function ShelfLink({ to, title, blurb }: { to: string; title: string; blurb: string }) {
+  return (
+    <Link
+      to={to}
+      className="block rounded-xl border border-brand-200 p-3 transition hover:border-brand-400 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-neutral-700 dark:hover:bg-neutral-800"
+    >
+      <p className="text-sm font-semibold text-brand-900 dark:text-brand-100">{title}</p>
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">{blurb}</p>
+    </Link>
+  )
+}
 
 export function HomePage() {
   const { user, logout } = useAuth()
@@ -48,6 +61,31 @@ export function HomePage() {
             {signingOut ? 'Signing out…' : 'Sign out'}
           </button>
         </section>
+
+        <nav
+          aria-label="Catalog"
+          className="w-full max-w-md space-y-3 rounded-2xl border border-brand-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+            Catalog
+          </h2>
+          <ShelfLink to="/teas" title="Browse teas" blurb="Search, filter and suggest new ones." />
+          <ShelfLink
+            to="/ingredients"
+            title="Ingredients"
+            blurb="What the catalog is described with."
+          />
+          {/* The admin link is hidden rather than disabled for a normal user: an entry
+              you can see but never use is a worse answer than no entry. RequireAdmin
+              still guards the route itself — this is tidiness, not security. */}
+          {user.role === 'admin' && (
+            <ShelfLink
+              to="/admin"
+              title="Admin"
+              blurb="Approve submissions and edit the vocabulary."
+            />
+          )}
+        </nav>
 
         <HealthCard />
       </div>

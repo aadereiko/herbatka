@@ -1,5 +1,13 @@
 import type { ReactNode } from 'react'
 
+import { TextField } from '../../components/ui/form'
+
+// The label/error/aria wiring these three used to own moved to components/ui/form.tsx
+// in M2, when the catalog and admin screens needed the same primitives plus selects,
+// textareas and checkboxes. Re-exported rather than re-implemented, so /login and
+// /register keep the exact imports they had and there is still only one of each.
+export { FormError, SubmitButton } from '../../components/ui/form'
+
 /** The shared shell for /login and /register: same card as the rest of the app, one h1. */
 export function AuthCard({
   title,
@@ -29,8 +37,10 @@ export function AuthCard({
 }
 
 /**
- * A real <label for> tied to a real id, plus aria-invalid/aria-describedby so a screen
- * reader hears the error with the field rather than as loose text somewhere on the page.
+ * The auth pages' text field. It is now a thin adapter over the shared `TextField` —
+ * narrower on purpose: a credential field is always one of three types and always wants
+ * an autocomplete token, and keeping that shape stops /login from sprouting a number
+ * input by accident.
  */
 export function AuthField({
   id,
@@ -49,56 +59,15 @@ export function AuthField({
   error?: string
   onChange: (value: string) => void
 }) {
-  const errorId = `${id}-error`
   return (
-    <div className="space-y-1">
-      <label
-        htmlFor={id}
-        className="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
-      >
-        {label}
-      </label>
-      <input
-        id={id}
-        name={id}
-        type={type}
-        value={value}
-        autoComplete={autoComplete}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:ring-brand-900"
-      />
-      {error && (
-        <p id={errorId} data-testid={errorId} className="text-xs text-rose-600 dark:text-rose-400">
-          {error}
-        </p>
-      )}
-    </div>
-  )
-}
-
-/** Server-side failures — a 401 or a 409 — as opposed to per-field validation. */
-export function FormError({ children }: { children: ReactNode }) {
-  return (
-    <p
-      role="alert"
-      data-testid="form-error"
-      className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950 dark:text-rose-300"
-    >
-      {children}
-    </p>
-  )
-}
-
-export function SubmitButton({ pending, children }: { pending: boolean; children: ReactNode }) {
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {children}
-    </button>
+    <TextField
+      id={id}
+      label={label}
+      type={type}
+      value={value}
+      autoComplete={autoComplete}
+      error={error}
+      onChange={onChange}
+    />
   )
 }

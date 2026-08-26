@@ -1,0 +1,331 @@
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+
+import { Button } from '../../components/ui/button'
+import {
+  CheckboxField,
+  FormError,
+  SelectField,
+  SubmitButton,
+  TextAreaField,
+  TextField,
+} from '../../components/ui/form'
+import { Badge, Skeleton } from '../../components/ui/page'
+import { useDebouncedValue } from '../../lib/debounce'
+import type { CaffeineLevel, Ingredient, TeaInput, TeaType } from '../../lib/catalog'
+import {
+  CAFFEINE_LEVELS,
+  CAFFEINE_LEVEL_LABELS,
+  INGREDIENT_CATEGORY_LABELS,
+  TEA_TYPES,
+  TEA_TYPE_LABELS,
+} from '../../lib/catalog'
+import { useBrandList, useIngredientList } from './queries'
+
+/** The tea form is shared by two callers with two endpoints: a signed-in visitor
+ *  suggesting a tea (`POST /catalog/teas`, comes back unapproved) and an admin creating
+ *  one (`POST /admin/teas`, comes back approved). Identical body, so the form takes the
+ *  submit function rather than knowing which of the two it is. */
+type PickedIngredient = {
+  ingredient: Ingredient
+  /** Kept as the raw string the user typed. Parsing at submit rather than on every
+   *  keystroke is what lets someone clear the box and type "12" without it becoming 1. */
+  percentage: string
+  isPrimary: boolean
+}
+
+type FieldErrors = { name?: string; ingredients?: string }
+
+function optionalText(raw: string): string | undefined {
+  const trimmed = raw.trim()
+  return trimmed === '' ? undefined : trimmed
+}
+
+function optionalNumber(raw: string): number | undefined {
+  const trimmed = raw.trim()
+  if (trimmed === '') return undefined
+  const value = Number(trimmed)
+  return Number.isFinite(value) ? value : undefined
+}
+
+const teaTypeOptions = TEA_TYPES.map((value) => ({ value, label: TEA_TYPE_LABELS[value] }))
+const caffeineOptions = CAFFEINE_LEVELS.map((value) => ({
+  value,
+  label: CAFFEINE_LEVEL_LABELS[value],
+}))
+
+export function TeaForm({
+  idPrefix,
+  submitLabel,
+  pendingLabel,
+  pending,
+  error,
+  onSubmit,
+}: {
+  idPrefix: string
+  submitLabel: string
+  pendingLabel: string
+  pending: boolean
+  error?: string | null
+  onSubmit: (input: TeaInput) => void
+}) {
+  const [name, setName] = useState('')
+  const [teaType, setTeaType] = useState<TeaType>('green')
+  const [caffeine, setCaffeine] = useState<CaffeineLevel>('medium')
+  const [brandId, setBrandId] = useState('')
+  const [origin, setOrigin] = useState('')
+  const [description, setDescription] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
+  const [brewTemp, setBrewTemp] = useState('')
+  const [brewSeconds, setBrewSeconds] = useState('')
+  const [grams, setGrams] = useState('')
+  const [picked, setPicked] = useState<PickedIngredient[]>([])
+  const [errors, setErrors] = useState<FieldErrors>({})
+
+  const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search)
+
+  const brands = useBrandList({ size: 100 })
+  const matches = useIngredientList({ q: debouncedSearch || undefined, size: 8 })
+
+  const pickedIds = new Set(picked.map((row) => row.ingredient.id))
+  const suggestions = (matches.data?.items ?? []).filter((item) => !pickedIds.has(item.id))
+
+  const brandOptions = [
+    { value: '', label: 'No brand / unknown' },
+    ...(brands.data?.items ?? []).map((brand) => ({ value: brand.id, label: brand.name })),
+  ]
+
+  function add(ingredient: Ingredient) {
+    setPicked((rows) => [...rows, { ingredient, percentage: '', isPrimary: rows.length === 0 }])
+    setSearch('')
+  }
+
+  function updateRow(id: string, patch: Partial<PickedIngredient>) {
+    setPicked((rows) => rows.map((row) => (row.ingredient.id === id ? { ...row, ...patch } : row)))
+  }
+
+  function remove(id: string) {
+    setPicked((rows) => rows.filter((row) => row.ingredient.id !== id))
+  }
+
+  function validate(): FieldErrors {
+    const found: FieldErrors = {}
+    if (!name.trim()) found.name = 'Give the tea a name.'
+    const badPercentage = picked.some((row) => {
+      if (row.percentage.trim() === '') return false
+      const value = Number(row.percentage)
+      return !Number.isFinite(value) || value <= 0 || value > 100
+    })
+    if (badPercentage) found.ingredients = 'Percentages must be between 1 and 100.'
+    return found
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const found = validate()
+    setErrors(found)
+    if (Object.keys(found).length > 0) return
+
+    // Optional fields left blank come out as `undefined` and JSON.stringify drops them,
+    // so a blank box sends no key at all rather than an empty string the API would have
+    // to decide what to do with.
+    onSubmit({
+      name: name.trim(),
+      tea_type: teaType,
+      caffeine_level: caffeine,
+      brand_id: optionalText(brandId),
+      origin_country: optionalText(origin),
+      description: optionalText(description),
+      image_url: optionalText(imageUrl),
+      brew_temp_c: optionalNumber(brewTemp),
+      brew_seconds: optionalNumber(brewSeconds),
+      grams_per_100ml: optionalNumber(grams),
+      ingredients: picked.map((row) => ({
+        ingredient_id: row.ingredient.id,
+        percentage: optionalNumber(row.percentage),
+        is_primary: row.isPrimary,
+      })),
+    })
+  }
+
+  return (
+    <form noValidate onSubmit={handleSubmit} data-testid={`${idPrefix}-form`} className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          id={`${idPrefix}-name`}
+          label="Name"
+          value={name}
+          onChange={setName}
+          error={errors.name}
+        />
+        <SelectField
+          id={`${idPrefix}-brand`}
+          label="Brand"
+          value={brandId}
+          onChange={setBrandId}
+          options={brandOptions}
+        />
+        <SelectField
+          id={`${idPrefix}-type`}
+          label="Tea type"
+          value={teaType}
+          onChange={(value) => setTeaType(value as TeaType)}
+          options={teaTypeOptions}
+        />
+        <SelectField
+          id={`${idPrefix}-caffeine`}
+          label="Caffeine"
+          value={caffeine}
+          onChange={(value) => setCaffeine(value as CaffeineLevel)}
+          options={caffeineOptions}
+        />
+        <TextField
+          id={`${idPrefix}-origin`}
+          label="Origin country"
+          value={origin}
+          onChange={setOrigin}
+          placeholder="China"
+        />
+        <TextField
+          id={`${idPrefix}-image`}
+          label="Image URL"
+          type="url"
+          value={imageUrl}
+          onChange={setImageUrl}
+        />
+      </div>
+
+      <TextAreaField
+        id={`${idPrefix}-description`}
+        label="Description"
+        value={description}
+        onChange={setDescription}
+      />
+
+      <fieldset className="grid gap-4 sm:grid-cols-3">
+        <legend className="mb-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+          Brewing guidance
+        </legend>
+        <TextField
+          id={`${idPrefix}-temp`}
+          label="Water (°C)"
+          type="number"
+          min={40}
+          max={100}
+          value={brewTemp}
+          onChange={setBrewTemp}
+        />
+        <TextField
+          id={`${idPrefix}-seconds`}
+          label="Steep (seconds)"
+          type="number"
+          min={5}
+          value={brewSeconds}
+          onChange={setBrewSeconds}
+        />
+        <TextField
+          id={`${idPrefix}-grams`}
+          label="Leaf (g / 100 ml)"
+          type="number"
+          step={0.1}
+          value={grams}
+          onChange={setGrams}
+        />
+      </fieldset>
+
+      <fieldset className="space-y-3 rounded-xl border border-brand-200 p-4 dark:border-neutral-800">
+        <legend className="px-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+          Ingredients
+        </legend>
+
+        {picked.length === 0 ? (
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            Nothing added yet. Search below to add leaves, herbs and flowers.
+          </p>
+        ) : (
+          <ul className="space-y-2" data-testid={`${idPrefix}-picked`}>
+            {picked.map((row) => (
+              <li
+                key={row.ingredient.id}
+                className="flex flex-wrap items-center gap-3 rounded-lg bg-brand-50 p-2 dark:bg-neutral-800"
+              >
+                <span className="mr-auto text-sm font-medium text-brand-900 dark:text-brand-100">
+                  {row.ingredient.name}
+                  <span className="ml-2 font-normal text-neutral-500 dark:text-neutral-400">
+                    {INGREDIENT_CATEGORY_LABELS[row.ingredient.category]}
+                  </span>
+                </span>
+                <div className="w-24">
+                  <TextField
+                    id={`${idPrefix}-percentage-${row.ingredient.id}`}
+                    label={`${row.ingredient.name} percentage`}
+                    labelHidden
+                    type="number"
+                    min={1}
+                    max={100}
+                    placeholder="%"
+                    value={row.percentage}
+                    onChange={(value) => updateRow(row.ingredient.id, { percentage: value })}
+                  />
+                </div>
+                <CheckboxField
+                  id={`${idPrefix}-primary-${row.ingredient.id}`}
+                  label="Primary"
+                  ariaLabel={`Primary — ${row.ingredient.name}`}
+                  checked={row.isPrimary}
+                  onChange={(checked) => updateRow(row.ingredient.id, { isPrimary: checked })}
+                />
+                <Button
+                  variant="danger"
+                  ariaLabel={`Remove ${row.ingredient.name}`}
+                  onClick={() => remove(row.ingredient.id)}
+                >
+                  Remove
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {errors.ingredients && (
+          <p className="text-xs text-rose-600 dark:text-rose-400">{errors.ingredients}</p>
+        )}
+
+        <TextField
+          id={`${idPrefix}-ingredient-search`}
+          label="Search ingredients"
+          type="search"
+          value={search}
+          onChange={setSearch}
+          placeholder="jasmine, bergamot, ginger…"
+        />
+
+        {matches.isPending ? (
+          <Skeleton className="h-8 w-full" />
+        ) : suggestions.length === 0 ? (
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            {debouncedSearch
+              ? `No ingredient matches “${debouncedSearch}”. An admin can add it on the ingredients page.`
+              : 'No ingredients in the catalog yet.'}
+          </p>
+        ) : (
+          <ul className="flex flex-wrap gap-2" data-testid={`${idPrefix}-suggestions`}>
+            {suggestions.map((ingredient) => (
+              <li key={ingredient.id} className="flex items-center gap-2">
+                <Button ariaLabel={`Add ${ingredient.name}`} onClick={() => add(ingredient)}>
+                  {ingredient.name}
+                  <Badge tone="neutral">{INGREDIENT_CATEGORY_LABELS[ingredient.category]}</Badge>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </fieldset>
+
+      {error && <FormError testId={`${idPrefix}-error`}>{error}</FormError>}
+
+      <SubmitButton pending={pending}>{pending ? pendingLabel : submitLabel}</SubmitButton>
+    </form>
+  )
+}

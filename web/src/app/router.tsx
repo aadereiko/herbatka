@@ -3,9 +3,15 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import type { Location } from 'react-router'
 
 import App from '../App'
+import { AdminHomePage } from '../features/admin/AdminHomePage'
+import { AdminIngredientsPage } from '../features/admin/AdminIngredientsPage'
+import { AdminTeasPage } from '../features/admin/AdminTeasPage'
 import { useAuth } from '../features/auth/auth-context'
 import { LoginPage } from '../features/auth/LoginPage'
 import { RegisterPage } from '../features/auth/RegisterPage'
+import { IngredientListPage } from '../features/catalog/IngredientListPage'
+import { TeaDetailPage } from '../features/catalog/TeaDetailPage'
+import { TeaListPage } from '../features/catalog/TeaListPage'
 import { HomePage } from '../features/home/HomePage'
 import { ForbiddenPage } from './ForbiddenPage'
 
@@ -34,7 +40,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return children
 }
 
-/** Same gate, plus the role check. Unused until M2 puts the admin catalog behind it. */
+/** Same gate, plus the role check. This is what /admin/* sits behind. */
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth()
   const location = useLocation()
@@ -84,6 +90,39 @@ export function AppRoutes() {
           </RequireAuth>
         }
       />
+
+      {/* The catalog is deliberately outside RequireAuth. Browsing what a tea is made of
+          needs no account, and a public catalog is the thing that makes an empty account
+          worth creating in the first place. */}
+      <Route path="/teas" element={<TeaListPage />} />
+      <Route path="/teas/:slug" element={<TeaDetailPage />} />
+      <Route path="/ingredients" element={<IngredientListPage />} />
+
+      <Route
+        path="/admin"
+        element={
+          <RequireAdmin>
+            <AdminHomePage />
+          </RequireAdmin>
+        }
+      />
+      <Route
+        path="/admin/teas"
+        element={
+          <RequireAdmin>
+            <AdminTeasPage />
+          </RequireAdmin>
+        }
+      />
+      <Route
+        path="/admin/ingredients"
+        element={
+          <RequireAdmin>
+            <AdminIngredientsPage />
+          </RequireAdmin>
+        }
+      />
+
       {/* The M0 status page, still reachable on its own and still public. */}
       <Route path="/health" element={<App />} />
       <Route path="*" element={<Navigate to="/" replace />} />

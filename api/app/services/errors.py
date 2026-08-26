@@ -17,3 +17,11 @@ class InvalidCredentials(ServiceError):
 
 class InvalidRefreshToken(ServiceError):
     pass
+
+
+class NotFound(ServiceError):
+    pass
+
+
+class IngredientInUse(ServiceError):
+    """Deleting an ingredient that teas still reference would rewrite their recipes."""

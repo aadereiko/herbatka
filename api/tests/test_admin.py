@@ -1,0 +1,222 @@
+from typing import Any
+
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.catalog import Ingredient, Tea
+
+ADMIN = "/api/v1/admin"
+CATALOG = "/api/v1/catalog"
+
+
+class TestAccessControl:
+    async def test_anonymous_is_rejected(self, client: AsyncClient) -> None:
+        assert (await client.get(f"{ADMIN}/teas")).status_code == 401
+
+    async def test_an_ordinary_user_is_forbidden(
+        self, client: AsyncClient, user_headers: dict[str, str]
+    ) -> None:
+        """401 means "who are you"; 403 means "I know, and no". The difference matters
+        to the client, which should not try to refresh a token over a 403."""
+        assert (await client.get(f"{ADMIN}/teas", headers=user_headers)).status_code == 403
+
+    async def test_an_admin_is_allowed(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        assert (await client.get(f"{ADMIN}/teas", headers=admin_headers)).status_code == 200
+
+    async def test_every_admin_route_is_guarded(
+        self, client: AsyncClient, user_headers: dict[str, str]
+    ) -> None:
+        """The guard is declared on the router, so a new route cannot forget it."""
+        for method, path in [
+            ("get", f"{ADMIN}/teas"),
+            ("post", f"{ADMIN}/teas"),
+            ("post", f"{ADMIN}/ingredients"),
+            ("post", f"{ADMIN}/brands"),
+        ]:
+            response = await client.request(method, path, headers=user_headers, json={})
+            assert response.status_code == 403, f"{method} {path} was not guarded"
+
+
+class TestModerationQueue:
+    async def test_lists_pending_teas(
+        self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
+    ) -> None:
+        body = (await client.get(f"{ADMIN}/teas?approved=false", headers=admin_headers)).json()
+
+        assert [t["name"] for t in body["items"]] == ["Secret Blend"]
+
+    async def test_lists_everything_when_unfiltered(
+        self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
+    ) -> None:
+        body = (await client.get(f"{ADMIN}/teas", headers=admin_headers)).json()
+
+        assert body["total"] == 2
+
+    async def test_approving_publishes_the_tea(
+        self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
+    ) -> None:
+        pending = catalog_fixtures["pending"]
+        assert (await client.get(f"{CATALOG}/teas/secret-blend")).status_code == 404
+
+        response = await client.post(f"{ADMIN}/teas/{pending.id}/approve", headers=admin_headers)
+
+        assert response.status_code == 200
+        assert response.json()["is_approved"] is True
+        assert (await client.get(f"{CATALOG}/teas/secret-blend")).status_code == 200
+
+
+class TestAdminTeas:
+    async def test_admin_created_teas_are_published_immediately(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        response = await client.post(
+            f"{ADMIN}/teas",
+            headers=admin_headers,
+            json={"name": "House Blend", "tea_type": "black"},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["is_approved"] is True
+
+    async def test_patch_replaces_the_recipe(
+        self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
+    ) -> None:
+        tea = catalog_fixtures["approved"]
+
+        response = await client.patch(
+            f"{ADMIN}/teas/{tea.id}",
+            headers=admin_headers,
+            json={"ingredients": [{"ingredient_id": str(catalog_fixtures["mint"].id)}]},
+        )
+
+        assert response.status_code == 200
+        assert [i["ingredient"]["name"] for i in response.json()["ingredients"]] == ["Mint"]
+
+    async def test_patch_without_ingredients_leaves_the_recipe_alone(
+        self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
+    ) -> None:
+        """`None` means "not mentioned"; `[]` would mean "remove everything"."""
+        tea = catalog_fixtures["approved"]
+
+        response = await client.patch(
+            f"{ADMIN}/teas/{tea.id}", headers=admin_headers, json={"name": "Renamed"}
+        )
+
+        assert len(response.json()["ingredients"]) == 2
+
+    async def test_patch_empty_ingredient_list_clears_the_recipe(
+        self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
+    ) -> None:
+        tea = catalog_fixtures["approved"]
+
+        response = await client.patch(
+            f"{ADMIN}/teas/{tea.id}", headers=admin_headers, json={"ingredients": []}
+        )
+
+        assert response.json()["ingredients"] == []
+
+    async def test_renaming_updates_the_slug(
+        self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
+    ) -> None:
+        tea = catalog_fixtures["approved"]
+
+        response = await client.patch(
+            f"{ADMIN}/teas/{tea.id}", headers=admin_headers, json={"name": "Peppermint Delight"}
+        )
+
+        assert response.json()["slug"] == "peppermint-delight"
+
+    async def test_delete_removes_the_tea(
+        self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
+    ) -> None:
+        tea = catalog_fixtures["approved"]
+
+        assert (
+            await client.delete(f"{ADMIN}/teas/{tea.id}", headers=admin_headers)
+        ).status_code == 204
+        assert (await client.get(f"{CATALOG}/teas/mint-green")).status_code == 404
+
+    async def test_unknown_tea_is_404(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        missing = "00000000-0000-0000-0000-000000000000"
+        assert (
+            await client.delete(f"{ADMIN}/teas/{missing}", headers=admin_headers)
+        ).status_code == 404
+
+
+class TestAdminIngredients:
+    async def test_creates_with_a_generated_slug(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        response = await client.post(
+            f"{ADMIN}/ingredients",
+            headers=admin_headers,
+            json={"name": "Lemon Verbena", "category": "herb", "is_caffeinated": False},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["slug"] == "lemon-verbena"
+
+    async def test_slugifies_non_ascii_names(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        """NFKD decomposition, so "Mięta" becomes "mieta" rather than being stripped."""
+        response = await client.post(
+            f"{ADMIN}/ingredients",
+            headers=admin_headers,
+            json={"name": "Mięta", "category": "herb"},
+        )
+
+        assert response.json()["slug"] == "mieta"
+
+    async def test_refuses_to_delete_an_ingredient_in_use(
+        self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
+    ) -> None:
+        """409 with a useful message, not a 500 from the FK's ON DELETE RESTRICT."""
+        mint = catalog_fixtures["mint"]
+
+        response = await client.delete(f"{ADMIN}/ingredients/{mint.id}", headers=admin_headers)
+
+        assert response.status_code == 409
+        assert "1 tea" in response.json()["detail"]
+
+    async def test_deletes_an_unused_ingredient(
+        self, client: AsyncClient, admin_headers: dict[str, str], db: AsyncSession
+    ) -> None:
+        created = (
+            await client.post(
+                f"{ADMIN}/ingredients",
+                headers=admin_headers,
+                json={"name": "Unused", "category": "other"},
+            )
+        ).json()
+
+        response = await client.delete(
+            f"{ADMIN}/ingredients/{created['id']}", headers=admin_headers
+        )
+
+        assert response.status_code == 204
+        assert await db.scalar(select(Ingredient).where(Ingredient.slug == "unused")) is None
+
+
+class TestAdminBrands:
+    async def test_deleting_a_brand_keeps_its_teas(
+        self,
+        client: AsyncClient,
+        admin_headers: dict[str, str],
+        catalog_fixtures: dict[str, Any],
+        db: AsyncSession,
+    ) -> None:
+        """ON DELETE SET NULL: the tea still exists on someone's shelf."""
+        brand = catalog_fixtures["brand"]
+
+        response = await client.delete(f"{ADMIN}/brands/{brand.id}", headers=admin_headers)
+
+        assert response.status_code == 204
+        tea = await db.scalar(select(Tea).where(Tea.slug == "mint-green"))
+        assert tea is not None
+        assert tea.brand_id is None

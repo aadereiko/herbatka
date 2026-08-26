@@ -1,6 +1,8 @@
 import asyncio
 from logging.config import fileConfig
+from typing import Any
 
+import sqlalchemy as sa
 from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
@@ -22,6 +24,29 @@ if not config.get_main_option("sqlalchemy.url", None):
 target_metadata = Base.metadata
 
 
+def _enum_check_constraint_names() -> set[str]:
+    """Names of the CHECK constraints that non-native Enum() columns generate.
+
+    Enum(..., native_enum=False, create_constraint=True) emits its CHECK at DDL time;
+    the constraint is not an object in Base.metadata. Autogenerate therefore sees it in
+    the database, fails to find it in the model, and writes a drop_constraint into every
+    single migration — quietly removing the validation the enums exist to provide.
+    Derived from metadata rather than hardcoded so a new enum is covered automatically.
+    """
+    names: set[str] = set()
+    for table in target_metadata.tables.values():
+        for column in table.columns:
+            if isinstance(column.type, sa.Enum) and column.type.name:
+                names.add(column.type.name)
+    return names
+
+
+def include_object(
+    obj: Any, name: str | None, type_: str, reflected: bool, compare_to: Any
+) -> bool:
+    return not (type_ == "check_constraint" and name in _enum_check_constraint_names())
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
@@ -29,6 +54,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -40,6 +66,7 @@ def do_run_migrations(connection) -> None:
         target_metadata=target_metadata,
         compare_type=True,  # catch column type changes, not just added/dropped columns
         compare_server_default=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
