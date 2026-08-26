@@ -63,6 +63,22 @@ export function HomePage() {
         </section>
 
         <nav
+          aria-label="Kitchen"
+          className="w-full max-w-md space-y-3 rounded-2xl border border-brand-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+            Kitchen
+          </h2>
+          {/* First, and on its own: this is the thing somebody opens the app to do, and
+              the catalog is what they consult while doing it. */}
+          <ShelfLink
+            to="/households"
+            title="Households"
+            blurb="Your shared shelves — what is left of what."
+          />
+        </nav>
+
+        <nav
           aria-label="Catalog"
           className="w-full max-w-md space-y-3 rounded-2xl border border-brand-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
         >

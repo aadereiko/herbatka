@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0 · M1 · M2 done**. Next up: M3 — households and stock.
+Status: **M0 · M1 · M2 · M3 done**. Next up: M4 — ratings and reviews.
 
 ---
 
@@ -229,12 +229,20 @@ round-trip through the URL, so a filtered view is linkable and survives reload.
 an admin → visible to a signed-out visitor; deleting an in-use ingredient shows the
 server's 409 inline; a non-admin gets the 403 page.
 
-### M3 — Households and stock
+### M3 — Households and stock ✅
 `household`, `household_member`, `household_invite`, `stock_item`, `stock_event`.
 Create a household, invite by code, accept, list members. Stock list with low-stock
 highlighting; add a tin; a one-tap "brewed 5 g" that writes a `stock_event`. Every
 endpoint gated on membership.
-**Done when:** two accounts in one household see each other's brews change the same number.
+**Done.** `household` / `household_member` / `household_invite` / `stock_item` /
+`stock_event`. Invite codes avoid ambiguous characters; the last owner cannot leave;
+non-members get 404 rather than 403, so household ids cannot be probed. Quantity is not
+patchable — every gram moves through the ledger, and `quantity_grams` is a cached sum
+recomputed in the same transaction. Frontend: one-tap brew presets with optimistic
+update and rollback on 409, `?low=1` in the URL, owner-only invites panel.
+109 backend + 57 frontend tests. Verified in a browser: a member brews 5 g, the owner
+sees the same number; brewing 500 g shows "Only 27.5 g left in that tin" and the
+displayed amount returns.
 
 ### M4 — Ratings and reviews
 `review` with subscores. Write/edit your review from a tea page. Aggregate average and

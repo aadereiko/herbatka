@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncGenerator
 from pathlib import Path
+from typing import TYPE_CHECKING, NamedTuple
 
 import asyncpg
 import pytest
@@ -14,6 +15,9 @@ from sqlalchemy.pool import NullPool
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.main import app
+
+if TYPE_CHECKING:
+    from app.models.catalog import Tea
 
 API_ROOT = Path(__file__).resolve().parents[1]
 
@@ -198,3 +202,90 @@ async def catalog_fixtures(db: AsyncSession) -> dict[str, object]:
     await db.flush()
 
     return {"brand": brand, "mint": mint, "green": green, "approved": approved, "pending": pending}
+
+
+class Account(NamedTuple):
+    """A registered user plus what tests need to act as them."""
+
+    id: str
+    headers: dict[str, str]
+
+
+async def _register(client: AsyncClient, email: str, name: str) -> Account:
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": "brew-it-strong-9", "display_name": name},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    return Account(
+        id=body["user"]["id"], headers={"Authorization": f"Bearer {body['access_token']}"}
+    )
+
+
+@pytest.fixture
+async def owner(client: AsyncClient) -> Account:
+    return await _register(client, "owner@example.com", "Owner")
+
+
+@pytest.fixture
+async def flatmate(client: AsyncClient) -> Account:
+    return await _register(client, "flatmate@example.com", "Flatmate")
+
+
+@pytest.fixture
+async def outsider(client: AsyncClient) -> Account:
+    """Someone with an account who belongs to no household under test."""
+    return await _register(client, "outsider@example.com", "Outsider")
+
+
+@pytest.fixture
+async def household(client: AsyncClient, owner: Account) -> dict:
+    response = await client.post(
+        "/api/v1/households", headers=owner.headers, json={"name": "Flat 3B"}
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.fixture
+async def shared_household(
+    client: AsyncClient, owner: Account, flatmate: Account, household: dict
+) -> dict:
+    """A household the flatmate has actually joined, via a real invite."""
+    invite = await client.post(
+        f"/api/v1/households/{household['id']}/invites", headers=owner.headers, json={}
+    )
+    assert invite.status_code == 201, invite.text
+    joined = await client.post(
+        "/api/v1/households/join", headers=flatmate.headers, json={"code": invite.json()["code"]}
+    )
+    assert joined.status_code == 200, joined.text
+    return joined.json()
+
+
+@pytest.fixture
+async def tea(db: AsyncSession) -> "Tea":
+    from app.models.catalog import Tea
+
+    row = Tea(
+        slug="test-sencha",
+        name="Test Sencha",
+        tea_type="green",
+        caffeine_level="medium",
+        is_approved=True,
+    )
+    db.add(row)
+    await db.flush()
+    return row
+
+
+@pytest.fixture
+async def tin(client: AsyncClient, owner: Account, household: dict, tea: "Tea") -> dict:
+    response = await client.post(
+        f"/api/v1/households/{household['id']}/stock",
+        headers=owner.headers,
+        json={"tea_id": str(tea.id), "quantity_grams": 100, "low_stock_grams": 20},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()

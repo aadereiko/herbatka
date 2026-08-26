@@ -311,10 +311,206 @@ export interface paths {
         patch: operations["update_brand_api_v1_admin_brands__brand_id__patch"];
         trace?: never;
     };
+    "/api/v1/households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Households
+         * @description Not paginated: you belong to a handful of households, not thousands.
+         */
+        get: operations["list_households_api_v1_households_get"];
+        put?: never;
+        /** Create Household */
+        post: operations["create_household_api_v1_households_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join Household */
+        post: operations["join_household_api_v1_households_join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Household */
+        get: operations["get_household_api_v1_households__household_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Household */
+        delete: operations["delete_household_api_v1_households__household_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename Household */
+        patch: operations["rename_household_api_v1_households__household_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Member
+         * @description An owner may remove anyone; anyone may remove themselves (leaving).
+         */
+        delete: operations["remove_member_api_v1_households__household_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Invites */
+        get: operations["list_invites_api_v1_households__household_id__invites_get"];
+        put?: never;
+        /** Create Invite */
+        post: operations["create_invite_api_v1_households__household_id__invites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/invites/{invite_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Invite */
+        delete: operations["revoke_invite_api_v1_households__household_id__invites__invite_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Stock */
+        get: operations["list_stock_api_v1_households__household_id__stock_get"];
+        put?: never;
+        /** Add Tin */
+        post: operations["add_tin_api_v1_households__household_id__stock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/stock/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Tin */
+        get: operations["get_tin_api_v1_households__household_id__stock__item_id__get"];
+        put?: never;
+        post?: never;
+        /** Remove Tin */
+        delete: operations["remove_tin_api_v1_households__household_id__stock__item_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Tin */
+        patch: operations["update_tin_api_v1_households__household_id__stock__item_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/stock/{item_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Movement
+         * @description The one-tap brew. `grams` is a positive magnitude; the server applies the sign.
+         */
+        post: operations["record_movement_api_v1_households__household_id__stock__item_id__events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/stock/{item_id}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adjust Tin */
+        post: operations["adjust_tin_api_v1_households__household_id__stock__item_id__adjust_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActorRef */
+        ActorRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Display Name */
+            display_name: string;
+        };
         /** BrandCreate */
         BrandCreate: {
             /** Name */
@@ -381,6 +577,70 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** HouseholdCreate */
+        HouseholdCreate: {
+            /** Name */
+            name: string;
+        };
+        /** HouseholdDetail */
+        HouseholdDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "member";
+            /** Member Count */
+            member_count: number;
+            /** Stock Item Count */
+            stock_item_count: number;
+            /** Low Stock Count */
+            low_stock_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Members */
+            members: components["schemas"]["Member"][];
+        };
+        /** HouseholdSummary */
+        HouseholdSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "member";
+            /** Member Count */
+            member_count: number;
+            /** Stock Item Count */
+            stock_item_count: number;
+            /** Low Stock Count */
+            low_stock_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** HouseholdUpdate */
+        HouseholdUpdate: {
+            /** Name */
+            name: string;
+        };
         /** IngredientCreate */
         IngredientCreate: {
             /** Name */
@@ -430,6 +690,45 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** Invite */
+        Invite: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Invited Email */
+            invited_email: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Accepted At */
+            accepted_at: string | null;
+        };
+        /** InviteCreate */
+        InviteCreate: {
+            /** Invited Email */
+            invited_email?: string | null;
+            /**
+             * Expires In Days
+             * @default 14
+             */
+            expires_in_days: number;
+        };
+        /** JoinRequest */
+        JoinRequest: {
+            /** Code */
+            code: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -439,6 +738,20 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** Member */
+        Member: {
+            user: components["schemas"]["UserRef"];
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "member";
+            /**
+             * Joined At
+             * Format: date-time
+             */
+            joined_at: string;
         };
         /** Page[BrandOut] */
         Page_BrandOut_: {
@@ -457,6 +770,19 @@ export interface components {
         Page_IngredientOut_: {
             /** Items */
             items: components["schemas"]["IngredientOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Pages */
+            pages: number;
+        };
+        /** Page[StockItem] */
+        Page_StockItem_: {
+            /** Items */
+            items: components["schemas"]["StockItem"][];
             /** Total */
             total: number;
             /** Page */
@@ -490,6 +816,165 @@ export interface components {
             password: string;
             /** Display Name */
             display_name: string;
+        };
+        /**
+         * StockAdjust
+         * @description "I actually have 42 g." The server records the difference as an adjust event.
+         */
+        StockAdjust: {
+            /** Quantity Grams */
+            quantity_grams: number;
+            /** Note */
+            note?: string | null;
+        };
+        /** StockEvent */
+        StockEvent: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "purchase" | "brew" | "adjust" | "discard";
+            /** Delta Grams */
+            delta_grams: number;
+            /** Note */
+            note: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            actor: components["schemas"]["ActorRef"] | null;
+        };
+        /** StockEventCreate */
+        StockEventCreate: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "purchase" | "brew" | "discard";
+            /** Grams */
+            grams: number;
+            /** Note */
+            note?: string | null;
+        };
+        /** StockItem */
+        StockItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            tea: components["schemas"]["TeaRef"];
+            /** Quantity Grams */
+            quantity_grams: number;
+            /** Low Stock Grams */
+            low_stock_grams: number;
+            /** Is Low */
+            is_low: boolean;
+            /** Location */
+            location: string | null;
+            /** Opened At */
+            opened_at: string | null;
+            /** Best Before */
+            best_before: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** StockItemCreate */
+        StockItemCreate: {
+            /**
+             * Tea Id
+             * Format: uuid
+             */
+            tea_id: string;
+            /** Quantity Grams */
+            quantity_grams: number;
+            /** Location */
+            location?: string | null;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Best Before */
+            best_before?: string | null;
+            /** Purchased At */
+            purchased_at?: string | null;
+            /** Price Paid Minor */
+            price_paid_minor?: number | null;
+            /** Currency */
+            currency?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Low Stock Grams
+             * @default 10
+             */
+            low_stock_grams: number;
+        };
+        /** StockItemDetail */
+        StockItemDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            tea: components["schemas"]["TeaRef"];
+            /** Quantity Grams */
+            quantity_grams: number;
+            /** Low Stock Grams */
+            low_stock_grams: number;
+            /** Is Low */
+            is_low: boolean;
+            /** Location */
+            location: string | null;
+            /** Opened At */
+            opened_at: string | null;
+            /** Best Before */
+            best_before: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Notes */
+            notes: string | null;
+            /** Purchased At */
+            purchased_at: string | null;
+            /** Price Paid Minor */
+            price_paid_minor: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Recent Events */
+            recent_events: components["schemas"]["StockEvent"][];
+        };
+        /**
+         * StockItemUpdate
+         * @description Metadata only. Quantity is absent by design — it moves through the ledger, and
+         *     a patchable quantity would let the cached total drift from its events.
+         */
+        StockItemUpdate: {
+            /** Location */
+            location?: string | null;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Best Before */
+            best_before?: string | null;
+            /** Purchased At */
+            purchased_at?: string | null;
+            /** Price Paid Minor */
+            price_paid_minor?: number | null;
+            /** Currency */
+            currency?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Low Stock Grams */
+            low_stock_grams?: number | null;
         };
         /** TeaCreate */
         TeaCreate: {
@@ -592,6 +1077,25 @@ export interface components {
             /** Is Primary */
             is_primary: boolean;
         };
+        /** TeaRef */
+        TeaRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /**
+             * Tea Type
+             * @enum {string}
+             */
+            tea_type: "green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend";
+            /** Image Url */
+            image_url: string | null;
+        };
         /** TeaSummary */
         TeaSummary: {
             /**
@@ -686,6 +1190,20 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** UserRef */
+        UserRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            /** Avatar Url */
+            avatar_url: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1384,6 +1902,554 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrandOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_households_api_v1_households_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdSummary"][];
+                };
+            };
+        };
+    };
+    create_household_api_v1_households_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HouseholdCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    join_household_api_v1_households_join_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_household_api_v1_households__household_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_household_api_v1_households__household_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_household_api_v1_households__household_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HouseholdUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_api_v1_households__household_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_invites_api_v1_households__household_id__invites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invite_api_v1_households__household_id__invites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_invite_api_v1_households__household_id__invites__invite_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_stock_api_v1_households__household_id__stock_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                low_only?: boolean;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_StockItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_tin_api_v1_households__household_id__stock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockItemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tin_api_v1_households__household_id__stock__item_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockItemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_tin_api_v1_households__household_id__stock__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_tin_api_v1_households__household_id__stock__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockItemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_movement_api_v1_households__household_id__stock__item_id__events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockEventCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockItemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    adjust_tin_api_v1_households__household_id__stock__item_id__adjust_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockAdjust"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockItemDetail"];
                 };
             };
             /** @description Validation Error */

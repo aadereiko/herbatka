@@ -8,9 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_access_token
 from app.db.session import get_db
+from app.models.household import HouseholdMember
 from app.models.user import User
 from app.schemas.common import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from app.services import household as household_service
 from app.services.auth import get_user_by_id
+from app.services.errors import NotAMember
 
 # Annotated aliases rather than `= Depends(...)` defaults: the signature stays a plain
 # type annotation, so linters and type checkers read it correctly, and each dependency
@@ -85,3 +88,42 @@ def pagination(
 
 
 PageParams = Annotated[Pagination, Depends(pagination)]
+
+
+async def get_membership(
+    household_id: uuid.UUID, user: "CurrentUser", db: "DbSession"
+) -> HouseholdMember:
+    """Resolve the caller's membership of a household, or 404.
+
+    404 and not 403, deliberately. A 403 would confirm that a household with this id
+    exists, letting anyone enumerate ids and learn who lives with whom. To a
+    non-member, someone else's household is indistinguishable from one that is not
+    there — which is the honest answer.
+    """
+    try:
+        return await household_service.get_membership(db, household_id, user.id)
+    except NotAMember as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Household not found"
+        ) from exc
+
+
+Membership = Annotated[HouseholdMember, Depends(get_membership)]
+
+
+async def get_ownership(member: Membership) -> HouseholdMember:
+    """Owner-only actions: renaming, deleting, and managing members and invites.
+
+    403 here rather than 404, because at this point the caller has already proved they
+    are a member — the household's existence is not a secret from them, only the
+    permission is missing.
+    """
+    if member.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only a household owner can do that",
+        )
+    return member
+
+
+Ownership = Annotated[HouseholdMember, Depends(get_ownership)]

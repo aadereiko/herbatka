@@ -13,6 +13,9 @@ import { IngredientListPage } from '../features/catalog/IngredientListPage'
 import { TeaDetailPage } from '../features/catalog/TeaDetailPage'
 import { TeaListPage } from '../features/catalog/TeaListPage'
 import { HomePage } from '../features/home/HomePage'
+import { HouseholdDetailPage } from '../features/household/HouseholdDetailPage'
+import { HouseholdListPage } from '../features/household/HouseholdListPage'
+import { StockItemPage } from '../features/stock/StockItemPage'
 import { ForbiddenPage } from './ForbiddenPage'
 
 /** What the guards stash in router state so the login page can send you back. */
@@ -97,6 +100,34 @@ export function AppRoutes() {
       <Route path="/teas" element={<TeaListPage />} />
       <Route path="/teas/:slug" element={<TeaDetailPage />} />
       <Route path="/ingredients" element={<IngredientListPage />} />
+
+      {/* Households are the opposite of the catalog: a shared shelf is only meaningful
+          for somebody with an account, and the API answers 404 rather than 403 for a
+          household you are not in — so there is nothing here to show a stranger. */}
+      <Route
+        path="/households"
+        element={
+          <RequireAuth>
+            <HouseholdListPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/households/:id"
+        element={
+          <RequireAuth>
+            <HouseholdDetailPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/households/:id/stock/:itemId"
+        element={
+          <RequireAuth>
+            <StockItemPage />
+          </RequireAuth>
+        }
+      />
 
       <Route
         path="/admin"

@@ -10,6 +10,15 @@ from app.models.catalog import (
     TeaIngredient,
     TeaTypeEnum,
 )
+from app.models.household import (
+    Household,
+    HouseholdInvite,
+    HouseholdMember,
+    MemberRoleEnum,
+    StockEvent,
+    StockEventKindEnum,
+    StockItem,
+)
 from app.models.user import AuthIdentity, AuthProvider, RefreshToken, User, UserRole
 
 __all__ = [
@@ -18,9 +27,16 @@ __all__ = [
     "Base",
     "Brand",
     "CaffeineLevelEnum",
+    "Household",
+    "HouseholdInvite",
+    "HouseholdMember",
     "Ingredient",
     "IngredientCategoryEnum",
+    "MemberRoleEnum",
     "RefreshToken",
+    "StockEvent",
+    "StockEventKindEnum",
+    "StockItem",
     "Tea",
     "TeaIngredient",
     "TeaTypeEnum",

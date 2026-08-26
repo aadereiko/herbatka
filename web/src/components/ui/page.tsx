@@ -35,6 +35,13 @@ function SiteNav() {
           </span>
           Herbatka
         </Link>
+        {/* Signed-in only, and first: the catalog is browsing, the shelf is the job.
+            RequireAuth guards the route itself — this is tidiness, not security. */}
+        {user && (
+          <NavLink to="/households" className={navClass} data-testid="nav-households">
+            Households
+          </NavLink>
+        )}
         <NavLink to="/teas" className={navClass}>
           Teas
         </NavLink>
@@ -92,15 +99,18 @@ export function Panel({
   as: Tag = 'section',
   className = '',
   ariaLabel,
+  testId,
 }: {
   children: ReactNode
   as?: 'section' | 'div' | 'li'
   className?: string
   ariaLabel?: string
+  testId?: string
 }) {
   return (
     <Tag
       aria-label={ariaLabel}
+      data-testid={testId}
       className={`rounded-2xl border border-brand-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:p-6 ${className}`}
     >
       {children}

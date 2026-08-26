@@ -2,8 +2,21 @@ import type { ReactNode } from 'react'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 
+export type ButtonSize = 'sm' | 'md' | 'lg'
+
 const BASE =
-  'inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition disabled:cursor-not-allowed disabled:opacity-60'
+
+/**
+ * `md` reproduces exactly what every M2 call site already had, so nothing moves by adding
+ * this. `lg` exists for the stock screen: the brew presets are tapped with a thumb while
+ * the kettle is boiling, and a 24px-tall button is a miss waiting to happen.
+ */
+const SIZES: Record<ButtonSize, string> = {
+  sm: 'px-2 py-1 text-xs',
+  md: 'px-3 py-1.5 text-sm',
+  lg: 'min-h-11 px-4 py-2.5 text-base',
+}
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-brand-600 text-white hover:bg-brand-700',
@@ -20,20 +33,31 @@ export function Button({
   children,
   onClick,
   variant = 'secondary',
+  size = 'md',
   type = 'button',
   disabled,
   title,
   testId,
   ariaLabel,
+  ariaPressed,
+  className = '',
 }: {
   children: ReactNode
   onClick?: () => void
   variant?: ButtonVariant
+  size?: ButtonSize
   type?: 'button' | 'submit'
   disabled?: boolean
   title?: string
   testId?: string
   ariaLabel?: string
+  /** For toggles. The control keeps one name and reports its state, rather than swapping
+   *  its label between "Show low" and "Show all" and leaving a screen reader to guess
+   *  which of the two it is looking at. */
+  ariaPressed?: boolean
+  /** Layout only — width, flex behaviour. Colour and padding belong to the variant and
+   *  the size, or the four looks stop being four looks. */
+  className?: string
 }) {
   return (
     <button
@@ -42,8 +66,9 @@ export function Button({
       disabled={disabled}
       title={title}
       aria-label={ariaLabel}
+      aria-pressed={ariaPressed}
       data-testid={testId}
-      className={`${BASE} ${VARIANTS[variant]}`}
+      className={`${BASE} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
     >
       {children}
     </button>

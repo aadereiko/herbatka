@@ -25,3 +25,27 @@ class NotFound(ServiceError):
 
 class IngredientInUse(ServiceError):
     """Deleting an ingredient that teas still reference would rewrite their recipes."""
+
+
+class NotAMember(ServiceError):
+    """Surfaced as 404, never 403 — see app/api/deps.get_membership."""
+
+
+class NotTheOwner(ServiceError):
+    pass
+
+
+class InviteExpired(ServiceError):
+    pass
+
+
+class AlreadyAMember(ServiceError):
+    pass
+
+
+class LastOwnerCannotLeave(ServiceError):
+    pass
+
+
+class InsufficientStock(ServiceError):
+    """Brewing or discarding more than the tin holds."""

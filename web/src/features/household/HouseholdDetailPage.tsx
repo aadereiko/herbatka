@@ -1,0 +1,293 @@
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
+
+import { Button } from '../../components/ui/button'
+import { FormError, SubmitButton, TextField } from '../../components/ui/form'
+import {
+  Badge,
+  EmptyState,
+  ErrorNote,
+  PageHeading,
+  PageShell,
+  Panel,
+  Skeleton,
+} from '../../components/ui/page'
+import { ApiError, describeApiError } from '../../lib/api'
+import { MEMBER_ROLE_LABELS } from '../../lib/household'
+import { pluralise } from '../catalog/format'
+import { useAuth } from '../auth/auth-context'
+import { StockList } from '../stock/StockList'
+import { InvitesPanel } from './InvitesPanel'
+import { MembersPanel } from './MembersPanel'
+import {
+  useDeleteHousehold,
+  useHousehold,
+  useRemoveMember,
+  useRenameHousehold,
+} from './queries'
+
+function RenameForm({
+  householdId,
+  currentName,
+  onDone,
+}: {
+  householdId: string
+  currentName: string
+  onDone: () => void
+}) {
+  const [name, setName] = useState(currentName)
+  const [nameError, setNameError] = useState<string | undefined>(undefined)
+  const rename = useRenameHousehold(householdId)
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) {
+      setNameError('It needs a name.')
+      return
+    }
+    setNameError(undefined)
+    rename.mutate({ name: trimmed }, { onSuccess: onDone })
+  }
+
+  return (
+    <Panel ariaLabel="Rename this household" className="mb-6">
+      <form noValidate onSubmit={handleSubmit} data-testid="rename-household-form" className="space-y-3">
+        <TextField
+          id="rename-household"
+          label="Household name"
+          value={name}
+          onChange={setName}
+          error={nameError}
+        />
+        {rename.isError && (
+          <FormError testId="rename-error">{describeApiError(rename.error)}</FormError>
+        )}
+        <div className="flex items-center gap-3">
+          <div className="w-40">
+            <SubmitButton pending={rename.isPending}>
+              {rename.isPending ? 'Saving…' : 'Save name'}
+            </SubmitButton>
+          </div>
+          <Button variant="ghost" testId="cancel-rename" onClick={onDone}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Panel>
+  )
+}
+
+/**
+ * One household: its shelf, who is in it, and — for an owner — the invite codes.
+ *
+ * The stock list comes first in the document as well as on screen. Members and invites
+ * are the settings of this page; the shelf is the reason anybody opened it, and on a
+ * phone that means it must not be below two panels of administration.
+ */
+export function HouseholdDetailPage() {
+  const { id = '' } = useParams()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+
+  const [renaming, setRenaming] = useState(false)
+  const [confirming, setConfirming] = useState<'delete' | 'leave' | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  const household = useHousehold(id)
+  const remove = useDeleteHousehold(id)
+  const leave = useRemoveMember(id)
+
+  if (household.isPending) {
+    return (
+      <PageShell>
+        <div role="status" aria-live="polite" data-testid="household-loading" className="space-y-4">
+          <span className="sr-only">Loading household…</span>
+          <Skeleton className="h-8 w-1/2" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </PageShell>
+    )
+  }
+
+  if (household.isError) {
+    /**
+     * The API answers 404 rather than 403 for a household you are not in, so that ids
+     * cannot be probed for existence. That means we genuinely cannot tell "no such
+     * household" from "not yours" — and must not pretend to. There is no retry here on
+     * purpose: neither answer changes on a second ask, and a Retry button that cannot
+     * help is a button that wastes somebody's time twice.
+     */
+    const missing = household.error instanceof ApiError && household.error.status === 404
+    return (
+      <PageShell>
+        {missing ? (
+          <EmptyState title="Not found, or not yours" testId="household-missing">
+            <p>
+              Either this household does not exist or you are not a member of it. If
+              somebody meant to add you, ask them for an invite code.
+            </p>
+            <Link to="/households" className="font-medium text-brand-700 dark:text-brand-300">
+              Back to your households
+            </Link>
+          </EmptyState>
+        ) : (
+          <div className="space-y-3">
+            <ErrorNote testId="household-error">{describeApiError(household.error)}</ErrorNote>
+            <Button testId="household-retry" onClick={() => void household.refetch()}>
+              Try again
+            </Button>
+          </div>
+        )}
+      </PageShell>
+    )
+  }
+
+  const detail = household.data
+  const isOwner = detail.role === 'owner'
+
+  function handleDelete() {
+    setActionError(null)
+    remove.mutate(undefined, {
+      onSuccess: () => void navigate('/households'),
+      onError: (error) => {
+        setConfirming(null)
+        setActionError(describeApiError(error))
+      },
+    })
+  }
+
+  function handleLeave() {
+    setActionError(null)
+    if (!user) return
+    leave.mutate(user.id, {
+      onSuccess: () => void navigate('/households'),
+      // The 409 case: the last owner cannot walk out and leave a household nobody can
+      // administer. The server's sentence says exactly that, so it is the one to show.
+      onError: (error) => {
+        setConfirming(null)
+        setActionError(describeApiError(error))
+      },
+    })
+  }
+
+  return (
+    <PageShell>
+      <PageHeading
+        title={detail.name}
+        subtitle={`${pluralise(detail.member_count, 'member')} · ${pluralise(
+          detail.stock_item_count,
+          'tin',
+        )}${detail.low_stock_count > 0 ? ` · ${detail.low_stock_count} running low` : ''}`}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={isOwner ? 'brand' : 'neutral'}>{MEMBER_ROLE_LABELS[detail.role]}</Badge>
+            <Link
+              to="/households"
+              className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
+            >
+              ← All households
+            </Link>
+          </div>
+        }
+      />
+
+      {actionError && (
+        <div className="mb-4">
+          <ErrorNote testId="household-action-error">{actionError}</ErrorNote>
+        </div>
+      )}
+
+      <div className="mb-6 flex flex-wrap gap-2">
+        {isOwner && !renaming && (
+          <Button testId="start-rename" onClick={() => setRenaming(true)}>
+            Rename
+          </Button>
+        )}
+
+        {/* Leaving is available to everybody, including an owner — the server refuses only
+            when they are the last one, and says so. */}
+        {confirming === 'leave' ? (
+          <>
+            <Button
+              variant="danger"
+              testId="confirm-leave"
+              disabled={leave.isPending}
+              onClick={handleLeave}
+            >
+              Really leave “{detail.name}”
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirming(null)}>
+              Stay
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="danger"
+            testId="leave-household"
+            onClick={() => {
+              setActionError(null)
+              setConfirming('leave')
+            }}
+          >
+            Leave household
+          </Button>
+        )}
+
+        {isOwner &&
+          (confirming === 'delete' ? (
+            <>
+              <Button
+                variant="danger"
+                testId="confirm-delete-household"
+                disabled={remove.isPending}
+                onClick={handleDelete}
+              >
+                Really delete, with every tin
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirming(null)}>
+                Keep it
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="danger"
+              testId="delete-household"
+              onClick={() => {
+                setActionError(null)
+                setConfirming('delete')
+              }}
+            >
+              Delete household
+            </Button>
+          ))}
+      </div>
+
+      {isOwner && renaming && (
+        <RenameForm
+          householdId={id}
+          currentName={detail.name}
+          onDone={() => setRenaming(false)}
+        />
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <StockList householdId={id} />
+
+        <div className="space-y-6">
+          <MembersPanel
+            householdId={id}
+            members={detail.members}
+            isOwner={isOwner}
+            currentUserId={user?.id ?? null}
+          />
+          {/* Absent, not disabled, for a member: the endpoint is owner-only and a panel
+              that can only ever answer 403 is worse than no panel at all. */}
+          {isOwner && <InvitesPanel householdId={id} />}
+        </div>
+      </div>
+    </PageShell>
+  )
+}

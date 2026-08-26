@@ -85,7 +85,7 @@ export function TextField({
   label: string
   value: string
   onChange: (value: string) => void
-  type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'number'
+  type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'number' | 'date'
   error?: string
   hint?: string
   placeholder?: string
