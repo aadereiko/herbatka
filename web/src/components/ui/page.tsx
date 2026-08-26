@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router'
 
 import { useAuth } from '../../features/auth/auth-context'
+import { useIncomingRequestCount } from '../../features/friend/queries'
 import { Button } from './button'
 
 function navClass({ isActive }: { isActive: boolean }): string {
@@ -17,6 +18,33 @@ function navClass({ isActive }: { isActive: boolean }): string {
  * The wordmark points at /teas for a signed-out visitor: "/" is behind RequireAuth, and
  * sending someone to a login screen for clicking a logo is a small betrayal.
  */
+/**
+ * The count of requests waiting on you, as a badge on the Friends entry.
+ *
+ * This is the one number in the app somebody scans the nav *for*, so it lives where they
+ * are already looking rather than only on the page they would have to remember to visit.
+ * Nothing is rendered at zero: a permanent "0" is a badge people learn to stop seeing,
+ * and the whole value of this one is that its presence means something.
+ *
+ * `useIncomingRequestCount` is `enabled` on having a session, which matters here and
+ * nowhere else in the feature: the nav renders on the public catalog pages too, and a
+ * signed-out visitor must not be firing an authenticated request on every page load.
+ */
+function IncomingBadge() {
+  const count = useIncomingRequestCount()
+  if (count === 0) return null
+
+  return (
+    <span
+      data-testid="nav-friends-badge"
+      aria-label={`${count} friend ${count === 1 ? 'request' : 'requests'} waiting`}
+      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-xs font-semibold text-white"
+    >
+      {count}
+    </span>
+  )
+}
+
 function SiteNav() {
   const { user } = useAuth()
 
@@ -35,8 +63,21 @@ function SiteNav() {
           </span>
           Herbatka
         </Link>
-        {/* Signed-in only, and first: the catalog is browsing, the shelf is the job.
-            RequireAuth guards the route itself — this is tidiness, not security. */}
+        {/* Signed-in only, and first: the catalog is browsing, these are the app. The
+            feed leads because it is the thing that changes without you — everything
+            after it is somewhere you go on purpose. RequireAuth guards the routes
+            themselves; this ordering is tidiness, not security. */}
+        {user && (
+          <NavLink to="/feed" className={navClass} data-testid="nav-feed">
+            Activity
+          </NavLink>
+        )}
+        {user && (
+          <NavLink to="/friends" className={navClass} data-testid="nav-friends">
+            Friends
+            <IncomingBadge />
+          </NavLink>
+        )}
         {user && (
           <NavLink to="/households" className={navClass} data-testid="nav-households">
             Households

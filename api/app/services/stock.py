@@ -125,6 +125,7 @@ async def create_item(
     item = StockItem(
         household_id=household_id,
         tea_id=payload.tea_id,
+        added_by_id=actor.id,
         quantity_grams=Decimal(0),
         low_stock_grams=_grams(payload.low_stock_grams),
         **fields,

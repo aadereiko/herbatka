@@ -13,7 +13,7 @@ import type {
   TeaSummary,
 } from '../../lib/catalog'
 import { toQuery } from '../../lib/query-string'
-import { useAuth } from '../auth/auth-context'
+import { useViewer } from '../auth/viewer'
 
 /**
  * Query keys as data rather than string literals sprinkled across components: the admin
@@ -37,23 +37,11 @@ export const catalogKeys = {
 
 /**
  * Tea responses depend on who is asking — `my_score` and `my_review` are the viewer's
- * own. Two things follow, and both are bugs if you skip them:
- *
- *  - The viewer belongs in the query key. Otherwise a signed-out response is cached
- *    under the same key a signed-in visitor reads, and signing out then in as somebody
- *    else shows them the previous person's rating.
- *  - The query must wait for auth to settle. `/teas/:slug` is public, so it renders and
- *    fetches immediately on a cold load — before AuthProvider's silent refresh has
- *    finished — and would cache the anonymous answer for a signed-in user.
- *
- * The viewer segment goes last, so `teaLists` and `teaDetail(slug)` still work as
- * invalidation prefixes.
+ * own — and these pages are public, so they render and fetch on a cold load *before*
+ * AuthProvider's silent refresh has answered. Both halves of `useViewer` therefore
+ * matter here: the viewer segment in the key, and `authReady` on `enabled`. Skipping
+ * either caches the anonymous answer for a signed-in user. See `auth/viewer.ts`.
  */
-function useViewer() {
-  const { user, isLoading } = useAuth()
-  return { viewer: user?.id ?? 'anon', authReady: !isLoading }
-}
-
 export const fetchTeas = (params: TeaListParams) =>
   api<Page<TeaSummary>>(`/catalog/teas${toQuery(params)}`)
 

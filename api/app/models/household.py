@@ -140,9 +140,16 @@ class StockItem(UUIDPrimaryKey, Timestamps, Base):
     price_paid_minor: Mapped[int | None] = mapped_column(Integer)
     currency: Mapped[str | None] = mapped_column(String(3))
     notes: Mapped[str | None] = mapped_column(Text)
+    # Who put this tin on the shelf. Derivable from the opening purchase event, but
+    # the feed reads it per row and a join to find "the earliest purchase event" is a
+    # lot of work for a fact that never changes.
+    added_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
 
     household: Mapped[Household] = relationship(back_populates="stock_items")
     tea: Mapped[Tea] = relationship()
+    added_by: Mapped[User | None] = relationship(foreign_keys=[added_by_id])
     events: Mapped[list["StockEvent"]] = relationship(
         back_populates="stock_item",
         cascade="all, delete-orphan",

@@ -10,6 +10,7 @@ from app.models.catalog import (
     TeaIngredient,
     TeaTypeEnum,
 )
+from app.models.friendship import Friendship, FriendshipStatusEnum, canonical_pair
 from app.models.household import (
     Household,
     HouseholdInvite,
@@ -28,6 +29,8 @@ __all__ = [
     "Base",
     "Brand",
     "CaffeineLevelEnum",
+    "Friendship",
+    "FriendshipStatusEnum",
     "Household",
     "HouseholdInvite",
     "HouseholdMember",
@@ -44,4 +47,5 @@ __all__ = [
     "TeaTypeEnum",
     "User",
     "UserRole",
+    "canonical_pair",
 ]

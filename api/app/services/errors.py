@@ -49,3 +49,15 @@ class LastOwnerCannotLeave(ServiceError):
 
 class InsufficientStock(ServiceError):
     """Brewing or discarding more than the tin holds."""
+
+
+class CannotBefriendYourself(ServiceError):
+    pass
+
+
+class AlreadyConnected(ServiceError):
+    """Already friends, or a request between the two is already open."""
+
+
+class Blocked(ServiceError):
+    """Surfaced as 404, never as "you are blocked" — see the router."""

@@ -12,6 +12,8 @@ import { RegisterPage } from '../features/auth/RegisterPage'
 import { IngredientListPage } from '../features/catalog/IngredientListPage'
 import { TeaDetailPage } from '../features/catalog/TeaDetailPage'
 import { TeaListPage } from '../features/catalog/TeaListPage'
+import { FeedPage } from '../features/feed/FeedPage'
+import { FriendsPage } from '../features/friend/FriendsPage'
 import { HomePage } from '../features/home/HomePage'
 import { HouseholdDetailPage } from '../features/household/HouseholdDetailPage'
 import { HouseholdListPage } from '../features/household/HouseholdListPage'
@@ -110,6 +112,26 @@ export function AppRoutes() {
         element={
           <RequireAuth>
             <MyReviewsPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* Neither of these means anything to a stranger: every M5 endpoint answers
+          relative to the caller — who *your* friends are, what *you* are allowed to
+          see — so there is no signed-out version of either page to fall back to. */}
+      <Route
+        path="/friends"
+        element={
+          <RequireAuth>
+            <FriendsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/feed"
+        element={
+          <RequireAuth>
+            <FeedPage />
           </RequireAuth>
         }
       />

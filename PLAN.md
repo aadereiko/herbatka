@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0 · M1 · M2 · M3 · M4 done**. Next up: M5 — friends.
+Status: **M0–M5 done**. Next up: M6 — polish, then M7 — ship.
 
 ---
 
@@ -261,11 +261,25 @@ Two things this milestone forced, both worth keeping in mind for M5:
   cached the anonymous answer. Found in a browser, not by a test; there is now a
   regression test that fails without the fix.
 
-### M5 — Friends
+### M5 — Friends ✅
 `friendship` with request/accept/block. Friend search by display name or email.
 Review visibility widens to friends. A simple activity feed: friends' recent reviews
 and newly-stocked teas.
-**Done when:** accepting a request makes their reviews appear in your feed.
+**Done.** `friendship` stores one row per pair in a canonical order
+(`user_a_id < user_b_id`), which makes A→B and B→A unrepresentable and forbids
+befriending yourself for free. Ordering the pair discards "who asked", so
+`requested_by_id` and `blocked_by_id` are separate: a pending request reads as outgoing
+to one side and incoming to the other, and only the blocker can lift a block. A blocked
+sender gets the same 404 as an unknown user, byte for byte. Search matches display names
+partially but emails only in full, so the box cannot enumerate addresses. The feed is one
+`UNION ALL` timeline with an id tiebreak, then two batched lookups.
+169 backend + 90 frontend tests.
+
+**Scope call:** the matrix above hints at friends-only reviews, but M4 shipped them
+public and this milestone's acceptance criterion is about the feed, so reviews stayed
+public. The feed carries friends' *reviews* plus tins added in households *you* belong
+to — never a friend's shelf, which stays private to its members
+(`test_a_friends_household_stock_stays_private`).
 
 ### M6 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

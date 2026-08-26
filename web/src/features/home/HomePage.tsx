@@ -62,6 +62,33 @@ export function HomePage() {
           </button>
         </section>
 
+        {/* First on the page, above the kitchen and the catalog.
+            The brief allowed either embedding the feed here or linking to it
+            prominently; linking won. This page is not a `PageShell` — it is its own
+            narrow, centred layout with the session card at the top — so inlining a
+            paginated stream would mean either rebuilding the feed at half width or
+            rebuilding this page around it. A pair of links at the very top, above
+            everything else, is not "buried", and the nav carries /feed on every screen
+            besides. */}
+        <nav
+          aria-label="People"
+          className="w-full max-w-md space-y-3 rounded-2xl border border-brand-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+            People
+          </h2>
+          <ShelfLink
+            to="/feed"
+            title="Activity"
+            blurb="What your friends rated, and what landed on your shelves."
+          />
+          <ShelfLink
+            to="/friends"
+            title="Friends"
+            blurb="Requests waiting, and people to add."
+          />
+        </nav>
+
         <nav
           aria-label="Kitchen"
           className="w-full max-w-md space-y-3 rounded-2xl border border-brand-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
