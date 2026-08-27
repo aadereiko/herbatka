@@ -98,7 +98,7 @@ export function BuyForm({
       <div
         role="status"
         data-testid="buy-success"
-        className="space-y-3 rounded-lg bg-brand-50 p-3 text-sm text-brand-900 dark:bg-brand-900 dark:text-brand-100"
+        className="note-info space-y-3"
       >
         <p>
           {formatGrams(tin.quantity_grams)} of {tin.tea.name} on the shelf

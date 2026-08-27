@@ -99,7 +99,7 @@ export function ListingRow({
               target="_blank"
               rel="noopener noreferrer"
               data-testid={`listing-link-${listing.id}`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-800 transition hover:bg-brand-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-brand-200 dark:hover:bg-neutral-800"
+              className="btn btn-md btn-secondary gap-1.5"
             >
               Buy at {shop.name}
               <span aria-hidden="true">↗</span>

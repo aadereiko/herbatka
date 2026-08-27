@@ -52,7 +52,7 @@ function Stat({ label, value, to }: { label: string; value: number | string; to?
     </>
   )
   const shell =
-    'rounded-2xl border border-brand-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900'
+    'rounded-2xl border border-brand-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900'
   return to ? (
     <Link
       to={to}
@@ -226,7 +226,7 @@ function SignedOut({ summary }: { summary: PublicSummary }) {
   const { tea_count, shop_count, ingredient_count, featured } = summary
   return (
     <>
-      <section className="rounded-2xl border border-brand-200 bg-white px-6 py-10 text-center dark:border-neutral-800 dark:bg-neutral-900 sm:px-10 sm:py-14">
+      <section className="rounded-2xl border border-brand-200 bg-white px-6 py-10 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:px-10 sm:py-14">
         <p className="text-4xl" role="img" aria-label="teacup">
           🍵
         </p>

@@ -305,7 +305,7 @@ export function ShopListPage() {
       {filters.near && (
         <div
           data-testid="nearby-banner"
-          className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-brand-50 p-3 text-sm text-brand-800 dark:bg-brand-900 dark:text-brand-100"
+          className="note-info mb-4 flex flex-wrap items-center justify-between gap-2"
         >
           {/* The second sentence is the honest half. Sorting by distance drops every
               shop nobody has pinned, and a list quietly missing a third of itself is

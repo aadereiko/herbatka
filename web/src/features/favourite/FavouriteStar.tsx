@@ -66,7 +66,7 @@ export function FavouriteStar({
       } ${
         isFavourite
           ? 'border-amber-300 bg-amber-100 text-amber-700 hover:bg-amber-200 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300'
-          : 'border-brand-200 bg-white/90 text-neutral-400 hover:text-amber-600 dark:border-neutral-700 dark:bg-neutral-900/90 dark:text-neutral-500'
+          : 'border-brand-200 bg-white text-neutral-400 hover:text-amber-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-500'
       }`}
     >
       <span aria-hidden="true">{isFavourite ? '★' : '☆'}</span>

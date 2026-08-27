@@ -26,7 +26,7 @@ import { useProfile } from './queries'
  *  read as a person who hates every tea they have ever drunk. */
 function Fact({ label, value, testId }: { label: string; value: string; testId: string }) {
   return (
-    <div className="rounded-2xl border border-brand-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="rounded-2xl border border-brand-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
         {label}
       </dt>

@@ -19,7 +19,7 @@ export function AuthCard({
   children: ReactNode
 }) {
   return (
-    <main className="grid min-h-dvh place-items-center bg-brand-50 p-6 dark:bg-neutral-950">
+    <main className="wood-ground grid min-h-dvh place-items-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-brand-200 bg-white p-8 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-center gap-3">
           <span className="text-3xl" role="img" aria-label="teacup">
