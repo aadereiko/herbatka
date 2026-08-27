@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6g done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6h done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -451,6 +451,39 @@ and appear in the nav, friend rows, review authors, feed actors and household me
 - The crowd average sits *above* the rating control on a card. Below, it lifted the
   select by one line on exactly the cards that had one, so a row of six ended up with its
   controls at two heights for a reason nobody could see.
+
+### M6h — A cartoon wooden tea house ✅
+- **`brand-*` is no longer "the greens".** It is one ramp walking from washi paper at 50,
+  through matcha in the middle, to sumi ink at 900, with the hue rotating along it. That
+  is the whole trick: feature code already writes `bg-brand-50` for the page,
+  `border-brand-200` for card edges, `text-brand-700` for links and `text-brand-900` for
+  headings, so re-teaching ten tokens retinted roughly twenty screens without editing
+  them — and each landed on the *right* material.
+- ⚠️ **Read that again before writing new code.** `brand-50`–`brand-300` are paper and
+  timber, not pale green. Anything written assuming "brand = green" will be surprised at
+  the light end of the ramp.
+- `neutral-*` gained warmth at the same lightness, so the app's ~130 muted greys stop
+  looking like grey pasted onto brown; `--color-white` is washi, because 21 call sites
+  say `bg-white` meaning "a card".
+- **Four Tailwind utilities are overridden** in an `@layer utilities` block: `border` is
+  2px, `bg-white` and `bg-brand-50/100` carry texture, `rounded-2xl` is deliberately out
+  of true. Border weight and surface texture have no theme token in v4 and they are half
+  of "hand-drawn", so overriding the utility was the only way to reach ~100 hardcoded
+  call sites. **This is a real cost:** `border` does not mean what the Tailwind docs say
+  it means in this repo. Kept because the alternative was editing a hundred call sites
+  for purity; if it ever bites, the honest replacement is an explicit `border-2` and a
+  real `Card` primitive.
+- Texture is CSS only — no image assets, no requests. Grain and fibre as repeating
+  gradients whose periods share no factor under 1189px, under 6% alpha.
+- Type is a rounded *system* stack led by `ui-rounded` rather than a webfont, so the app
+  still makes no network requests for fonts. Self-hosted Zen Maru Gothic is the upgrade
+  if it is ever wanted.
+- Dark is a tea house at night — stained walnut and a lamp — not the same design with
+  inverted greys. Every pairing the app actually uses was measured; all clear AA, and the
+  focus ring got better rather than worse (3.4 → 4.9 on paper).
+- The primary button recipe had been copy-pasted into four files and drifted. It is now
+  `btn` + size + variant utilities, which `Button`/`LinkButton` map onto; no call site
+  learned a class name.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

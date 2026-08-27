@@ -103,13 +103,13 @@ export function ImageUploadField({
             src={value}
             alt={previewAlt}
             data-testid={`${id}-preview`}
-            className="h-28 w-28 rounded-xl object-cover"
+            className="h-28 w-28 rounded-xl border border-brand-200 object-cover dark:border-neutral-700"
           />
         ) : (
           <div
             aria-hidden="true"
             data-testid={`${id}-placeholder`}
-            className="grid h-28 w-28 place-items-center rounded-xl bg-brand-100 text-3xl dark:bg-neutral-800"
+            className="grid h-28 w-28 place-items-center rounded-xl border border-dashed border-brand-300 bg-brand-100 text-3xl dark:border-neutral-600 dark:bg-neutral-800"
           >
             🍃
           </div>
@@ -127,7 +127,9 @@ export function ImageUploadField({
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
             onChange={(event) => handleFile(event.target.files?.[0])}
-            className="text-sm text-neutral-700 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-neutral-300"
+            // `btn-file` paints ::file-selector-button with the same recipe as
+            // `btn btn-md btn-primary`; see index.css for why it needs its own utility.
+            className="btn-file text-sm text-neutral-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-neutral-300"
           />
 
           {value && !upload.isPending && (

@@ -42,7 +42,7 @@ function useMenuClose(): () => void {
 }
 
 const ITEM_CLASS =
-  'block w-full cursor-pointer px-3 py-2 text-left text-sm text-neutral-700 hover:bg-brand-50 focus:bg-brand-50 focus:outline-none dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800'
+  'block w-full cursor-pointer px-3 py-2 text-left text-sm text-brand-800 hover:bg-brand-100 focus:bg-brand-100 focus:outline-none dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800'
 
 export function MenuLink({
   to,
@@ -232,7 +232,10 @@ export function Menu({
         aria-controls={menuId}
         data-testid={triggerTestId}
         onClick={() => setOpen((value) => !value)}
-        className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm font-medium text-neutral-600 hover:bg-brand-50 hover:text-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-neutral-300 dark:hover:bg-neutral-800 ${triggerClassName}`}
+        // The identical `btn btn-md btn-quiet` the nav's inactive entries wear: a menu
+        // trigger sitting in that row and looking like something else was the old bar's
+        // one visible seam.
+        className={`btn btn-md btn-quiet focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${triggerClassName}`}
       >
         {trigger}
         <span aria-hidden="true" className="text-[0.6rem] leading-none">
@@ -247,7 +250,9 @@ export function Menu({
         aria-labelledby={triggerId}
         hidden={!open}
         data-testid={menuTestId}
-        className={`absolute z-20 mt-1 min-w-44 overflow-hidden rounded-xl border border-brand-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 ${
+        // `mt-2` rather than `mt-1`: the panel now carries a 3-4px hard offset shadow of
+        // its own, and at `mt-1` that shadow collided with the trigger's hover edge.
+        className={`absolute z-20 mt-2 min-w-44 overflow-hidden rounded-xl border border-brand-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 ${
           align === 'right' ? 'right-0' : 'left-0'
         }`}
       >

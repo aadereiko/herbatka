@@ -9,6 +9,10 @@
  * a colour derived from their name: stable across every screen they appear on, different
  * from the person above them, and readable at 24px.
  *
+ * Both forms wear the same thin ink edge. A photograph dropped straight onto timber has
+ * no outline of its own, and next to initials — which do, being a filled circle — the two
+ * stopped looking like the same component.
+ *
  * Decorative throughout — `alt=""` on the photo, `aria-hidden` on the initials. Every
  * call site in the app puts the display name immediately beside it, so an accessible
  * name here would only make a screen reader read the person twice. The one place that
@@ -75,7 +79,7 @@ export function Avatar({
         alt=""
         data-testid={testId}
         loading="lazy"
-        className={`${SIZES[size]} shrink-0 rounded-full object-cover`}
+        className={`${SIZES[size]} shrink-0 rounded-full border border-brand-800/25 object-cover dark:border-black/50`}
       />
     )
   }
@@ -84,7 +88,7 @@ export function Avatar({
     <span
       aria-hidden="true"
       data-testid={testId}
-      className={`${SIZES[size]} ${toneOf(name)} inline-grid shrink-0 place-items-center rounded-full font-semibold leading-none`}
+      className={`${SIZES[size]} ${toneOf(name)} inline-grid shrink-0 place-items-center rounded-full border border-brand-800/25 font-semibold leading-none dark:border-black/50`}
     >
       {initialsOf(name)}
     </span>

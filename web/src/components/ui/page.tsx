@@ -9,10 +9,19 @@ import { Avatar } from './avatar'
 import { Button } from './button'
 import { Menu, MenuButton, MenuLink } from './menu'
 
+/**
+ * A nav entry, and the one place in the app where "where am I" is worth shouting.
+ *
+ * Active is a pressed matcha tile with its own ink edge rather than the old pale
+ * highlight: the bar is now a wooden beam, and a tint-on-tint highlight disappears
+ * against grain. Cream on `brand-600` is 6.2:1, so the loudest state is also the most
+ * readable one. Inactive text is `brand-800` rather than a grey — grey on timber reads
+ * as a rendering fault.
+ */
 function navClass({ isActive }: { isActive: boolean }): string {
   return isActive
-    ? 'rounded-lg bg-brand-100 px-2.5 py-1 text-sm font-semibold text-brand-900 dark:bg-neutral-800 dark:text-brand-100'
-    : 'rounded-lg px-2.5 py-1 text-sm font-medium text-neutral-600 hover:bg-brand-50 hover:text-brand-800 dark:text-neutral-300 dark:hover:bg-neutral-800'
+    ? 'btn btn-md btn-primary font-semibold'
+    : 'btn btn-md btn-quiet'
 }
 
 /**
@@ -178,16 +187,26 @@ function SiteNav() {
   }
 
   return (
-    <header className="border-b border-brand-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+    // The beam the shop sign hangs off: a band of lighter timber with grain (free, from
+    // `bg-brand-100`), a thick ink underline, and the house drop shadow so the bar sits
+    // *on* the room rather than being a hairline drawn across it. It stays lighter than
+    // the ground in both schemes — by night that reads as the one lit surface.
+    <header className="border-b-[3px] border-brand-800/50 bg-brand-100 shadow-sm dark:border-neutral-950 dark:bg-neutral-900">
       <nav
         aria-label="Main"
         className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:px-6"
       >
         <Link
           to={user ? '/' : '/teas'}
-          className="mr-auto flex items-center gap-2 text-base font-semibold text-brand-900 dark:text-brand-100"
+          className="mr-auto flex items-center gap-2 text-lg font-bold text-brand-900 dark:text-brand-50"
         >
-          <span role="img" aria-label="teacup">
+          <span
+            role="img"
+            aria-label="teacup"
+            // The cup gets a little wooden coaster of its own. It is the app's only logo,
+            // and a bare emoji beside bold text reads as a stray character.
+            className="grid size-8 place-items-center rounded-full border border-brand-800/60 bg-white text-base shadow-2xs dark:border-neutral-950 dark:bg-neutral-800"
+          >
             🍵
           </span>
           Herbatka
@@ -200,7 +219,7 @@ function SiteNav() {
             aria-expanded={open}
             aria-controls="nav-primary"
             onClick={() => setOpen((value) => !value)}
-            className="rounded-lg px-2 py-1 text-lg leading-none text-neutral-600 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-neutral-300 dark:hover:bg-neutral-800 sm:hidden"
+            className="btn btn-sm btn-secondary text-lg leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:hidden"
           >
             <span aria-hidden="true">☰</span>
             <span className="sr-only">Menu</span>
@@ -249,9 +268,12 @@ function SiteNav() {
   )
 }
 
+/** `wood-ground` rather than `bg-brand-50 dark:bg-neutral-950`: the utility carries both
+ *  colours *and* the grain, plank seams and night lamp, and pairing it with the colour
+ *  utilities would knock its own background-image out. See the note on it in index.css. */
 export function PageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-brand-50 dark:bg-neutral-950">
+    <div className="wood-ground min-h-dvh">
       <SiteNav />
       <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
     </div>
@@ -273,13 +295,20 @@ export function PageHeading({
   leading?: ReactNode
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
       <div className="flex items-center gap-3">
         {leading}
         <div>
-          <h1 className="text-2xl font-semibold text-brand-900 dark:text-brand-100">{title}</h1>
+          {/* One brush stroke under the title, on every page, from one place. It is the
+              app's only ornament, and it is here rather than on each page for the usual
+              reason: a signature that half the screens are missing is not a signature.
+              The subtitle drops to `mt-3` to clear the stroke, which hangs below the
+              heading's box. */}
+          <h1 className="brush-underline text-2xl font-bold text-brand-900 dark:text-brand-50 sm:text-3xl">
+            {title}
+          </h1>
           {subtitle && (
-            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{subtitle}</p>
+            <p className="mt-3 text-sm text-neutral-600 dark:text-neutral-400">{subtitle}</p>
           )}
         </div>
       </div>
@@ -288,15 +317,34 @@ export function PageHeading({
   )
 }
 
+export type PanelTone = 'paper' | 'wood'
+
+/**
+ * Paper is a card you read; wood is a card you read *past*.
+ *
+ * Two tones rather than one because the app kept reaching for
+ * `rounded-xl bg-brand-50 p-3` by hand whenever something needed to sit visibly *inside*
+ * a card — a brewing table, a picked-shop row, a note above a list — and once every
+ * surface is textured, a paper card nested inside a paper card is invisible. Timber for
+ * the inner one solves it in a way a shade of grey no longer can.
+ */
+const PANEL_TONES: Record<PanelTone, string> = {
+  paper: 'border-brand-200 bg-white dark:border-neutral-700 dark:bg-neutral-900',
+  wood: 'border-brand-300/70 bg-brand-50 dark:border-neutral-700 dark:bg-neutral-800',
+}
+
 export function Panel({
   children,
   as: Tag = 'section',
+  tone = 'paper',
   className = '',
   ariaLabel,
   testId,
 }: {
   children: ReactNode
   as?: 'section' | 'div' | 'li'
+  /** `wood` for a panel nested inside another panel. Default `paper`. */
+  tone?: PanelTone
   className?: string
   ariaLabel?: string
   testId?: string
@@ -305,7 +353,7 @@ export function Panel({
     <Tag
       aria-label={ariaLabel}
       data-testid={testId}
-      className={`rounded-2xl border border-brand-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:p-6 ${className}`}
+      className={`rounded-2xl border p-4 shadow-sm ${PANEL_TONES[tone]} sm:p-6 ${className}`}
     >
       {children}
     </Tag>
@@ -314,11 +362,15 @@ export function Panel({
 
 export type BadgeTone = 'brand' | 'neutral' | 'amber' | 'rose'
 
+/** Drawn edges, like everything else — but at 1.5px, set explicitly so the house-wide
+ *  2px `border` does not apply. A 2px outline around an 18px-tall pill is a black olive,
+ *  and a tea card wears four of these at once. */
 const BADGE_TONES: Record<BadgeTone, string> = {
-  brand: 'bg-brand-100 text-brand-800 dark:bg-brand-900 dark:text-brand-100',
-  neutral: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
-  amber: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  rose: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200',
+  brand: 'border-brand-300/60 bg-brand-100 text-brand-800 dark:border-brand-700 dark:bg-brand-900 dark:text-brand-100',
+  neutral:
+    'border-neutral-300 bg-neutral-100 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
+  amber: 'border-amber-300/70 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200',
+  rose: 'border-rose-300/70 bg-rose-100 text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200',
 }
 
 export function Badge({
@@ -330,7 +382,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}
+      className={`inline-block rounded-full border-[1.5px] px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}
     >
       {children}
     </span>
@@ -341,7 +393,7 @@ export function Skeleton({ className = 'h-4 w-full' }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={`animate-pulse rounded bg-brand-100 dark:bg-neutral-800 ${className}`}
+      className={`animate-pulse rounded-md bg-brand-100 dark:bg-neutral-800 ${className}`}
     />
   )
 }
@@ -368,7 +420,7 @@ export function LoadingGrid({
       {Array.from({ length: count }, (_, index) => (
         <div
           key={index}
-          className="space-y-3 rounded-2xl border border-brand-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+          className="space-y-3 rounded-2xl border border-brand-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
         >
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-4 w-2/3" />
@@ -391,7 +443,10 @@ export function EmptyState({
   return (
     <div
       data-testid={testId}
-      className="rounded-2xl border border-dashed border-brand-300 bg-white p-8 text-center dark:border-neutral-700 dark:bg-neutral-900"
+      // An empty tray rather than an empty card: timber under a chunky dashed edge, so
+      // "there is nothing here yet" looks like a place waiting for something rather than
+      // like a card that failed to load.
+      className="rounded-2xl border border-dashed border-brand-300 bg-brand-50 p-8 text-center dark:border-neutral-600 dark:bg-neutral-900"
     >
       <p className="text-base font-semibold text-brand-900 dark:text-brand-100">{title}</p>
       {children && (
@@ -408,7 +463,7 @@ export function ErrorNote({ children, testId }: { children: ReactNode; testId?: 
     <p
       role="alert"
       data-testid={testId}
-      className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+      className="note-error"
     >
       {children}
     </p>

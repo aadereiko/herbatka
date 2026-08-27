@@ -38,6 +38,8 @@ export function EntityImage({
       <div
         aria-hidden="true"
         data-testid={testId ? `${testId}-placeholder` : undefined}
+        // `bg-brand-100` picks up the wood grain from index.css for free, so the
+        // stand-in reads as an empty board with a leaf on it rather than as a grey box.
         className={`grid place-items-center bg-brand-100 text-4xl dark:bg-neutral-800 ${className}`}
       >
         🍃

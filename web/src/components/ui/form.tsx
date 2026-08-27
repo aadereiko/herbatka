@@ -9,8 +9,19 @@ import type { ReactNode } from 'react'
  * drift apart. The auth pages' own prop shapes are unchanged.
  */
 
+/**
+ * A field is a slot cut into the board: timber inside a drawn edge, sunk half a step
+ * below the paper it sits on.
+ *
+ * Two changes worth naming. The fill is `brand-50`/`neutral-950` rather than paper white —
+ * once cards are paper, a paper input inside a paper card has nothing but its border to
+ * say it is an input, and a border alone is not enough at a glance. And the focus ring
+ * moved from `brand-200` to `brand-500/35`: `brand-200` used to be a pale green and is now
+ * the mid-brown the borders are drawn in, so a ring in it would have been invisible
+ * against the border it surrounds.
+ */
 const CONTROL_CLASS =
-  'w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:ring-brand-900'
+  'w-full rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-neutral-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/35 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:border-brand-400 dark:focus:ring-brand-400/35'
 
 /** The bit every field has in common: a real `<label for>`, and an error paragraph the
  *  control points at with `aria-describedby` so it is announced with the field rather
@@ -222,7 +233,7 @@ export function CheckboxField({
         checked={checked}
         aria-label={ariaLabel}
         onChange={(event) => onChange(event.target.checked)}
-        className="size-4 rounded border-brand-300 text-brand-600 focus:ring-2 focus:ring-brand-200 dark:border-neutral-600 dark:focus:ring-brand-900"
+        className="size-4 rounded-sm border-brand-300 text-brand-600 focus:ring-2 focus:ring-brand-500/35 dark:border-neutral-600 dark:focus:ring-brand-400/35"
       />
       <label htmlFor={id} className="text-sm text-neutral-700 dark:text-neutral-300">
         {label}
@@ -244,7 +255,7 @@ export function FormError({
     <p
       role="alert"
       data-testid={testId}
-      className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+      className="note-error"
     >
       {children}
     </p>
@@ -256,7 +267,7 @@ export function FormNote({ children, testId }: { children: ReactNode; testId?: s
     <p
       role="status"
       data-testid={testId}
-      className="rounded-lg bg-brand-50 p-3 text-sm text-brand-800 dark:bg-brand-900 dark:text-brand-100"
+      className="note-info"
     >
       {children}
     </p>
@@ -268,7 +279,10 @@ export function SubmitButton({ pending, children }: { pending: boolean; children
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+      // Not a `Button` — this one is always `type="submit"`, always full width, and takes
+      // `pending` rather than `disabled`. It wears the same three utilities `Button` does
+      // so the two cannot drift; only the width and the heavier weight are its own.
+      className="btn btn-md btn-primary w-full font-semibold"
     >
       {children}
     </button>
