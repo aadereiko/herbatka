@@ -90,6 +90,10 @@ const signedIn = (user: User = ada) =>
   mockFetch({
     'POST /auth/refresh': () => json(sessionFor(user)),
     'GET /friends/requests': () => json([]),
+    // Both badge queries fire on every signed-in page, including the public catalog
+    // ones. Registered here so an unrelated nav test cannot fail on a request it was
+    // never about.
+    'GET /households/invitations': () => json([]),
   })
 
 const signedOut = () =>
@@ -335,4 +339,57 @@ test('below sm the four primary entries sit behind the hamburger', async () => {
   // The account menu is never inside the panel: it stays on the bar at every width, so
   // there is exactly one "Sign out" in the document.
   expect(panel.contains(screen.getByTestId('account-menu'))).toBe(false)
+})
+
+/**
+ * The Households badge, mirroring the Friends one beside it. A household invitation now
+ * arrives without a code to relay, so the only thing that tells you it is waiting is this
+ * — an invitation nobody is shown is not a feature.
+ */
+test('an outstanding household invitation shows on the Households entry, and vanishes with it', async () => {
+  const invitation = {
+    id: 'inv-1',
+    household: { id: 'hh-1', name: 'Flat 3B', image_url: null },
+    invited_by: { id: 'user-2', display_name: 'Sasha', avatar_url: null },
+    expires_at: '2026-12-01T00:00:00Z',
+    created_at: '2026-08-01T00:00:00Z',
+  }
+  mockFetch({
+    'POST /auth/refresh': () => json(sessionFor(ada)),
+    'GET /friends/requests': () => json([]),
+    'GET /households/invitations': () => json([invitation]),
+  })
+  renderNav()
+
+  const badge = await screen.findByTestId('nav-households-badge')
+  expect(badge).toHaveTextContent('1')
+  // Not a bare number for a screen reader: "1" next to "Households" says nothing.
+  expect(badge).toHaveAccessibleName('1 household invitation waiting')
+
+  cleanup()
+  signedIn()
+  renderNav()
+
+  await screen.findByTestId('nav-households')
+  expect(screen.queryByTestId('nav-households-badge')).toBeNull()
+})
+
+/**
+ * The nav renders on the public catalog pages, so a signed-out visitor must not be firing
+ * authenticated requests on every page load.
+ *
+ * Be honest about what this proves, because it is less than it looks. The property is
+ * held up twice over: the badge sits inside the `{user && …}` branch, so the hook never
+ * mounts; and the query is `enabled: isSignedIn`, so it would not fire even if it did. I
+ * checked both — removing either one on its own leaves this test green. So it is a
+ * backstop against losing *both*, not a test of either, and it is cheap enough to be
+ * worth exactly that much.
+ */
+test('signed out, the nav makes no authenticated request', async () => {
+  signedOut()
+  renderNav()
+
+  await screen.findByTestId('nav-sign-in')
+  expect(calls.some((call) => call.includes('/households/invitations'))).toBe(false)
+  expect(calls.some((call) => call.includes('/friends/requests'))).toBe(false)
 })

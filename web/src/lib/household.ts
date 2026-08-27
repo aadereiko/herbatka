@@ -39,7 +39,28 @@ export type HouseholdSummary = components['schemas']['HouseholdSummary']
 
 export type HouseholdDetail = components['schemas']['HouseholdDetail']
 
+/**
+ * One outstanding offer, as the owner's Invites panel sees it. M6h widened it: `code` is
+ * now nullable, and `invited_user`/`declined_at` arrived, because an invite comes in two
+ * flavours now — a bearer code, or a named friend. Exactly one of `code` and
+ * `invited_user` is ever set (the API's XOR CHECK guarantees it), so the panel renders
+ * whichever is not null and never has to arbitrate. `declined_at` set means they said no.
+ */
 export type Invite = components['schemas']['Invite']
+
+/** A household as it looks to somebody being invited into it: a name and a picture, and
+ *  deliberately none of the members-only counts. */
+export type HouseholdBrief = components['schemas']['HouseholdBrief']
+
+/**
+ * One offer as the *invited* person sees it — the household side of a friend request.
+ *
+ * Shaped like `FriendRequest` on purpose, because it answers the same question on the same
+ * kind of screen. `invited_by` is nullable for the same reason a feed's actor is: the
+ * household outlives the owner who sent the offer (`created_by_id` is ON DELETE SET NULL),
+ * so rendering the sender unguarded is a crash waiting for the first departed owner.
+ */
+export type Invitation = components['schemas']['Invitation']
 
 /* ------------------------------------------------------------------------ stock */
 
@@ -93,6 +114,19 @@ export type HouseholdPatch = components['schemas']['HouseholdUpdate']
 export type JoinInput = components['schemas']['JoinRequest']
 
 export type InviteInput = Omit<components['schemas']['InviteCreate'], 'expires_in_days'> & {
+  expires_in_days?: number
+}
+
+/**
+ * Invite one named friend. `expires_in_days` is reopened as optional for the same reason
+ * it is on `InviteInput`: `--default-non-nullable` renders a field carrying a `default` as
+ * required, which is right for a response and wrong for a request the server has a default
+ * for. `user_id` stays required — a friend invite with no recipient is not a thing.
+ */
+export type FriendInviteInput = Omit<
+  components['schemas']['FriendInviteCreate'],
+  'expires_in_days'
+> & {
   expires_in_days?: number
 }
 

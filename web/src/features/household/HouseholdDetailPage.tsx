@@ -331,7 +331,9 @@ export function HouseholdDetailPage() {
           />
           {/* Absent, not disabled, for a member: the endpoint is owner-only and a panel
               that can only ever answer 403 is worse than no panel at all. */}
-          {isOwner && <InvitesPanel householdId={id} />}
+          {isOwner && (
+            <InvitesPanel householdId={id} memberIds={detail.members.map((m) => m.user.id)} />
+          )}
         </div>
       </div>
     </PageShell>

@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6h done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6i done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -484,6 +484,29 @@ and appear in the nav, friend rows, review authors, feed actors and household me
 - The primary button recipe had been copy-pasted into four files and drifted. It is now
   `btn` + size + variant utilities, which `Button`/`LinkButton` map onto; no call site
   learned a class name.
+
+### M6i — Invite a friend into a household ✅
+- An owner picks a friend by name; no code to relay. The invited person sees the offer on
+  their own Households page and in a nav badge, and accepts or declines there — the same
+  shape as an incoming friend request, because an invitation nobody is shown is not a
+  feature.
+- **One table, not two.** A friend invite is the same event as a code invite — a place
+  offered, an expiry, answered once. They differ in *authority*, and that is a constraint
+  rather than a convention: `CHECK ((code IS NULL) <> (invited_user_id IS NULL))`. Bearer
+  authority (a string anyone may relay) or named authority (exactly one account may
+  accept), never both. That one CHECK is what makes the two accept paths incapable of
+  crossing.
+- You can only invite an actual friend, checked with the same read `/friends` uses. Every
+  way of not being one — no such account, never connected, still pending, they blocked
+  you — is the same 404, because a distinguishable refusal is a block announcing itself.
+- Declining **records** a refusal rather than deleting the row, the opposite of a declined
+  friend request. An owner administering a member list is entitled to know the answer came
+  back "no" instead of watching a row forever.
+- Re-inviting after a decline is allowed (a refusal is not a block); a second invite while
+  one is open is a 409, backed by a partial unique index on open invites.
+- Accepting does **not** re-check friendship: the offer came from a household, not a
+  person, so unfriending afterwards should not 404 a button already on screen. The owner
+  revokes if they change their mind.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

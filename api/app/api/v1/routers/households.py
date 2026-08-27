@@ -3,12 +3,15 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUser, DbSession, Membership, Ownership
-from app.models.household import Household, HouseholdMember
+from app.models.household import Household, HouseholdInvite, HouseholdMember
 from app.schemas.household import (
+    FriendInviteCreate,
+    HouseholdBrief,
     HouseholdCreate,
     HouseholdDetail,
     HouseholdSummary,
     HouseholdUpdate,
+    Invitation,
     Invite,
     InviteCreate,
     JoinRequest,
@@ -18,6 +21,7 @@ from app.schemas.household import (
 from app.services import household as household_service
 from app.services.errors import (
     AlreadyAMember,
+    AlreadyExists,
     InviteExpired,
     LastOwnerCannotLeave,
     NotFound,
@@ -95,6 +99,77 @@ async def join_household(payload: JoinRequest, user: CurrentUser, db: DbSession)
     return await _detail(db, household.id, user.id)
 
 
+def _invitation(invite: HouseholdInvite) -> Invitation:
+    return Invitation(
+        id=invite.id,
+        household=HouseholdBrief.model_validate(invite.household),
+        invited_by=UserRef.model_validate(invite.created_by) if invite.created_by else None,
+        created_at=invite.created_at,
+        expires_at=invite.expires_at,
+    )
+
+
+# ------------------------------------------------------------ invitations addressed to me
+#
+# Declared above `/{household_id}` on purpose: FastAPI matches in declaration order, so a
+# GET of `/households/invitations` would otherwise be read as a household whose id is the
+# word "invitations" and answered with a 422. `/households/join` sits above it for the
+# same reason and has since M3.
+
+
+@router.get("/invitations", response_model=list[Invitation])
+async def list_invitations(user: CurrentUser, db: DbSession) -> list[Invitation]:
+    """What is waiting on you, the counterpart of `GET /friends/requests`.
+
+    Not owner-scoped and not household-scoped: this is the one household read that is
+    answered entirely relative to the caller, which is what lets the invited person see it
+    without being a member of anything.
+    """
+    invites = await household_service.list_invitations(db, user.id)
+    return [_invitation(i) for i in invites]
+
+
+@router.post("/invitations/{invite_id}/accept", response_model=HouseholdDetail)
+async def accept_invitation(
+    invite_id: uuid.UUID, user: CurrentUser, db: DbSession
+) -> HouseholdDetail:
+    try:
+        household = await household_service.accept_invitation(db, invite_id, user)
+    except NotFound as exc:
+        # Somebody else's invitation, one already answered, and one that never existed all
+        # answer the same. An invitation id is a capability; confirming that one exists to
+        # a person it was not addressed to is the same leak as a probeable household id.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No such invitation"
+        ) from exc
+    except InviteExpired as exc:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE, detail="That invitation has expired"
+        ) from exc
+    except AlreadyAMember as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You are already a member of that household",
+        ) from exc
+    return await _detail(db, household.id, user.id)
+
+
+@router.post("/invitations/{invite_id}/decline", status_code=status.HTTP_204_NO_CONTENT)
+async def decline_invitation(invite_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
+    """POST rather than DELETE, because declining *writes* something.
+
+    A declined invitation is stamped, not removed — the owner is entitled to know they can
+    stop waiting. The verb says so, so nobody reads the route table and assumes the row is
+    gone.
+    """
+    try:
+        await household_service.decline_invitation(db, invite_id, user)
+    except NotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No such invitation"
+        ) from exc
+
+
 @router.get("/{household_id}", response_model=HouseholdDetail)
 async def get_household(
     household_id: uuid.UUID, member: Membership, db: DbSession
@@ -144,6 +219,41 @@ async def create_invite(
     household_id: uuid.UUID, payload: InviteCreate, owner: Ownership, db: DbSession
 ) -> Invite:
     invite = await household_service.create_invite(db, household_id, payload, owner.user)
+    return Invite.model_validate(invite)
+
+
+@router.post(
+    "/{household_id}/invites/friend",
+    response_model=Invite,
+    status_code=status.HTTP_201_CREATED,
+)
+async def invite_friend(
+    household_id: uuid.UUID, payload: FriendInviteCreate, owner: Ownership, db: DbSession
+) -> Invite:
+    """Invite somebody you are already friends with, by id rather than by code.
+
+    A sibling of `POST …/invites` under the same collection and behind the same
+    `Ownership`, because it is the same act with a named recipient. The code route is
+    untouched and stays the answer for somebody who is not on Herbatka yet.
+    """
+    try:
+        invite = await household_service.invite_friend(
+            db, household_id, payload.user_id, owner.user, payload.expires_in_days
+        )
+    except NotFound as exc:
+        # Byte-identical for "no such account", "not your friend", "request still pending"
+        # and "they blocked you". See `invite_friend` in the service for why.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such friend") from exc
+    except AlreadyAMember as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="They are already in this household",
+        ) from exc
+    except AlreadyExists as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="They have already been invited and have not answered yet",
+        ) from exc
     return Invite.model_validate(invite)
 
 

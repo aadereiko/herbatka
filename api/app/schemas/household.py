@@ -55,20 +55,74 @@ class HouseholdUpdate(BaseModel):
     image_url: str | None = Field(default=None, max_length=500)
 
 
+class HouseholdBrief(BaseModel):
+    """A household as it looks to somebody who is not in it yet.
+
+    Name and picture and nothing else: an invitation has to say *which* shelf is being
+    offered, and "Flat 3B" next to a photograph is how somebody recognises it. Counts are
+    absent on purpose — how many tins are in a household is a members-only fact, and an
+    invitation is not membership.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    image_url: str | None
+
+
 class InviteCreate(BaseModel):
     invited_email: str | None = Field(default=None, max_length=320)
     expires_in_days: int = Field(default=14, ge=1, le=90)
 
 
+class FriendInviteCreate(BaseModel):
+    """Invite one named friend. `user_id` only — an email here would be a second way to
+    name a recipient and would reopen exactly the "invite an arbitrary stranger" door the
+    friendship check exists to close."""
+
+    user_id: uuid.UUID
+    expires_in_days: int = Field(default=14, ge=1, le=90)
+
+
 class Invite(BaseModel):
+    """One outstanding offer, as the household's owner sees it.
+
+    `code` and `invited_user` are the two flavours and exactly one is ever populated — the
+    `ck_household_invite_code_xor_recipient` CHECK guarantees it — so a client renders
+    whichever is not null and never has to decide which wins.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    code: str
+    code: str | None
     invited_email: str | None
+    invited_user: UserRef | None
     expires_at: datetime
     created_at: datetime
     accepted_at: datetime | None
+    # Set means they said no. The owner is shown it rather than left watching a row that
+    # will never move; see `decline_invitation`.
+    declined_at: datetime | None
+
+
+class Invitation(BaseModel):
+    """One offer, as the invited person sees it.
+
+    Shaped after `FriendRequest` rather than after `Invite`, because it answers the same
+    question on the same kind of screen: something is waiting on you, here is who it is
+    from, accept or decline. It carries no code — a named invite has none — and no member
+    list, because you are not a member yet.
+    """
+
+    id: uuid.UUID
+    household: HouseholdBrief
+    # Nullable because `created_by_id` is ON DELETE SET NULL: the household outlives the
+    # owner who sent the invitation, and so does the invitation.
+    invited_by: UserRef | None
+    created_at: datetime
+    expires_at: datetime
 
 
 class JoinRequest(BaseModel):

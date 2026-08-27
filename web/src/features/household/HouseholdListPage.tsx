@@ -17,6 +17,7 @@ import { describeApiError } from '../../lib/api'
 import type { HouseholdSummary } from '../../lib/household'
 import { MEMBER_ROLE_LABELS } from '../../lib/household'
 import { pluralise } from '../catalog/format'
+import { InvitationsPanel } from './InvitationsPanel'
 import { useCreateHousehold, useHouseholdList, useJoinHousehold } from './queries'
 
 function HouseholdCard({ household }: { household: HouseholdSummary }) {
@@ -172,6 +173,10 @@ export function HouseholdListPage() {
         title="Households"
         subtitle="A shared shelf. Everyone in one sees the same tins and the same amounts left."
       />
+
+      {/* Anything waiting on you, first — the same placement incoming friend requests get
+          on /friends. Renders nothing when there is nothing to answer. */}
+      <InvitationsPanel />
 
       {households.isError && (
         <div className="mb-6">

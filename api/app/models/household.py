@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -86,6 +87,39 @@ class HouseholdMember(Timestamps, Base):
 
 
 class HouseholdInvite(UUIDPrimaryKey, Timestamps, Base):
+    """One offer to join a household, in one of exactly two flavours.
+
+    **Why this is one table and not two.** M6h asked for "invite a friend", and the first
+    instinct was a second table — `household_friend_invite` — beside this one. It is the
+    same event: a household offers somebody a place on its shelf, that offer expires, and
+    it is answered once. Splitting it would have duplicated `expires_at`, `accepted_at`,
+    `accepted_by_id`, the revoke endpoint, the owner's pending list and the "already a
+    member" check, and then required the owner's panel to merge two queries to answer the
+    single question it exists to answer: *who have we asked?*
+
+    **What the two flavours actually differ in is authority, and that is a constraint.**
+
+    - A **code** invite is *bearer* authority: whoever holds the string may join, and the
+      string is meant to be relayed through a channel we do not own.
+    - A **friend** invite is *named* authority: exactly one account may accept it, we know
+      which, and nothing is relayed anywhere.
+
+    Two authorisation models in one row is the classic way to end up running the wrong
+    check, so they are made mutually exclusive by `ck_household_invite_code_xor_recipient`
+    rather than by everyone remembering. That single CHECK is what makes the two accept
+    paths incapable of crossing: `accept_invite(code)` matches on `code = :code`, which no
+    named invite can satisfy because its code is NULL, and `accept_invitation(id)` matches
+    on `invited_user_id = :me`, which no code invite can satisfy because *its* recipient is
+    NULL. `POST /households/join` therefore behaves in M6h exactly as it did in M3, and its
+    tests did not need a line changed.
+
+    `declined_at` records a refusal instead of deleting the row, which is the opposite of
+    what a declined *friend request* does. The asymmetry is deliberate: a friend request is
+    a private matter between two people and a silent "no" is a kindness, whereas a
+    household has an owner who is administering a member list and is entitled to stop
+    waiting. See `decline_invitation` in `services/household.py`.
+    """
+
     __tablename__ = "household_invite"
 
     household_id: Mapped[uuid.UUID] = mapped_column(
@@ -93,8 +127,20 @@ class HouseholdInvite(UUIDPrimaryKey, Timestamps, Base):
     )
     # Short, unguessable, and unique across all households — the code alone is enough
     # to join, so it is generated from secrets, never from the household name or id.
-    code: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    #
+    # Nullable since M6h, and only for a named invite: there is nothing to relay when the
+    # recipient is a row in `user_account`, and minting a code anyway would quietly make
+    # every "invite my flatmate" forwardable to a stranger. Postgres permits any number of
+    # NULLs under a UNIQUE constraint, so the code's uniqueness is untouched.
+    code: Mapped[str | None] = mapped_column(String(32), unique=True)
     invited_email: Mapped[str | None] = mapped_column(String(320))
+    # The named recipient, and the *only* account that may answer this invite. CASCADE
+    # rather than SET NULL: an invitation whose recipient no longer exists is not a
+    # weaker invitation, it is no invitation at all — and SET NULL would silently turn it
+    # into a codeless, recipientless row that violates the XOR below.
+    invited_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE")
+    )
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("user_account.id", ondelete="SET NULL")
     )
@@ -103,10 +149,54 @@ class HouseholdInvite(UUIDPrimaryKey, Timestamps, Base):
     accepted_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("user_account.id", ondelete="SET NULL")
     )
+    declined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     household: Mapped[Household] = relationship(back_populates="invites")
+    # Three foreign keys point at user_account now, so every relationship has to say which
+    # one it walks — SQLAlchemy cannot guess and raises AmbiguousForeignKeysError.
+    invited_user: Mapped[User | None] = relationship(foreign_keys=[invited_user_id])
+    created_by: Mapped[User | None] = relationship(foreign_keys=[created_by_id])
 
-    __table_args__ = (Index("ix_household_invite_household_id", "household_id"),)
+    __table_args__ = (
+        # Exactly one of the two flavours, never both and never neither. "Neither" would be
+        # an invite nobody can accept; "both" would be a named invite with a bearer token
+        # stapled to it, which is the security hole this table is shaped to avoid.
+        CheckConstraint(
+            "(code IS NULL) <> (invited_user_id IS NULL)",
+            name="ck_household_invite_code_xor_recipient",
+        ),
+        # An invite is answered once. Accepted-and-declined is not a state anyone should
+        # have to write a reader for.
+        CheckConstraint(
+            "accepted_at IS NULL OR declined_at IS NULL",
+            name="ck_household_invite_one_answer",
+        ),
+        # Only a named recipient can decline: a code invite has nobody whose refusal it
+        # would be recording.
+        CheckConstraint(
+            "declined_at IS NULL OR invited_user_id IS NOT NULL",
+            name="ck_household_invite_decline_is_named",
+        ),
+        Index("ix_household_invite_household_id", "household_id"),
+        # "What is waiting for me" reads by recipient across every household, so it needs
+        # its own index — the partial unique below leads with household_id and cannot
+        # serve it.
+        Index("ix_household_invite_invited_user", "invited_user_id"),
+        # At most one *open* invitation per person per household. The service checks this
+        # first and answers 409 with a sentence; the index is what makes two owners
+        # clicking "Invite Bruno" at the same instant impossible rather than merely
+        # unlikely. Partial, because a household may quite reasonably re-invite somebody
+        # who declined last month, and because an accepted invite is history.
+        Index(
+            "uq_household_invite_open_recipient",
+            "household_id",
+            "invited_user_id",
+            unique=True,
+            postgresql_where=text(
+                "invited_user_id IS NOT NULL AND accepted_at IS NULL AND declined_at IS NULL"
+            ),
+        ),
+    )
 
 
 class StockItem(UUIDPrimaryKey, Timestamps, Base):

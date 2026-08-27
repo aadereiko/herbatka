@@ -5,6 +5,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../../features/auth/auth-context'
 import type { User } from '../../lib/api'
 import { useIncomingRequestCount } from '../../features/friend/queries'
+import { useIncomingInvitationCount } from '../../features/household/queries'
 import { Avatar } from './avatar'
 import { Button } from './button'
 import { Menu, MenuButton, MenuLink } from './menu'
@@ -44,6 +45,24 @@ function IncomingBadge() {
     <span
       data-testid="nav-friends-badge"
       aria-label={`${count} friend ${count === 1 ? 'request' : 'requests'} waiting`}
+      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-xs font-semibold text-white"
+    >
+      {count}
+    </span>
+  )
+}
+
+/** The same badge for a household you have been invited to join. Same `isSignedIn` gate
+ *  as the one above, and for the same reason: the nav renders on the public catalog pages
+ *  and a signed-out visitor must not be firing an authenticated request on every load. */
+function InvitationsBadge() {
+  const count = useIncomingInvitationCount()
+  if (count === 0) return null
+
+  return (
+    <span
+      data-testid="nav-households-badge"
+      aria-label={`${count} household ${count === 1 ? 'invitation' : 'invitations'} waiting`}
       className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-xs font-semibold text-white"
     >
       {count}
@@ -245,6 +264,7 @@ function SiteNav() {
           {user && (
             <NavLink to="/households" className={navClass} data-testid="nav-households">
               Households
+              <InvitationsBadge />
             </NavLink>
           )}
           {user && (

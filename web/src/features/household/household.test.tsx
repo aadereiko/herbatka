@@ -7,7 +7,15 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { AppRoutes } from '../../app/router'
 import type { Session, User } from '../../lib/api'
 import type { Page } from '../../lib/catalog'
-import type { HouseholdDetail, HouseholdSummary, Invite, Member, StockItem } from '../../lib/household'
+import type { Friend } from '../../lib/friend'
+import type {
+  HouseholdDetail,
+  HouseholdSummary,
+  Invitation,
+  Invite,
+  Member,
+  StockItem,
+} from '../../lib/household'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
 
@@ -79,9 +87,43 @@ const invite: Invite = {
   id: 'inv-1',
   code: 'TEA-7788',
   invited_email: null,
+  // M6h widened the invite: a code invite carries no named recipient, and neither answer
+  // has come back, so both are null. The XOR the API enforces is why exactly one of
+  // `code` and `invited_user` is ever set.
+  invited_user: null,
   expires_at: '2026-09-01T08:00:00Z',
   created_at: '2026-08-01T08:00:00Z',
   accepted_at: null,
+  declined_at: null,
+}
+
+/** Bruno is a friend of Ada's who is NOT in the Home household — the one person the
+ *  invite picker should offer a button for. Grace, by contrast, is both a friend and a
+ *  member, and must show as already here. */
+const bruno: User = {
+  ...ada,
+  id: 'user-3',
+  email: 'bruno@herbatka.test',
+  display_name: 'Bruno Tea',
+}
+
+const friendOf = (user: User): Friend => ({
+  user: {
+    id: user.id,
+    display_name: user.display_name,
+    email: user.email,
+    avatar_url: user.avatar_url,
+  },
+  friends_since: '2026-06-01T08:00:00Z',
+})
+
+/** An invitation into the Home household, as its recipient sees it. */
+const invitation: Invitation = {
+  id: 'invn-1',
+  household: { id: 'hh-1', name: 'Home', image_url: null },
+  invited_by: { id: ada.id, display_name: ada.display_name, email: ada.email, avatar_url: null },
+  created_at: '2026-08-25T08:00:00Z',
+  expires_at: '2026-09-08T08:00:00Z',
 }
 
 /** A `File` the upload field will accept: the right type, and comfortably under the
@@ -169,6 +211,12 @@ function signedIn(user: User, overrides: Record<string, Handler> = {}) {
     'GET /households/hh-1': () => json(homeDetail),
     'GET /households/hh-1/stock': () => json(emptyStock),
     'GET /households/hh-1/invites': () => json([invite]),
+    // M6h: the owner's invites panel now fetches the owner's friends for the picker, and
+    // the households list surfaces invitations addressed to the viewer. Empty by default,
+    // so tests that are not about either feature are unaffected; the ones that are override
+    // these.
+    'GET /friends': () => json([]),
+    'GET /households/invitations': () => json([]),
     ...overrides,
   })
 }
@@ -467,4 +515,118 @@ test('deleting a household needs a confirm and then returns to the list', async 
   fireEvent.click(screen.getByTestId('confirm-delete-household'))
 
   await waitFor(() => expect(currentPath).toBe('/households'))
+})
+
+/* ------------------------------------------------------ M6h: inviting a friend by name */
+
+test('an owner picks a friend and invites them straight in, no code to relay', async () => {
+  signedIn(ada, {
+    // Grace is a friend AND already a member of Home; Bruno is a friend and not a member.
+    'GET /friends': () => json([friendOf(grace), friendOf(bruno)]),
+    'POST /households/hh-1/invites/friend': () =>
+      json(
+        {
+          id: 'inv-9',
+          code: null,
+          invited_email: null,
+          invited_user: {
+            id: bruno.id,
+            display_name: bruno.display_name,
+            email: bruno.email,
+            avatar_url: null,
+          },
+          expires_at: '2026-09-10T08:00:00Z',
+          created_at: '2026-08-27T08:00:00Z',
+          accepted_at: null,
+          declined_at: null,
+        },
+        201,
+      ),
+  })
+  renderApp('/households/hh-1')
+
+  // Wait for the friends query to resolve into the list, not just the panel container.
+  const inviteButton = await screen.findByTestId(`invite-friend-${bruno.id}`)
+  // The friend who already lives here is shown, but with no button — inviting them would
+  // only ever 409.
+  expect(screen.getByTestId(`friend-here-${grace.id}`)).toHaveTextContent('In this household')
+  expect(screen.queryByTestId(`invite-friend-${grace.id}`)).toBeNull()
+
+  // The friend who is not a member gets the button. That is the whole feature.
+  fireEvent.click(inviteButton)
+
+  await waitFor(() =>
+    expect(
+      calls.some(
+        (call) => call.method === 'POST' && call.path === '/households/hh-1/invites/friend',
+      ),
+    ).toBe(true),
+  )
+  const posted = calls.find((call) => call.path === '/households/hh-1/invites/friend')
+  // By id — not an email, not a code. The recipient is a friend, named.
+  expect(JSON.parse(posted?.body ?? '{}')).toEqual({ user_id: bruno.id })
+})
+
+test('the friend picker explains itself when you have no friends yet', async () => {
+  signedIn(ada, { 'GET /friends': () => json([]) })
+  renderApp('/households/hh-1')
+
+  const empty = await screen.findByTestId('friend-picker-empty')
+  expect(empty).toHaveTextContent('No friends yet')
+  // The code path is still right there as the answer for somebody not on the app.
+  expect(screen.getByTestId('create-invite-form')).toBeInTheDocument()
+  // And nothing was invited: an empty picker cannot POST.
+  expect(calls.some((call) => call.path === '/households/hh-1/invites/friend')).toBe(false)
+})
+
+test('the invited person sees an invitation on their households page and accepts it', async () => {
+  signedIn(ada, {
+    'GET /households/invitations': () => json([invitation]),
+    'POST /households/invitations/invn-1/accept': () => json(homeDetail),
+  })
+  renderApp('/households')
+
+  const panel = await screen.findByTestId('invitations-panel')
+  // Who and where, so the person can tell what they are accepting. The "invited by" line
+  // carries the date too, so match on a substring.
+  expect(within(panel).getByText('Home')).toBeInTheDocument()
+  expect(within(panel).getByText(/Invited by Ada Lovelace/)).toBeInTheDocument()
+
+  fireEvent.click(screen.getByTestId('accept-invitation-invn-1'))
+
+  // Accepting lands you on the household you joined, the same as joining by code.
+  await waitFor(() => expect(currentPath).toBe('/households/hh-1'))
+  expect(
+    calls.some(
+      (call) =>
+        call.method === 'POST' && call.path === '/households/invitations/invn-1/accept',
+    ),
+  ).toBe(true)
+})
+
+test('declining an invitation POSTs a decline and the row goes away', async () => {
+  let invitationCalls = 0
+  signedIn(ada, {
+    'GET /households/invitations': () => {
+      invitationCalls += 1
+      // Present at first, gone after the decline invalidates and refetches.
+      return json(invitationCalls === 1 ? [invitation] : [])
+    },
+    'POST /households/invitations/invn-1/decline': () => new Response(null, { status: 204 }),
+  })
+  renderApp('/households')
+
+  fireEvent.click(await screen.findByTestId('decline-invitation-invn-1'))
+
+  // Declining writes (POST, not DELETE — the API records the refusal) and the panel, which
+  // renders nothing at zero, disappears.
+  await waitFor(() => expect(screen.queryByTestId('invitations-panel')).toBeNull())
+  expect(
+    calls.some(
+      (call) =>
+        call.method === 'POST' && call.path === '/households/invitations/invn-1/decline',
+    ),
+  ).toBe(true)
+  // Still on the list, no household joined.
+  expect(currentPath).toBe('/households')
 })

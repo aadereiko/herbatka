@@ -1,23 +1,41 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 
+import { Avatar } from '../../components/ui/avatar'
 import { Button } from '../../components/ui/button'
 import { FormError, SubmitButton, TextField } from '../../components/ui/form'
-import { EmptyState, ErrorNote, Panel, Skeleton } from '../../components/ui/page'
+import { Badge, EmptyState, ErrorNote, Panel, Skeleton } from '../../components/ui/page'
 import { describeApiError } from '../../lib/api'
-import type { InviteInput } from '../../lib/household'
+import type { Invite, InviteInput } from '../../lib/household'
 import { formatDay } from '../stock/format'
+import { FriendInvitePicker } from './FriendInvitePicker'
 import { useCreateInvite, useInvites, useRevokeInvite } from './queries'
 
 /**
  * Owner-only, and rendered only for an owner — the route is the server's business but a
  * panel of controls that always answers 403 is nobody's idea of a useful screen.
  *
- * The code itself is the product here, so it is rendered large, selectable and in a
- * monospace face: it gets read aloud across a kitchen or pasted into a message, and an
- * `l`/`1` mix-up in a proportional font costs somebody a phone call.
+ * Two ways to invite, in the order most people want them. **A friend, by name** comes
+ * first: the app already knows who your friends are, so inviting a flatmate you already
+ * know is picking them off a list, not minting and relaying a string. **A code** stays
+ * below it, because it is still the only answer for somebody who is not on Herbatka yet —
+ * you cannot pick a name that has no account behind it.
+ *
+ * The code itself is rendered large, selectable and monospace: it gets read aloud across a
+ * kitchen or pasted into a message, and an `l`/`1` mix-up in a proportional font costs
+ * somebody a phone call. A named invite carries no code by design, so its row shows the
+ * person instead — there is nothing to copy, which is the whole point.
  */
-export function InvitesPanel({ householdId }: { householdId: string }) {
+export function InvitesPanel({
+  householdId,
+  memberIds,
+}: {
+  householdId: string
+  /** The current members, so the friend picker can mark those already here and never
+   *  offer a button that would only 409. Passed down rather than refetched — the detail
+   *  page already has it. */
+  memberIds: string[]
+}) {
   const [email, setEmail] = useState('')
   const [days, setDays] = useState('')
   const [daysError, setDaysError] = useState<string | undefined>(undefined)
@@ -59,10 +77,24 @@ export function InvitesPanel({ householdId }: { householdId: string }) {
     <Panel ariaLabel="Invites" testId="invites-panel">
       <h2 className="mb-1 text-lg font-semibold text-brand-900 dark:text-brand-100">Invites</h2>
       <p className="mb-3 text-sm text-neutral-600 dark:text-neutral-400">
-        Share a code and whoever has it can join. Only owners can see this.
+        Invite a friend by name, or share a code with anybody else. Only owners can see this.
       </p>
 
-      <form noValidate onSubmit={handleSubmit} data-testid="create-invite-form" className="space-y-3">
+      <FriendInvitePicker
+        householdId={householdId}
+        memberIds={new Set(memberIds)}
+        invites={items}
+      />
+
+      <form
+        noValidate
+        onSubmit={handleSubmit}
+        data-testid="create-invite-form"
+        className="mt-4 space-y-3 border-t border-brand-100 pt-4 dark:border-neutral-800"
+      >
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          Or share a code
+        </h3>
         <TextField
           id="invite-email"
           label="For whom? (optional)"
@@ -104,63 +136,121 @@ export function InvitesPanel({ householdId }: { householdId: string }) {
         )}
 
         {!invites.isPending && !invites.isError && items.length === 0 && (
-          <EmptyState title="No codes outstanding" testId="invites-empty">
-            <p>Make one above when somebody needs to join.</p>
+          <EmptyState title="Nothing outstanding" testId="invites-empty">
+            <p>Invite a friend above, or make a code, when somebody needs to join.</p>
           </EmptyState>
         )}
 
         {items.length > 0 && (
           <ul className="space-y-3" data-testid="invite-list">
             {items.map((invite) => (
-              <li
+              <InviteRow
                 key={invite.id}
-                className="rounded-xl border border-brand-200 p-3 dark:border-neutral-700"
-              >
-                <p
-                  data-testid={`invite-code-${invite.id}`}
-                  className="select-all font-mono text-lg font-semibold tracking-wider text-brand-900 dark:text-brand-100"
-                >
-                  {invite.code}
-                </p>
-                <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                  {invite.invited_email ? `For ${invite.invited_email} · ` : 'Anyone · '}
-                  expires {formatDay(invite.expires_at)}
-                </p>
-                <div className="mt-2 flex gap-2">
-                  {confirming === invite.id ? (
-                    <>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        disabled={revoke.isPending}
-                        testId={`confirm-revoke-${invite.id}`}
-                        onClick={() =>
-                          revoke.mutate(invite.id, { onSuccess: () => setConfirming(null) })
-                        }
-                      >
-                        Really revoke
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setConfirming(null)}>
-                        Keep it
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      ariaLabel={`Revoke invite ${invite.code}`}
-                      testId={`revoke-${invite.id}`}
-                      onClick={() => setConfirming(invite.id)}
-                    >
-                      Revoke
-                    </Button>
-                  )}
-                </div>
-              </li>
+                invite={invite}
+                confirming={confirming === invite.id}
+                revoking={revoke.isPending}
+                onConfirm={() => setConfirming(invite.id)}
+                onCancel={() => setConfirming(null)}
+                onRevoke={() => revoke.mutate(invite.id, { onSuccess: () => setConfirming(null) })}
+              />
             ))}
           </ul>
         )}
       </div>
     </Panel>
+  )
+}
+
+/**
+ * One outstanding invite. The two flavours look different on purpose: a code is a thing to
+ * copy, so it is shown as one; a named invite is a person, so it shows who — there is no
+ * string to hand over. A named invite that has been declined says so rather than sitting
+ * there looking like it is still waiting, because the owner is the one entitled to know
+ * the answer came back "no".
+ */
+function InviteRow({
+  invite,
+  confirming,
+  revoking,
+  onConfirm,
+  onCancel,
+  onRevoke,
+}: {
+  invite: Invite
+  confirming: boolean
+  revoking: boolean
+  onConfirm: () => void
+  onCancel: () => void
+  onRevoke: () => void
+}) {
+  const named = invite.invited_user
+  const declined = invite.declined_at != null
+  const revokeLabel = named
+    ? `Revoke invite for ${named.display_name}`
+    : `Revoke invite ${invite.code}`
+
+  return (
+    <li className="rounded-xl border border-brand-200 p-3 dark:border-neutral-700">
+      {named ? (
+        <div className="flex items-center gap-2.5" data-testid={`invite-friend-row-${invite.id}`}>
+          <Avatar src={named.avatar_url} name={named.display_name} size="sm" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-brand-900 dark:text-brand-100">
+              {named.display_name}
+            </p>
+            <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{named.email}</p>
+          </div>
+          {declined && (
+            <span className="ml-auto" data-testid={`invite-declined-${invite.id}`}>
+              <Badge tone="rose">Declined</Badge>
+            </span>
+          )}
+        </div>
+      ) : (
+        <p
+          data-testid={`invite-code-${invite.id}`}
+          className="select-all font-mono text-lg font-semibold tracking-wider text-brand-900 dark:text-brand-100"
+        >
+          {invite.code}
+        </p>
+      )}
+
+      <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+        {named
+          ? declined
+            ? `Declined ${formatDay(invite.declined_at as string)}`
+            : `Invited · expires ${formatDay(invite.expires_at)}`
+          : `${invite.invited_email ? `For ${invite.invited_email} · ` : 'Anyone · '}expires ${formatDay(invite.expires_at)}`}
+      </p>
+
+      <div className="mt-2 flex gap-2">
+        {confirming ? (
+          <>
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={revoking}
+              testId={`confirm-revoke-${invite.id}`}
+              onClick={onRevoke}
+            >
+              Really revoke
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onCancel}>
+              Keep it
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="danger"
+            size="sm"
+            ariaLabel={revokeLabel}
+            testId={`revoke-${invite.id}`}
+            onClick={onConfirm}
+          >
+            Revoke
+          </Button>
+        )}
+      </div>
+    </li>
   )
 }

@@ -589,6 +589,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/households/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invitations
+         * @description What is waiting on you, the counterpart of `GET /friends/requests`.
+         *
+         *     Not owner-scoped and not household-scoped: this is the one household read that is
+         *     answered entirely relative to the caller, which is what lets the invited person see it
+         *     without being a member of anything.
+         */
+        get: operations["list_invitations_api_v1_households_invitations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/invitations/{invite_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Invitation */
+        post: operations["accept_invitation_api_v1_households_invitations__invite_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/invitations/{invite_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline Invitation
+         * @description POST rather than DELETE, because declining *writes* something.
+         *
+         *     A declined invitation is stamped, not removed — the owner is entitled to know they can
+         *     stop waiting. The verb says so, so nobody reads the route table and assumes the row is
+         *     gone.
+         */
+        post: operations["decline_invitation_api_v1_households_invitations__invite_id__decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/households/{household_id}": {
         parameters: {
             query?: never;
@@ -640,6 +705,30 @@ export interface paths {
         put?: never;
         /** Create Invite */
         post: operations["create_invite_api_v1_households__household_id__invites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/invites/friend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invite Friend
+         * @description Invite somebody you are already friends with, by id rather than by code.
+         *
+         *     A sibling of `POST …/invites` under the same collection and behind the same
+         *     `Ownership`, because it is the same act with a named recipient. The code route is
+         *     untouched and stays the answer for somebody who is not on Herbatka yet.
+         */
+        post: operations["invite_friend_api_v1_households__household_id__invites_friend_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1330,6 +1419,24 @@ export interface components {
              */
             friends_since: string;
         };
+        /**
+         * FriendInviteCreate
+         * @description Invite one named friend. `user_id` only — an email here would be a second way to
+         *     name a recipient and would reopen exactly the "invite an arbitrary stranger" door the
+         *     friendship check exists to close.
+         */
+        FriendInviteCreate: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Expires In Days
+             * @default 14
+             */
+            expires_in_days: number;
+        };
         /** FriendRequest */
         FriendRequest: {
             /**
@@ -1404,6 +1511,26 @@ export interface components {
             recent_activity: (components["schemas"]["ReviewFeedItem"] | components["schemas"]["StockedFeedItem"])[];
             /** Unrated */
             unrated: components["schemas"]["TeaSummary"][];
+        };
+        /**
+         * HouseholdBrief
+         * @description A household as it looks to somebody who is not in it yet.
+         *
+         *     Name and picture and nothing else: an invitation has to say *which* shelf is being
+         *     offered, and "Flat 3B" next to a photograph is how somebody recognises it. Counts are
+         *     absent on purpose — how many tins are in a household is a members-only fact, and an
+         *     invitation is not membership.
+         */
+        HouseholdBrief: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Image Url */
+            image_url: string | null;
         };
         /** HouseholdCreate */
         HouseholdCreate: {
@@ -1584,7 +1711,42 @@ export interface components {
             /** Image Url */
             image_url?: string | null;
         };
-        /** Invite */
+        /**
+         * Invitation
+         * @description One offer, as the invited person sees it.
+         *
+         *     Shaped after `FriendRequest` rather than after `Invite`, because it answers the same
+         *     question on the same kind of screen: something is waiting on you, here is who it is
+         *     from, accept or decline. It carries no code — a named invite has none — and no member
+         *     list, because you are not a member yet.
+         */
+        Invitation: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            household: components["schemas"]["HouseholdBrief"];
+            invited_by: components["schemas"]["UserRef"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /**
+         * Invite
+         * @description One outstanding offer, as the household's owner sees it.
+         *
+         *     `code` and `invited_user` are the two flavours and exactly one is ever populated — the
+         *     `ck_household_invite_code_xor_recipient` CHECK guarantees it — so a client renders
+         *     whichever is not null and never has to decide which wins.
+         */
         Invite: {
             /**
              * Id
@@ -1592,9 +1754,10 @@ export interface components {
              */
             id: string;
             /** Code */
-            code: string;
+            code: string | null;
             /** Invited Email */
             invited_email: string | null;
+            invited_user: components["schemas"]["UserRef"] | null;
             /**
              * Expires At
              * Format: date-time
@@ -1607,6 +1770,8 @@ export interface components {
             created_at: string;
             /** Accepted At */
             accepted_at: string | null;
+            /** Declined At */
+            declined_at: string | null;
         };
         /** InviteCreate */
         InviteCreate: {
@@ -4191,6 +4356,86 @@ export interface operations {
             };
         };
     };
+    list_invitations_api_v1_households_invitations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invitation"][];
+                };
+            };
+        };
+    };
+    accept_invitation_api_v1_households_invitations__invite_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_invitation_api_v1_households_invitations__invite_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_household_api_v1_households__household_id__get: {
         parameters: {
             query?: never;
@@ -4359,6 +4604,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["InviteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invite_friend_api_v1_households__household_id__invites_friend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FriendInviteCreate"];
             };
         };
         responses: {
