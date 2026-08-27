@@ -47,9 +47,22 @@ function describeTaste(ingredient: IngredientTaste): string | null {
 export function IngredientTasteControl({
   ingredient,
   idPrefix,
+  label,
 }: {
   ingredient: IngredientTaste
   idPrefix: string
+  /**
+   * A visible caption, which also switches the layout to the stacked one.
+   *
+   * The two places this appears are different shapes, and pretending otherwise is what
+   * pushed the select out through the side of an ingredient card: a tea page row is the
+   * full width of the page and fits caption, average and control on one line, while a
+   * card is a third of that and cannot. Rather than have each caller lay out three
+   * fixed-width pieces and get it wrong differently, the control owns both arrangements —
+   * caption given, it stacks; caption omitted, it stays on one line beside whatever the
+   * row already says.
+   */
+  label?: string
 }) {
   // `isSignedIn`, not `viewer`: the viewer segment is the string 'anon' for a signed-out
   // visitor — it is a cache-key component, and it is always truthy.
@@ -75,14 +88,19 @@ export function IngredientTasteControl({
   const crowd = describeTaste(ingredient)
 
   if (!isSignedIn) {
-    return crowd ? (
+    if (!crowd) return null
+    const average = (
       <span
         data-testid={`ingredient-average-${ingredient.slug}`}
         className="whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400"
       >
         Liked {crowd}
       </span>
-    ) : null
+    )
+    // No control to caption, so the caption is dropped rather than left labelling
+    // nothing: "How much you like it" above a read-only average is a question with no
+    // way to answer it.
+    return average
   }
 
   function handleChange(next: string) {
@@ -104,35 +122,64 @@ export function IngredientTasteControl({
 
   const error = rate.error ?? clear.error
 
+  const average = crowd ? (
+    <span
+      data-testid={`ingredient-average-${ingredient.slug}`}
+      className="whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400"
+    >
+      {crowd}
+    </span>
+  ) : null
+
+  const select = (
+    <div className="w-20 shrink-0">
+      <SelectField
+        id={`${idPrefix}-taste-${ingredient.slug}`}
+        label={`How much you like ${ingredient.name}`}
+        labelHidden
+        value={draft}
+        onChange={handleChange}
+        options={TASTE_OPTIONS}
+      />
+    </div>
+  )
+
+  const failure = error ? (
+    <span
+      role="alert"
+      data-testid={`ingredient-taste-error-${ingredient.slug}`}
+      className="text-xs text-rose-600 dark:text-rose-400"
+    >
+      {describeApiError(error)}
+    </span>
+  ) : null
+
+  if (label) {
+    return (
+      <div data-testid={`ingredient-taste-${ingredient.slug}`}>
+        <div className="flex items-center justify-between gap-2">
+          {/* `min-w-0 truncate` so a long caption gives way rather than shouldering the
+              select out through the side of the card. */}
+          <span className="min-w-0 truncate text-sm text-neutral-600 dark:text-neutral-400">
+            {label}
+          </span>
+          {select}
+        </div>
+        {(average || failure) && (
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {average}
+            {failure}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center gap-2" data-testid={`ingredient-taste-${ingredient.slug}`}>
-      {crowd && (
-        <span
-          data-testid={`ingredient-average-${ingredient.slug}`}
-          className="whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400"
-        >
-          {crowd}
-        </span>
-      )}
-      <div className="w-20 shrink-0">
-        <SelectField
-          id={`${idPrefix}-taste-${ingredient.slug}`}
-          label={`How much you like ${ingredient.name}`}
-          labelHidden
-          value={draft}
-          onChange={handleChange}
-          options={TASTE_OPTIONS}
-        />
-      </div>
-      {error && (
-        <span
-          role="alert"
-          data-testid={`ingredient-taste-error-${ingredient.slug}`}
-          className="text-xs text-rose-600 dark:text-rose-400"
-        >
-          {describeApiError(error)}
-        </span>
-      )}
+      {average}
+      {select}
+      {failure}
     </div>
   )
 }

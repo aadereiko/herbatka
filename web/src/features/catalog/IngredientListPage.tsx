@@ -150,12 +150,15 @@ export function IngredientListPage() {
               )}
               {/* Below the description rather than up in the badge row: the badges say
                   what the ingredient *is*, which is the same for everybody, and this says
-                  what you think of it, which is not. */}
-              <div className="mt-3 flex items-center justify-between gap-2 border-t border-brand-100 pt-3 dark:border-neutral-800">
-                <span className="shrink-0 text-sm text-neutral-600 dark:text-neutral-400">
-                  How much you like it
-                </span>
-                <IngredientTasteControl ingredient={ingredient} idPrefix="list" />
+                  what you think of it, which is not. The caption goes *into* the control
+                  rather than beside it — a card is a third of a row wide, and three
+                  fixed-width pieces on one line do not fit in it. */}
+              <div className="mt-3 border-t border-brand-100 pt-3 dark:border-neutral-800">
+                <IngredientTasteControl
+                  ingredient={ingredient}
+                  idPrefix="list"
+                  label="How much you like it"
+                />
               </div>
             </Panel>
           ))}

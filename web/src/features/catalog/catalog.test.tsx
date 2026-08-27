@@ -625,3 +625,27 @@ test('the ingredient list waits for the session before caching who you are', asy
   release(json(session))
   expect(await screen.findByLabelText('How much you like Jasmine')).toHaveValue('9')
 })
+
+/**
+ * A card is a third of a row wide. When the caption sat outside the control, the card had
+ * three fixed-width things on one line — caption, average, select — and the select was
+ * pushed out through the side. jsdom does no layout, so this cannot assert the overflow
+ * itself; what it can pin down is the structure that caused it, which is the caption
+ * living outside the control that has to make room for it.
+ */
+test('on a card the caption is part of the control, not a sibling competing for the line', async () => {
+  mockFetch({
+    'POST /auth/refresh': () => json(session),
+    'GET /friends/requests': () => json([]),
+    'GET /catalog/ingredients': () => json(pageOf([jasmineFlower])),
+  })
+  renderApp('/ingredients')
+
+  const control = await screen.findByTestId('ingredient-taste-jasmine')
+  expect(within(control).getByText('How much you like it')).toBeInTheDocument()
+  expect(within(control).getByLabelText('How much you like Jasmine')).toHaveValue('9')
+  // And the crowd figure is not on the caption's line — it is the third thing that did
+  // not fit.
+  const caption = within(control).getByText('How much you like it')
+  expect(caption.parentElement).not.toContainElement(screen.getByTestId('ingredient-average-jasmine'))
+})
