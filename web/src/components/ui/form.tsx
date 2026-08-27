@@ -21,7 +21,7 @@ import type { ReactNode } from 'react'
  * against the border it surrounds.
  */
 const CONTROL_CLASS =
-  'w-full rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-neutral-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/35 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:border-brand-400 dark:focus:ring-brand-400/35'
+  'w-full rounded-lg border control-edge bg-brand-50 px-3 py-2 text-sm text-neutral-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/35 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:border-brand-400 dark:focus:ring-brand-400/35'
 
 /** The bit every field has in common: a real `<label for>`, and an error paragraph the
  *  control points at with `aria-describedby` so it is announced with the field rather

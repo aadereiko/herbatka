@@ -57,10 +57,10 @@
      The last row is the focus ring, which needs 3:1 rather than 4.5:1 and clears
      it in both schemes — that is why 500 is the darkest step still read as
      green, and why the ring is 500 rather than the 200 it used to be. */
-  --color-brand-50: oklch(0.925 0.032 78);
-  --color-brand-100: oklch(0.872 0.045 76);
-  --color-brand-200: oklch(0.665 0.055 74);
-  --color-brand-300: oklch(0.7 0.082 106);
+  --color-brand-50: oklch(0.962 0.016 82);
+  --color-brand-100: oklch(0.928 0.024 80);
+  --color-brand-200: oklch(0.7 0.048 76);
+  --color-brand-300: oklch(0.735 0.075 104);
   --color-brand-400: oklch(0.588 0.095 122);
   --color-brand-500: oklch(0.532 0.11 136);
   --color-brand-600: oklch(0.468 0.106 141);
@@ -72,7 +72,17 @@
   /* Same lightness ladder as Tailwind's neutrals so nothing in the app changes
      weight, with just enough chroma to stop them looking like ash on oak. The
      dark end is the night version of the house: 950 is the unlit room, 900 the
-     stained boards a card is cut from, 800 an inset tray. */
+     stained boards a card is cut from, 800 an inset tray.
+
+     The night pair is pinned from both ends. The *card* cannot go lighter than
+     ~0.27: `focus-visible:ring-brand-500` is written across the feature files,
+     and brand-500 on a 0.27 card measures 3.04 against the 3:1 a focus
+     indicator owes you — at 0.30 it is 2.73 and the ring stops being visible
+     enough to count. So the way to stop the night reading as one muddy brown
+     mass is not a lighter card but a darker *room*: 950 drops to 0.172, which
+     takes ground-to-card separation from 1.14 to 1.25 while the boards
+     themselves get lighter than they were. Lit boards in a dark room, rather
+     than everything at one value. */
   --color-neutral-50: oklch(0.976 0.008 82);
   --color-neutral-100: oklch(0.951 0.012 80);
   --color-neutral-200: oklch(0.902 0.016 78);
@@ -81,13 +91,13 @@
   --color-neutral-500: oklch(0.5 0.026 66);
   --color-neutral-600: oklch(0.446 0.028 62);
   --color-neutral-700: oklch(0.372 0.028 58);
-  --color-neutral-800: oklch(0.315 0.028 55);
-  --color-neutral-900: oklch(0.238 0.026 52);
-  --color-neutral-950: oklch(0.176 0.024 50);
+  --color-neutral-800: oklch(0.335 0.026 55);
+  --color-neutral-900: oklch(0.268 0.024 52);
+  --color-neutral-950: oklch(0.172 0.02 50);
 
   /* Washi, not paper-white. Warm enough to sit on the wood without glaring,
      cool enough that `text-white` on a matcha button still reads as white. */
-  --color-white: oklch(0.988 0.009 88);
+  --color-white: oklch(0.995 0.004 88);
 
   /* ------------------------------------------------------ vermilion, not pink */
   /* The app's only cold colour was Tailwind rose, used for errors, "unfriend"
@@ -158,11 +168,11 @@
      them as `shadow-sm … hover:shadow-md` on every clickable card, so the hover
      now reads as the card lifting off the table), `shadow-lg` the menu panel. */
   --shadow-2xs: 0 1px 0 0 var(--herb-edge);
-  --shadow-xs: 0 2px 0 0 var(--herb-edge);
-  --shadow-sm: 0 3px 0 0 var(--herb-edge), 0 6px 12px -8px var(--herb-cast);
-  --shadow-md: 0 5px 0 0 var(--herb-edge), 0 12px 20px -10px var(--herb-cast);
-  --shadow-lg: 0 5px 0 0 var(--herb-edge), 0 18px 28px -14px var(--herb-cast);
-  --shadow-xl: 0 7px 0 0 var(--herb-edge), 0 26px 40px -18px var(--herb-cast);
+  --shadow-xs: 0 1px 0 0 var(--herb-edge);
+  --shadow-sm: 0 2px 0 0 var(--herb-edge), 0 5px 10px -8px var(--herb-cast);
+  --shadow-md: 0 3px 0 0 var(--herb-edge), 0 10px 18px -11px var(--herb-cast);
+  --shadow-lg: 0 3px 0 0 var(--herb-edge), 0 16px 26px -15px var(--herb-cast);
+  --shadow-xl: 0 4px 0 0 var(--herb-edge), 0 24px 38px -19px var(--herb-cast);
 }
 
 /* ===========================================================================
@@ -188,18 +198,18 @@
   --herb-grain-wood:
     repeating-linear-gradient(
       180deg,
-      oklch(0.3 0.05 58 / 0.055) 0 1px,
+      oklch(0.3 0.05 58 / 0.03) 0 1px,
       transparent 1px 6px,
-      oklch(0.3 0.05 58 / 0.028) 6px 7px,
+      oklch(0.3 0.05 58 / 0.016) 6px 7px,
       transparent 7px 17px,
-      oklch(0.3 0.05 58 / 0.042) 17px 18px,
+      oklch(0.3 0.05 58 / 0.024) 17px 18px,
       transparent 18px 41px
     ),
     repeating-linear-gradient(
       180deg,
-      oklch(0.3 0.05 58 / 0.03) 0 1px,
+      oklch(0.3 0.05 58 / 0.018) 0 1px,
       transparent 1px 11px,
-      oklch(0.98 0.02 90 / 0.035) 11px 12px,
+      oklch(0.98 0.02 90 / 0.02) 11px 12px,
       transparent 12px 29px
     );
 
@@ -209,12 +219,12 @@
   --herb-grain-paper:
     repeating-linear-gradient(
       63deg,
-      oklch(0.35 0.04 60 / 0.015) 0 1px,
+      oklch(0.35 0.04 60 / 0.009) 0 1px,
       transparent 1px 4px
     ),
     repeating-linear-gradient(
       -57deg,
-      oklch(0.35 0.04 60 / 0.011) 0 1px,
+      oklch(0.35 0.04 60 / 0.007) 0 1px,
       transparent 1px 5px
     );
 
@@ -224,8 +234,8 @@
     repeating-linear-gradient(
       180deg,
       transparent 0 172px,
-      oklch(0.3 0.05 58 / 0.06) 172px 174px,
-      oklch(0.99 0.02 90 / 0.3) 174px 175px,
+      oklch(0.3 0.05 58 / 0.035) 172px 174px,
+      oklch(0.99 0.02 90 / 0.22) 174px 175px,
       transparent 175px 347px
     );
 
@@ -345,30 +355,33 @@
    block joins the same layer afterwards, so at equal specificity it wins.
    =========================================================================== */
 @layer utilities {
-  /* A hairline is a CSS artefact; a drawn edge has weight. 2px is the whole
-     difference between "panel" and "board", and it is why the border colours
-     above are mid-tone browns rather than the near-white tints a 1px rule needs
-     in order not to shout. */
+  /* A hairline is a CSS artefact; a drawn edge has weight. 1.5px is where that
+     stops being true in the other direction: at 2px, with a card edge on every
+     panel, badge, tile and field, the page read as a colouring book — the thing
+     the eye followed was the outlines rather than the words inside them. 1.5px
+     still reads as drawn rather than as a CSS rule, and it is why the border
+     colours above are mid-tone browns rather than the near-white tints a real
+     hairline would need in order not to shout. */
   .border {
-    border-width: 2px;
+    border-width: 1.5px;
   }
   .border-t {
-    border-top-width: 2px;
+    border-top-width: 1.5px;
   }
   .border-b {
-    border-bottom-width: 2px;
+    border-bottom-width: 1.5px;
   }
   .border-l {
-    border-left-width: 2px;
+    border-left-width: 1.5px;
   }
   .border-r {
-    border-right-width: 2px;
+    border-right-width: 1.5px;
   }
   .border-x {
-    border-inline-width: 2px;
+    border-inline-width: 1.5px;
   }
   .border-y {
-    border-block-width: 2px;
+    border-block-width: 1.5px;
   }
 
   /* Texture, by role rather than by element. `bg-white` is what the app calls a
@@ -701,5 +714,29 @@
     border-color: var(--color-brand-700);
     background-color: var(--color-brand-900);
     color: var(--color-brand-100);
+  }
+}
+
+
+/**
+ * The edge of a form control, which is a different job from the edge of a card.
+ *
+ * A card outline is decoration: lose it and you still have a card, because the
+ * surface, the shadow and the gap around it all still say so. An input has none
+ * of those — the border *is* the affordance, and WCAG 1.4.11 asks for 3:1
+ * against what surrounds it for exactly that reason.
+ *
+ * They used to share `border-brand-200`, which is why lightening the palette
+ * pulled the fields under the line: brand-200 against the old ground measured
+ * 2.46, and the lighter ground would have made it worse. Splitting them lets the
+ * card edge go as pale as it likes while the field keeps its footing. Measured
+ * against the surfaces they actually sit on: 3.28 on the page ground and 3.61 on
+ * a card by day, 3.53 against the field's own ink-dark fill by night.
+ */
+@utility control-edge {
+  border-color: oklch(0.62 0.05 74);
+
+  @media (prefers-color-scheme: dark) {
+    border-color: oklch(0.54 0.024 58);
   }
 }

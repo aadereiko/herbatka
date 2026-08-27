@@ -479,7 +479,19 @@ and appear in the nav, friend rows, review authors, feed actors and household me
   still makes no network requests for fonts. Self-hosted Zen Maru Gothic is the upgrade
   if it is ever wanted.
 - Dark is a tea house at night — stained walnut and a lamp — not the same design with
-  inverted greys. Every pairing the app actually uses was measured; all clear AA, and the
+  inverted greys. The night pair is pinned from both ends: the *card* cannot go lighter
+  than ~0.27 because `focus-visible:ring-brand-500` is written across the feature files
+  and the ring stops clearing 3:1 above that. So separation comes from a darker room
+  rather than a lighter board.
+- **Lightened after a first look** — the first pass read heavy. The paper end of the ramp
+  lifted (`brand-50` #f2e4cf → #f8f2e7), borders went 2px → 1.5px, the hard shadow offset
+  halved, and the grain dropped to roughly half its alpha. Text contrast *improved*
+  everywhere as a result.
+- Form controls got their own edge token, `control-edge`. A card outline is decoration —
+  lose it and the surface, shadow and gap still say "card". An input has none of those:
+  the border *is* the affordance, which is why WCAG asks 3:1 of it. Sharing
+  `border-brand-200` had already put fields under the line at 2.46 before this pass, and
+  a paler ground would have made it worse. Every pairing the app actually uses was measured; all clear AA, and the
   focus ring got better rather than worse (3.4 → 4.9 on paper).
 - The primary button recipe had been copy-pasted into four files and drifted. It is now
   `btn` + size + variant utilities, which `Button`/`LinkButton` map onto; no call site
