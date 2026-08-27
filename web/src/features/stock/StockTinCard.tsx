@@ -122,7 +122,12 @@ export function StockTinCard({
             key={grams}
             variant="primary"
             size="lg"
-            className="min-w-16"
+            // `btn-primary` sets the reference's letterspaced caps, and these are the one
+            // set of primary buttons in the app whose label is not a phrase but a
+            // quantity: "5 g" upper-cased is "5 G", and G is giga. An arbitrary property
+            // rather than `normal-case` because Tailwind emits those last, so it is the
+            // one form guaranteed to win against the utility that set it.
+            className="min-w-16 [text-transform:none]"
             testId={`brew-${item.id}-${grams}`}
             // The visible label is "5 g"; the accessible name has to say which tin, or a
             // screen-reader user hears "5 g" nine times down the shelf.

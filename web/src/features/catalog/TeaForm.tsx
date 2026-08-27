@@ -271,7 +271,10 @@ export function TeaForm({
             {picked.map((row) => (
               <li
                 key={row.ingredient.id}
-                className="flex flex-wrap items-center gap-3 rounded-lg bg-brand-50 p-2 dark:bg-neutral-800"
+                // Recessed rather than raised — see the note on `SpecRow` in
+                // BrewingPanel: this row carries `neutral-400` secondary copy, which does
+                // not clear AA on a `neutral-800` fill.
+                className="flex flex-wrap items-center gap-3 border border-brand-200 bg-brand-50 p-2 dark:border-neutral-800 dark:bg-neutral-950"
               >
                 <span className="mr-auto text-sm font-medium text-brand-900 dark:text-brand-100">
                   {row.ingredient.name}

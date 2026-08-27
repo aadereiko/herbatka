@@ -94,7 +94,7 @@ export function ShopPicker({
         </p>
         <div
           data-testid="shop-picked"
-          className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+          className="flex flex-wrap items-center gap-2 border border-brand-200 bg-brand-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-950"
         >
           <span className="font-medium text-brand-900 dark:text-brand-100">{selected.name}</span>
           <span className="ml-auto">
@@ -160,7 +160,9 @@ export function ShopPicker({
                     type="button"
                     data-testid={`shop-listing-${listing.id}`}
                     onClick={() => onSelect(toShopRef(listing.shop), listing)}
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-neutral-800"
+                    // Hover recedes to the ground colour rather than lifting to
+                    // `neutral-800` — see the note on the identical row in TeaPicker.
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-neutral-950"
                   >
                     <span className="font-medium text-brand-900 dark:text-brand-100">
                       {listing.shop.name}
@@ -218,7 +220,7 @@ export function ShopPicker({
                 type="button"
                 data-testid={`shop-result-${shop.id}`}
                 onClick={() => onSelect(toShopRef(shop))}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-neutral-800"
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-neutral-950"
               >
                 <span className="font-medium text-brand-900 dark:text-brand-100">{shop.name}</span>
                 <span className="text-xs text-neutral-500 dark:text-neutral-400">

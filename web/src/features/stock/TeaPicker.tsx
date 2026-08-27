@@ -58,7 +58,7 @@ export function TeaPicker({
         <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Tea</p>
         <div
           data-testid="tea-picked"
-          className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+          className="flex flex-wrap items-center gap-2 border border-brand-200 bg-brand-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-950"
         >
           <span className="font-medium text-brand-900 dark:text-brand-100">{selected.name}</span>
           <Badge tone="brand">{TEA_TYPE_LABELS[selected.tea_type]}</Badge>
@@ -120,7 +120,12 @@ export function TeaPicker({
                 type="button"
                 data-testid={`tea-result-${tea.id}`}
                 onClick={() => onSelect(toTeaRef(tea))}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-neutral-800"
+                // The hover fill recedes to the ground colour rather than lifting to
+                // `neutral-800`. `neutral-800` doubles as the rule colour and so has to
+                // stay bright, and this row carries `text-neutral-400` secondary copy,
+                // which measures 3.8:1 on it — a hover state is not allowed to be the
+                // moment the text stops clearing AA.
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-neutral-950"
               >
                 <span className="font-medium text-brand-900 dark:text-brand-100">{tea.name}</span>
                 <span className="text-xs text-neutral-500 dark:text-neutral-400">

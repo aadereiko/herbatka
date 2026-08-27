@@ -109,7 +109,7 @@ export function ImageUploadField({
           <div
             aria-hidden="true"
             data-testid={`${id}-placeholder`}
-            className="grid h-28 w-28 place-items-center rounded-xl border border-dashed border-brand-300 bg-brand-100 text-3xl dark:border-neutral-600 dark:bg-neutral-800"
+            className="grid h-28 w-28 place-items-center border border-dashed border-brand-300 bg-brand-100 text-3xl dark:border-neutral-600 dark:bg-neutral-950"
           >
             🍃
           </div>

@@ -51,7 +51,11 @@ function describeFigures(figures: Figures): string {
  */
 function SpecRow({ label, value, source }: { label: string; value: string; source?: string }) {
   return (
-    <div className="rounded-xl bg-brand-50 p-3 text-center dark:bg-neutral-800">
+    // A fact tile is set *into* the card, not raised off it: the fill is the page
+    // ground with a 1px rule round it. It used to be `neutral-800`, which is the rule
+    // colour and so has to stay bright — and the eyebrow inside it is `neutral-400`,
+    // which measures 3.82 on that fill and 6.75 on this one.
+    <div className="border border-brand-200 bg-brand-50 p-3 text-center dark:border-neutral-800 dark:bg-neutral-950">
       <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
         {label}
       </dt>

@@ -265,11 +265,19 @@ export function ShopListPage() {
         {/* One control that reports its state, rather than a button whose label flips
             between "Map" and "List" and leaves a screen reader to work out which of the
             two it is currently looking at. */}
+        {/* `[text-transform:none]` on both halves: `btn-primary` carries the reference's
+            letterspaced caps, which is right for a call to action and wrong for a
+            segmented control — the pressed half would be measurably wider than the
+            unpressed one, so the pair would resize every time you switched view. An
+            arbitrary property rather than `normal-case` because Tailwind emits those
+            last, which is the one form guaranteed to win against the utility that set
+            it. */}
         <div className="flex gap-1" role="group" aria-label="How to show the shops">
           <Button
             variant={filters.view === 'list' ? 'primary' : 'secondary'}
             ariaPressed={filters.view === 'list'}
             testId="shop-view-list"
+            className="[text-transform:none]"
             onClick={() => setView('list')}
           >
             List
@@ -278,6 +286,7 @@ export function ShopListPage() {
             variant={filters.view === 'map' ? 'primary' : 'secondary'}
             ariaPressed={filters.view === 'map'}
             testId="shop-view-map"
+            className="[text-transform:none]"
             onClick={() => setView('map')}
           >
             Map

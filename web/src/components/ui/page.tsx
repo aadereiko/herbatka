@@ -13,15 +13,19 @@ import { Menu, MenuButton, MenuLink } from './menu'
 /**
  * A nav entry, and the one place in the app where "where am I" is worth shouting.
  *
- * Active is a pressed matcha tile with its own ink edge rather than the old pale
- * highlight: the bar is now a wooden beam, and a tint-on-tint highlight disappears
- * against grain. Cream on `brand-600` is 6.2:1, so the loudest state is also the most
- * readable one. Inactive text is `brand-800` rather than a grey — grey on timber reads
- * as a rendering fault.
+ * Active used to be a filled `btn-primary` tile. It is now `btn-current` — pale mint with
+ * a leaf rule under it — for a reason that only appeared once the primary button grew
+ * letterspaced caps: caps and tracking make a word measurably wider, so the current entry
+ * would have been a different width from the same word when inactive, and the whole bar
+ * would have shuffled sideways on every navigation. `btn-current` draws its rule with an
+ * inset box-shadow, which takes no space at all.
+ *
+ * Mint against sage is 4.6:1 apart, so the state is visible without the rule; and
+ * `NavLink` sets `aria-current="page"` regardless, so it is not carried by colour alone.
  */
 function navClass({ isActive }: { isActive: boolean }): string {
   return isActive
-    ? 'btn btn-md btn-primary font-semibold'
+    ? 'btn btn-md btn-current font-semibold'
     : 'btn btn-md btn-quiet'
 }
 
@@ -206,11 +210,10 @@ function SiteNav() {
   }
 
   return (
-    // The beam the shop sign hangs off: a band of lighter timber with grain (free, from
-    // `bg-brand-100`), a thick ink underline, and the house drop shadow so the bar sits
-    // *on* the room rather than being a hairline drawn across it. It stays lighter than
-    // the ground in both schemes — by night that reads as the one lit surface.
-    <header className="border-b-[3px] border-brand-800/50 bg-brand-100 shadow-sm dark:border-neutral-950 dark:bg-neutral-900">
+    // A band one step off the ground with a single 1px rule under it. It was a 3px ink
+    // underline and a drop shadow, which is what a wooden beam needs; this design draws
+    // every boundary in the app with the same hairline and the bar is not an exception.
+    <header className="border-b border-brand-200 bg-brand-100 dark:border-neutral-800 dark:bg-neutral-900">
       <nav
         aria-label="Main"
         className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:px-6"
@@ -222,9 +225,11 @@ function SiteNav() {
           <span
             role="img"
             aria-label="teacup"
-            // The cup gets a little wooden coaster of its own. It is the app's only logo,
-            // and a bare emoji beside bold text reads as a stray character.
-            className="grid size-8 place-items-center rounded-full border border-brand-800/60 bg-white text-base shadow-2xs dark:border-neutral-950 dark:bg-neutral-800"
+            // The cup gets a square tile of its own. It is the app's only logo, and a
+            // bare emoji beside bold text reads as a stray character. Square rather than
+            // the round coaster it was: a circle is the one shape this design does not
+            // own, and the wordmark is the last place to make an exception.
+            className="grid size-8 place-items-center border border-brand-800/60 bg-white text-base dark:border-neutral-700 dark:bg-neutral-800"
           >
             🍵
           </span>
@@ -288,12 +293,13 @@ function SiteNav() {
   )
 }
 
-/** `wood-ground` rather than `bg-brand-50 dark:bg-neutral-950`: the utility carries both
- *  colours *and* the grain, plank seams and night lamp, and pairing it with the colour
- *  utilities would knock its own background-image out. See the note on it in index.css. */
+/** `page-ground` rather than a bare `bg-neutral-950`: `body` carries the same colour so
+ *  the overscroll bounce is not a white flash, and two places holding one value want a
+ *  name between them. It used to be `wood-ground` and carried grain, plank seams and a
+ *  lamp as well; all three went with the timber. */
 export function PageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="wood-ground min-h-dvh">
+    <div className="page-ground min-h-dvh">
       <SiteNav />
       <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
     </div>
@@ -324,7 +330,7 @@ export function PageHeading({
               reason: a signature that half the screens are missing is not a signature.
               The subtitle drops to `mt-3` to clear the stroke, which hangs below the
               heading's box. */}
-          <h1 className="brush-underline text-2xl font-bold text-brand-900 dark:text-brand-50 sm:text-3xl">
+          <h1 className="title-rule text-2xl font-bold text-brand-900 dark:text-brand-50 sm:text-3xl">
             {title}
           </h1>
           {subtitle && (
@@ -337,33 +343,37 @@ export function PageHeading({
   )
 }
 
-export type PanelTone = 'paper' | 'wood'
+export type PanelTone = 'surface' | 'inset'
 
 /**
- * Paper is a card you read; wood is a card you read *past*.
+ * A surface is a card you read; an inset is a card you read *past*.
  *
- * Two tones rather than one because the app kept reaching for
- * `rounded-xl bg-brand-50 p-3` by hand whenever something needed to sit visibly *inside*
- * a card — a brewing table, a picked-shop row, a note above a list — and once every
- * surface is textured, a paper card nested inside a paper card is invisible. Timber for
- * the inner one solves it in a way a shade of grey no longer can.
+ * Two tones rather than one because the app kept reaching for `bg-brand-50 p-3` by hand
+ * whenever something needed to sit visibly *inside* a card — a brewing table, a
+ * picked-shop row, a note above a list — and a card nested inside a card at the same
+ * value is invisible. The inner one goes *down* to the page ground rather than up to a
+ * tint: the app's tint value, `neutral-800`, doubles as the rule colour and so has to
+ * stay bright enough that secondary copy on it measures 3.82.
+ *
+ * They were called `paper` and `wood`, which meant something when the app was a timber
+ * tea house and means nothing now.
  */
 const PANEL_TONES: Record<PanelTone, string> = {
-  paper: 'border-brand-200 bg-white dark:border-neutral-700 dark:bg-neutral-900',
-  wood: 'border-brand-300/70 bg-brand-50 dark:border-neutral-700 dark:bg-neutral-800',
+  surface: 'border-brand-200 bg-white dark:border-neutral-700 dark:bg-neutral-900',
+  inset: 'border-brand-300/70 bg-brand-50 dark:border-neutral-700 dark:bg-neutral-950',
 }
 
 export function Panel({
   children,
   as: Tag = 'section',
-  tone = 'paper',
+  tone = 'surface',
   className = '',
   ariaLabel,
   testId,
 }: {
   children: ReactNode
   as?: 'section' | 'div' | 'li'
-  /** `wood` for a panel nested inside another panel. Default `paper`. */
+  /** `inset` for a panel nested inside another panel. Default `surface`. */
   tone?: PanelTone
   className?: string
   ariaLabel?: string
@@ -373,6 +383,11 @@ export function Panel({
     <Tag
       aria-label={ariaLabel}
       data-testid={testId}
+      // `rounded-2xl` and `shadow-sm` still stand here and in the twelve other card
+      // components, and both now resolve to nothing — the radius tokens are zero and the
+      // shadow tokens are transparent. Left in place on purpose: stripping dead classes
+      // out of thirteen files is a diff with no pixels in it, and the day somebody wants
+      // a corner back, one token brings all thirteen with it.
       className={`rounded-2xl border p-4 shadow-sm ${PANEL_TONES[tone]} sm:p-6 ${className}`}
     >
       {children}
@@ -382,13 +397,13 @@ export function Panel({
 
 export type BadgeTone = 'brand' | 'neutral' | 'amber' | 'rose'
 
-/** Drawn edges, like everything else — but at 1.5px, set explicitly so the house-wide
- *  2px `border` does not apply. A 2px outline around an 18px-tall pill is a black olive,
- *  and a tea card wears four of these at once. */
+/** Square chips with a 1px edge, like every other boundary in the app. They were 18px
+ *  pills at 1.5px; a rounded badge is the one shape the reference never draws, and a tea
+ *  card wears four of these at once so the shape is not a detail. */
 const BADGE_TONES: Record<BadgeTone, string> = {
   brand: 'border-brand-300/60 bg-brand-100 text-brand-800 dark:border-brand-700 dark:bg-brand-900 dark:text-brand-100',
   neutral:
-    'border-neutral-300 bg-neutral-100 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
+    'border-neutral-300 bg-neutral-100 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300',
   amber: 'border-amber-300/70 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200',
   rose: 'border-rose-300/70 bg-rose-100 text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200',
 }
@@ -402,7 +417,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-block rounded-full border-[1.5px] px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}
+      className={`inline-block border px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}
     >
       {children}
     </span>

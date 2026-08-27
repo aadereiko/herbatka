@@ -264,10 +264,14 @@ function TypeChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
+      // Square, like every other chip in the app now. The selected one carries a border
+      // of its own colour rather than no border at all: without it the pressed chip was
+      // 2px smaller than its neighbours, which nobody noticed while they were pills and
+      // everybody would notice in a row of rectangles.
       className={
         active
-          ? 'rounded-full bg-brand-600 px-3 py-1 text-sm font-medium text-white'
-          : 'rounded-full border border-brand-200 px-3 py-1 text-sm font-medium text-brand-800 hover:bg-brand-50 dark:border-neutral-700 dark:text-brand-200 dark:hover:bg-neutral-800'
+          ? 'border border-brand-600 bg-brand-600 px-3 py-1 text-sm font-medium text-white'
+          : 'border border-brand-200 px-3 py-1 text-sm font-medium text-brand-800 hover:bg-brand-50 dark:border-neutral-700 dark:text-brand-200 dark:hover:bg-neutral-800'
       }
     >
       {label}

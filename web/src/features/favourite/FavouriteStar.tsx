@@ -61,7 +61,10 @@ export function FavouriteStar({
       title={label}
       data-testid={`favourite-${kind}-${slug}`}
       onClick={() => toggle.mutate({ slug, next: !isFavourite })}
-      className={`inline-flex items-center justify-center rounded-full border leading-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+      // Square, like every other bordered thing in the app. It sits over the corner of a
+      // card image, and a circle there was the last round edge on the page that was not
+      // an avatar or a status dot.
+      className={`inline-flex items-center justify-center border leading-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
         SIZES[size]
       } ${
         isFavourite

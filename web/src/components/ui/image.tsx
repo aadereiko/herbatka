@@ -38,9 +38,11 @@ export function EntityImage({
       <div
         aria-hidden="true"
         data-testid={testId ? `${testId}-placeholder` : undefined}
-        // `bg-brand-100` picks up the wood grain from index.css for free, so the
-        // stand-in reads as an empty board with a leaf on it rather than as a grey box.
-        className={`grid place-items-center bg-brand-100 text-4xl dark:bg-neutral-800 ${className}`}
+        // The ground colour rather than a tint, so a missing picture reads as a recess
+        // cut into the card rather than as a block sitting on it. It also keeps the one
+        // focus ring that lands on top of a card image — the favourite star — off
+        // `neutral-800`, which is the one surface `brand-500` does not clear 3:1 against.
+        className={`grid place-items-center bg-brand-100 text-4xl dark:bg-neutral-950 ${className}`}
       >
         🍃
       </div>

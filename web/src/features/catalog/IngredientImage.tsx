@@ -112,7 +112,9 @@ export function IngredientImage({
         // The category, in the DOM, so a test can prove that a *spice* gets the spice
         // drawing rather than merely that some drawing appeared.
         data-category={category}
-        className={`grid place-items-center bg-brand-100 text-brand-700 dark:bg-neutral-800 dark:text-brand-200 ${className}`}
+        // `neutral-950`, matching `EntityImage`: a missing picture is a recess in the
+        // card, not a tile on it.
+        className={`grid place-items-center bg-brand-100 text-brand-700 dark:bg-neutral-950 dark:text-brand-200 ${className}`}
       >
         <svg
           viewBox="0 0 64 64"

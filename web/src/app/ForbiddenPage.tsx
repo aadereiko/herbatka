@@ -5,7 +5,7 @@ import { Link } from 'react-router'
  *  you just may not be here". */
 export function ForbiddenPage() {
   return (
-    <main className="wood-ground grid min-h-dvh place-items-center p-6">
+    <main className="page-ground grid min-h-dvh place-items-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-brand-200 bg-white p-8 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">403</p>
         <h1

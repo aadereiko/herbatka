@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6j done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6k done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -459,9 +459,9 @@ and appear in the nav, friend rows, review authors, feed actors and household me
   `border-brand-200` for card edges, `text-brand-700` for links and `text-brand-900` for
   headings, so re-teaching ten tokens retinted roughly twenty screens without editing
   them — and each landed on the *right* material.
-- ⚠️ **Read that again before writing new code.** `brand-50`–`brand-300` are paper and
-  timber, not pale green. Anything written assuming "brand = green" will be surprised at
-  the light end of the ramp.
+- ⚠️ **Superseded by M6k.** The ramp described in this section is gone; `brand-50`–
+  `brand-300` are pale mint again, and `dark:` is unconditional. Read M6k before
+  believing anything in the rest of this entry.
 - `neutral-*` gained warmth at the same lightness, so the app's ~130 muted greys stop
   looking like grey pasted onto brown; `--color-white` is washi, because 21 call sites
   say `bg-white` meaning "a card".
@@ -538,6 +538,60 @@ and appear in the nav, friend rows, review authors, feed actors and household me
 - Three are honest rather than literal: honeybush and lemongrass are the living plant (no
   usable photo of the dried material exists), and bergamot is the fruit in cross-section,
   because nobody photographs the oil.
+
+### M6k — Timber & Leaf: one dark forest-green scheme ✅
+- The wooden tea house is gone. Deep forest green, flat colour, square corners, 1px
+  rules, a chunky serif. No grain, no plank seams, no lamp, no drop shadow, no radius.
+- **The app has one scheme now, and `@custom-variant dark (&)` is the whole mechanism.**
+  Roughly 700 call sites were authored as `text-brand-900 dark:text-brand-100` pairs.
+  Redefining the `dark:` variant as "always" makes the second half of every pair the one
+  that renders, which restyles twenty screens by re-teaching twenty tokens rather than by
+  editing four hundred files. Measured first: all but two dozen coloured call sites
+  already carry a `dark:` sibling. The rule that follows, and the one thing to remember
+  when editing feature code: **the `dark:` half of a pair is the half you can see.**
+- Both ramps are role-based rather than lightness ladders. `neutral-*` is the structure
+  (950 ground, 900 card, 800 rule and tint, 700 outline, 400 secondary copy);
+  `brand-*` is leaf (100 headings, 300 links, 500 focus ring, 600 the primary button,
+  900 a badge fill). `brand-900` being a *fill* while `brand-100` is *text* is not
+  elegant; it is what not editing four hundred files costs.
+- The ground is `oklch(0.305)` rather than the reference's ~0.25, by request.
+- **The four Tailwind utility overrides M6h introduced are deleted.** `border` means 1px
+  again, `bg-white` paints no grain, and `rounded-2xl` is not out of true — it is zero,
+  along with every other radius token. That was the largest wart in the old stylesheet
+  and the restyle happened to be the moment to pay it off.
+- **Fraunces, self-hosted, 59 KB.** The first webfont in the app: half the reference's
+  character is typographic and a sans-serif version of it does not read. Chosen over
+  Instrument Serif (one weight, no bold), Zilla Slab (three static files) and Bitter
+  (less character) because it is variable in weight, so one file carries 400 body, 600
+  eyebrows and 700 headings. Instanced with `fonttools` — `opsz` pinned at 20, `wght`
+  clamped 400–750 — to get from Google's 124 KB two-axis variable font down to
+  31 KB latin + 28 KB latin-ext. latin-ext is not optional: Kraków, Dvořák, Wierzbą.
+  No CDN, no runtime request to anybody.
+- **The eyebrow needed no markup.** The reference's letterspaced small-caps label was
+  already in the app eighteen times as `text-xs uppercase tracking-wide`; widening
+  `--tracking-wide` from 0.025em to 0.13em turned all eighteen into it at once.
+- Every text pair the app renders was measured (oklch → sRGB → WCAG), not eyeballed;
+  worst text pair 4.60, worst focus ring 4.06 against a 3:1 requirement. Two constraints
+  drove real edits rather than token tweaks: `neutral-800` is simultaneously the rule
+  colour and a tint, so anything putting `neutral-400` copy on it fails at 3.82 — the two
+  search pickers, the brew fact tiles, the admin ingredient rows and the neutral badge
+  all recede to the ground colour instead; and `focus-visible:ring-brand-500`, written
+  into 16 feature files, pins `brand-500` from below.
+- The primary button wears the reference's white letterspaced caps. Two controls opt out
+  with `[text-transform:none]`, both because they use `primary` to mean *selected* or
+  *a quantity* rather than *the main action*: the brew presets ("5 G" is giga) and the
+  shops list/map toggle (a segmented control must not resize when you press it). The nav
+  stopped using `btn-primary` for its current entry for the same reason and now marks it
+  with `btn-current` — mint plus an inset rule, which costs no width.
+- A native checkbox ignores `text-*`, so every checked box in the app had been drawn in
+  Chrome's own blue since M1. Nobody saw it on cream; on one green it is the only cold
+  thing on the page. `accent-brand-600`.
+
+- **The menu's focus indicator was a background change of 1.74:1**, with
+  `focus:outline-none` throwing the browser's own ring away — pre-existing, and the
+  restyle carried it over. No background fixes it: the value that finally reads as a state
+  change (neutral-600, 3.09) drops the item's own text to 3.24. Menu items now take a real
+  inset ring in `brand-300`, which measures 3.30 on the focused row and 5.73 on the panel.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

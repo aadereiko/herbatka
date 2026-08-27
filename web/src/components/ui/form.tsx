@@ -233,7 +233,13 @@ export function CheckboxField({
         checked={checked}
         aria-label={ariaLabel}
         onChange={(event) => onChange(event.target.checked)}
-        className="size-4 rounded-sm border-brand-300 text-brand-600 focus:ring-2 focus:ring-brand-500/35 dark:border-neutral-600 dark:focus:ring-brand-400/35"
+        // `accent-brand-600` is new and is the only thing here that actually paints the
+        // box: a native checkbox ignores `text-*`, so a checked box was drawn in Chrome's
+        // own blue. Nobody noticed while the app was brown-on-cream and the box was one
+        // small blue square among many colours; on a page that is a single green it is
+        // the only cold thing on the screen. White on `brand-600` measures 4.97, which is
+        // what the tick has to clear.
+        className="size-4 rounded-sm border-brand-300 accent-brand-600 text-brand-600 focus:ring-2 focus:ring-brand-500/35 dark:border-neutral-600 dark:focus:ring-brand-400/35"
       />
       <label htmlFor={id} className="text-sm text-neutral-700 dark:text-neutral-300">
         {label}
