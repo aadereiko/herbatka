@@ -51,6 +51,25 @@ export type MyReview = components['schemas']['MyReview']
  */
 export type ReviewInput = components['schemas']['ReviewInput']
 
+/**
+ * The part of a review that `ReviewDetails` actually reads: the three optional aspects
+ * and the notes.
+ *
+ * Spelled as a structural subset rather than as `Review`, because three different shapes
+ * now want the same two paragraphs rendered the same way — `Review` on a tea page,
+ * `MyReview` on your own list, and `ProfileReview` on somebody's profile. The subscores
+ * are optional *keys* here, not merely nullable values: a `ProfileReview` does not carry
+ * them at all, and widening the component was a better answer than either a fourth copy
+ * of the markup or a fake `aroma: null` invented at the call site.
+ */
+export type ReviewNotes = {
+  id: string
+  aroma?: number | null
+  flavour?: number | null
+  aftertaste?: number | null
+  body: string | null
+}
+
 /* --------------------------------------------------- what a tea gains from ratings */
 
 /** The rollup both `TeaSummary` and `TeaDetail` carry. `average_score` is null rather

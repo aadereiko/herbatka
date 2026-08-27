@@ -1,24 +1,44 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 
+import { Avatar } from '../../components/ui/avatar'
 import { Button } from '../../components/ui/button'
 import type { ButtonVariant } from '../../components/ui/button'
 import type { UserRef } from '../../lib/household'
 
 /**
- * Name over email, truncating. Every list on /friends shows the same two lines, and the
+ * Face, name, email, truncating. Every list on /friends shows the same two lines, and the
  * email is the load-bearing half: display names are not unique, so "Ada Lovelace" alone
  * is not enough to tell you which Ada you are about to hand your reading history to.
+ *
+ * The email stays here and is absent from the profile page, which is not an inconsistency
+ * — see the note in `lib/profile.ts`. These rows only ever list people you are already
+ * connected to, or people you searched for by an address you already had.
+ *
+ * The name links to the profile, because "who is this Ada" is the question this row
+ * raises and cannot answer. The avatar deliberately does not: two adjacent links to the
+ * same place is one target too many for a pointer and one stop too many for a keyboard.
  */
 export function PersonIdentity({ user, note }: { user: UserRef; note?: ReactNode }) {
   return (
-    <div className="min-w-0">
-      <p className="truncate text-sm font-medium text-brand-900 dark:text-brand-100">
-        {user.display_name}
-      </p>
-      <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
-        {user.email}
-        {note != null && <> · {note}</>}
-      </p>
+    <div className="flex min-w-0 items-center gap-2.5">
+      <Avatar
+        src={user.avatar_url}
+        name={user.display_name}
+        size="sm"
+        testId={`person-avatar-${user.id}`}
+      />
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-brand-900 dark:text-brand-100">
+          <Link to={`/users/${user.id}`} className="hover:underline">
+            {user.display_name}
+          </Link>
+        </p>
+        <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
+          {user.email}
+          {note != null && <> · {note}</>}
+        </p>
+      </div>
     </div>
   )
 }

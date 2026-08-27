@@ -110,7 +110,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Me */
+        patch: operations["update_me_api_v1_auth_me_patch"];
         trace?: never;
     };
     "/api/v1/catalog/teas": {
@@ -997,6 +998,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/{user_id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Profile
+         * @description Public, like the reviews it shows. Signed out, friend_state is simply null.
+         */
+        get: operations["get_profile_api_v1_users__user_id__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1611,6 +1632,87 @@ export interface components {
             size: number;
             /** Pages */
             pages: number;
+        };
+        /** ProfileReview */
+        ProfileReview: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            tea: components["schemas"]["TeaRef"];
+            /** Score */
+            score: number;
+            /** Body */
+            body: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * ProfileUpdate
+         * @description Your own profile. Every field optional, and every one clearable with null.
+         *
+         *     Deliberately not here: email and role. Changing an email is an identity change that
+         *     wants its own confirmation flow, and a role you can set yourself is not a role.
+         */
+        ProfileUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Avatar Url */
+            avatar_url?: string | null;
+            /** Pronouns */
+            pronouns?: string | null;
+            /** Bio */
+            bio?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Favourite Tea Type */
+            favourite_tea_type?: ("green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend") | null;
+        };
+        /**
+         * PublicProfile
+         * @description What anyone may see about a person.
+         *
+         *     No email. It appears in friend and household contexts, where the two of you are
+         *     already connected and it is how you find each other — but a profile is reachable by
+         *     anyone with the id, and an address is not something to hand out at that distance.
+         */
+        PublicProfile: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Url */
+            avatar_url: string | null;
+            /** Pronouns */
+            pronouns: string | null;
+            /** Bio */
+            bio: string | null;
+            /** Location */
+            location: string | null;
+            /** Favourite Tea Type */
+            favourite_tea_type: ("green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend") | null;
+            /**
+             * Member Since
+             * Format: date-time
+             */
+            member_since: string;
+            /** Review Count */
+            review_count: number;
+            /** Average Score Given */
+            average_score_given: number | null;
+            /** Household Count */
+            household_count: number;
+            /** Friend State */
+            friend_state: ("none" | "incoming" | "outgoing" | "friends" | "blocked" | "self") | null;
+            /** Recent Reviews */
+            recent_reviews: components["schemas"]["ProfileReview"][];
         };
         /**
          * PublicSummary
@@ -2266,6 +2368,14 @@ export interface components {
             role: "user" | "admin";
             /** Avatar Url */
             avatar_url: string | null;
+            /** Pronouns */
+            pronouns: string | null;
+            /** Bio */
+            bio: string | null;
+            /** Location */
+            location: string | null;
+            /** Favourite Tea Type */
+            favourite_tea_type: ("green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend") | null;
             /**
              * Created At
              * Format: date-time
@@ -2470,6 +2580,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
+    update_me_api_v1_auth_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4576,6 +4719,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicSummary"];
+                };
+            };
+        };
+    };
+    get_profile_api_v1_users__user_id__profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

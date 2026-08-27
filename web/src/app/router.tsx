@@ -18,6 +18,8 @@ import { FriendsPage } from '../features/friend/FriendsPage'
 import { HomePage } from '../features/home/HomePage'
 import { HouseholdDetailPage } from '../features/household/HouseholdDetailPage'
 import { HouseholdListPage } from '../features/household/HouseholdListPage'
+import { ProfilePage } from '../features/profile/ProfilePage'
+import { SettingsPage } from '../features/profile/SettingsPage'
 import { MyReviewsPage } from '../features/review/MyReviewsPage'
 import { ShopDetailPage } from '../features/shop/ShopDetailPage'
 import { ShopListPage } from '../features/shop/ShopListPage'
@@ -122,6 +124,22 @@ export function AppRoutes() {
         element={
           <RequireAuth>
             <MyReviewsPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* Public, and it has to be: a review carries a name, and a name that only becomes
+          clickable once you have an account is a dead end for exactly the visitor who has
+          not made one yet. The server answers the same document minus `friend_state`. */}
+      <Route path="/users/:id" element={<ProfilePage />} />
+
+      {/* Your own half of the same thing. No id in the path — PATCH /auth/me has no
+          version that edits somebody else. */}
+      <Route
+        path="/settings"
+        element={
+          <RequireAuth>
+            <SettingsPage />
           </RequireAuth>
         }
       />

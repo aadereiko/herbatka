@@ -1,17 +1,20 @@
+import { Link } from 'react-router'
+
+import { Avatar } from '../../components/ui/avatar'
 import { Badge, ErrorNote, Pagination, Skeleton } from '../../components/ui/page'
 import { describeApiError } from '../../lib/api'
 import { formatDay } from '../../lib/format'
-import type { Review, Subscore } from '../../lib/review'
+import type { Review, ReviewNotes, Subscore } from '../../lib/review'
 import { SUBSCORES, SUBSCORE_LABELS } from '../../lib/review'
 import { formatScore } from './format'
 
 /** "Aroma 8 · Flavour 7" — a sentence rather than a table, because most reviews will
  *  carry one of the three and a three-column grid mostly full of blanks reads worse. */
-function subscoreLine(review: Review): string | null {
+function subscoreLine(review: ReviewNotes): string | null {
   const values: Record<Subscore, number | null> = {
-    aroma: review.aroma,
-    flavour: review.flavour,
-    aftertaste: review.aftertaste,
+    aroma: review.aroma ?? null,
+    flavour: review.flavour ?? null,
+    aftertaste: review.aftertaste ?? null,
   }
   const parts = SUBSCORES.map((key) => ({ key, value: values[key] }))
     .filter((entry): entry is { key: Subscore; value: number } => entry.value != null)
@@ -22,7 +25,7 @@ function subscoreLine(review: Review): string | null {
 /** The part of a review that is the same wherever it is read: what it scored on each
  *  aspect, and what the person said. Shared with `/reviews/mine`, which frames it
  *  differently but should not describe a cup differently. */
-export function ReviewDetails({ review }: { review: Review }) {
+export function ReviewDetails({ review }: { review: ReviewNotes }) {
   const details = subscoreLine(review)
 
   return (
@@ -54,9 +57,20 @@ export function ReviewRow({ review, isMine = false }: { review: Review; isMine?:
       className="border-b border-brand-100 py-3 last:border-0 dark:border-neutral-800"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium text-brand-900 dark:text-brand-100">
+        <Avatar
+          src={review.author.avatar_url}
+          name={review.author.display_name}
+          size="sm"
+          testId={`review-author-avatar-${review.id}`}
+        />
+        {/* The name is the link, not the avatar: one target rather than two adjacent ones
+            going to the same place, which is a screen reader reading the person twice. */}
+        <Link
+          to={`/users/${review.author.id}`}
+          className="font-medium text-brand-900 hover:underline dark:text-brand-100"
+        >
           {review.author.display_name}
-        </span>
+        </Link>
         {isMine && <Badge tone="brand">You</Badge>}
         <span
           data-testid={`review-score-${review.id}`}

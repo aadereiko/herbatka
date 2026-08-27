@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 
+import { Avatar } from '../../components/ui/avatar'
 import { Button } from '../../components/ui/button'
 import { Badge, Panel } from '../../components/ui/page'
 import { describeApiError } from '../../lib/api'
@@ -51,10 +53,18 @@ export function MembersPanel({
         {members.map((member) => {
           const isYou = member.user.id === currentUserId
           return (
-            <li key={member.user.id} className="flex flex-wrap items-center gap-2 py-2.5">
+            <li key={member.user.id} className="flex flex-wrap items-center gap-2.5 py-2.5">
+              <Avatar
+                src={member.user.avatar_url}
+                name={member.user.display_name}
+                size="sm"
+                testId={`member-avatar-${member.user.id}`}
+              />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-brand-900 dark:text-brand-100">
-                  {member.user.display_name}
+                  <Link to={`/users/${member.user.id}`} className="hover:underline">
+                    {member.user.display_name}
+                  </Link>
                   {isYou && <span className="ml-1 text-xs text-neutral-500">(you)</span>}
                 </p>
                 <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">

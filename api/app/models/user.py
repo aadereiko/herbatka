@@ -8,12 +8,14 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import CITEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
+from app.models.catalog import TeaTypeEnum
 
 # native_enum=False stores these as VARCHAR + CHECK rather than a PostgreSQL ENUM type.
 # Adding a value to a PG enum inside a transaction is awkward and removing one is worse;
@@ -32,6 +34,16 @@ class User(UUIDPrimaryKey, Timestamps, Base):
     email: Mapped[str] = mapped_column(CITEXT, nullable=False, unique=True)
     display_name: Mapped[str] = mapped_column(String(80), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(500))
+
+    # Free text, not a picklist. Pronouns people actually use do not fit a fixed set,
+    # and guessing from a name is exactly the mistake this field exists to prevent.
+    pronouns: Mapped[str | None] = mapped_column(String(40))
+    bio: Mapped[str | None] = mapped_column(Text)
+    # "Kraków", "London", "somewhere with hard water" — a place as a person describes it,
+    # not a geocoded point. Shop locations are precise because a map needs them to be;
+    # a profile does not, and asking for coordinates here would be intrusive.
+    location: Mapped[str | None] = mapped_column(String(120))
+    favourite_tea_type: Mapped[str | None] = mapped_column(TeaTypeEnum)
     role: Mapped[str] = mapped_column(
         UserRole, nullable=False, default="user", server_default="user"
     )

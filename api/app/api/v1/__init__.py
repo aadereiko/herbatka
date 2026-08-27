@@ -8,6 +8,7 @@ from app.api.v1.routers import (
     health,
     home,
     households,
+    profile,
     reviews,
     shops,
     stock,
@@ -24,3 +25,4 @@ api_router.include_router(reviews.router)
 api_router.include_router(friends.router)
 api_router.include_router(shops.router)
 api_router.include_router(home.router)
+api_router.include_router(profile.router)

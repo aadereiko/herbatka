@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 
+import { Avatar } from '../../components/ui/avatar'
 import {
   Badge,
   EmptyState,
@@ -14,11 +15,37 @@ import {
 import { describeApiError } from '../../lib/api'
 import { TEA_TYPE_LABELS } from '../../lib/catalog'
 import { formatMoment } from '../../lib/format'
-import type { FeedItem, FeedReviewItem, FeedStockedItem } from '../../lib/friend'
+import type { FeedActor, FeedItem, FeedReviewItem, FeedStockedItem } from '../../lib/friend'
 import { formatScore } from '../review/format'
 import { useFeed } from './queries'
 
 const PAGE_SIZE = 20
+
+/**
+ * Who did the thing, as a face and a link to them.
+ *
+ * `actor` is nullable on a stocked item — a tin outlives the account of whoever bought it
+ * — so "Somebody" is a real case rather than a defensive branch, and it gets neither a
+ * link nor an avatar: there is nobody to link to, and initials for a person we cannot
+ * name would be an invention.
+ */
+function Actor({ actor }: { actor: FeedActor | null }) {
+  if (!actor) {
+    return <span className="font-medium text-brand-900 dark:text-brand-100">Somebody</span>
+  }
+
+  return (
+    <>
+      <Avatar src={actor.avatar_url} name={actor.display_name} size="sm" />
+      <Link
+        to={`/users/${actor.id}`}
+        className="font-medium text-brand-900 hover:underline dark:text-brand-100"
+      >
+        {actor.display_name}
+      </Link>
+    </>
+  )
+}
 
 /** 12.5 → "12.5 g", 100 → "100 g". Trailing ".0" on a bag of tea reads like a lab
  *  notebook. */
@@ -35,11 +62,9 @@ function ReviewItem({ item }: { item: FeedReviewItem }) {
     <Panel as="li" testId="feed-item-review">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            <span className="font-medium text-brand-900 dark:text-brand-100">
-              {item.actor.display_name}
-            </span>{' '}
-            rated
+          <p className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+            <Actor actor={item.actor} />
+            <span>rated</span>
           </p>
           <h2 className="text-base font-semibold text-brand-900 dark:text-brand-100">
             <Link to={`/teas/${item.tea.slug}`} className="hover:underline">
@@ -82,11 +107,8 @@ function ReviewItem({ item }: { item: FeedReviewItem }) {
 function StockedItem({ item }: { item: FeedStockedItem }) {
   return (
     <Panel as="li" testId="feed-item-stocked">
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">
-        <span className="font-medium text-brand-900 dark:text-brand-100">
-          {item.actor?.display_name ?? 'Somebody'}
-        </span>{' '}
-        added {formatGrams(item.grams)} of{' '}
+      <p className="flex flex-wrap items-center gap-1 text-sm text-neutral-600 dark:text-neutral-400">
+        <Actor actor={item.actor} /> added {formatGrams(item.grams)} of{' '}
         <span className="font-medium text-brand-900 dark:text-brand-100">{item.tea.name}</span> to{' '}
         <Link
           to={`/households/${item.household.id}`}

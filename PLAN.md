@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6b done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6c done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -343,6 +343,27 @@ The position is used for that one comparison and never stored server-side or log
 The browser remembers it locally so a later visit opens on your area.
 
 Map rendering is Leaflet with OpenStreetMap tiles: free, no API key, no billing account.
+
+### M6c — Profiles, and a navigation that groups ✅
+Eight flat nav items became `Activity · Households · Friends · Catalog▾ · [you]▾`, with
+a real WAI-ARIA menu button — click to open, Escape returns focus to the trigger, arrow
+keys walk the items, click-outside and blur close it. Below `sm` the four collapse behind
+a hamburger; the account menu stays on the bar so the avatar never lands on a third line.
+
+`user` gains `pronouns`, `bio`, `location`, `favourite_tea_type`, and `avatar_url` finally
+has something that sets it. Pronouns are free text, not a picklist — the ones people use
+do not fit a fixed set, and a name tells you nothing.
+
+`GET /users/{id}/profile` is public, like the reviews it shows, and **carries no email**.
+An address appears in friend and household contexts, where the two of you are already
+connected; a profile is reachable by anyone holding the id. A deactivated account returns
+the same 404 as one that never existed.
+
+`ProfileUpdate` deliberately omits `role` and `email`: a role you can set yourself is not
+a role, and changing an identity wants its own confirmation flow.
+
+Avatars fall back to initials on a name-hashed colour rather than a generic silhouette,
+and appear in the nav, friend rows, review authors, feed actors and household members.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

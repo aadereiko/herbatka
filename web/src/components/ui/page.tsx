@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router'
 
 import { useAuth } from '../../features/auth/auth-context'
+import type { User } from '../../lib/api'
 import { useIncomingRequestCount } from '../../features/friend/queries'
+import { Avatar } from './avatar'
 import { Button } from './button'
+import { Menu, MenuButton, MenuLink } from './menu'
 
 function navClass({ isActive }: { isActive: boolean }): string {
   return isActive
@@ -11,13 +15,6 @@ function navClass({ isActive }: { isActive: boolean }): string {
     : 'rounded-lg px-2.5 py-1 text-sm font-medium text-neutral-600 hover:bg-brand-50 hover:text-brand-800 dark:text-neutral-300 dark:hover:bg-neutral-800'
 }
 
-/**
- * The bar every catalog and admin page wears. `NavLink` sets `aria-current="page"` on
- * the active entry for free, which is the whole reason to use it over `Link`.
- *
- * The wordmark points at /teas for a signed-out visitor: "/" is behind RequireAuth, and
- * sending someone to a login screen for clicking a logo is a small betrayal.
- */
 /**
  * The count of requests waiting on you, as a badge on the Friends entry.
  *
@@ -45,37 +42,141 @@ function IncomingBadge() {
   )
 }
 
-function SignOut({ name }: { name: string }) {
+/**
+ * Teas, Ingredients, Shops — the three public browsing screens, behind one entry.
+ *
+ * They were three top-level items out of eight, and eight wrapped onto two lines on
+ * anything narrower than a laptop. Grouping them is not only a space saving: they are the
+ * one part of the app that means the same thing signed in or out, and collapsing them
+ * leaves the top level to the things that are *yours*.
+ */
+function CatalogMenu() {
+  return (
+    <Menu trigger={<span>Catalog</span>} triggerTestId="nav-catalog" menuTestId="catalog-menu">
+      <MenuLink to="/teas" testId="nav-teas">
+        Teas
+      </MenuLink>
+      <MenuLink to="/ingredients" testId="nav-ingredients">
+        Ingredients
+      </MenuLink>
+      {/* A shop is the other half of "what is this tea" — the half that answers where to
+          get it — so it belongs with the catalog rather than beside the feed. */}
+      <MenuLink to="/shops" testId="nav-shops">
+        Shops
+      </MenuLink>
+    </Menu>
+  )
+}
+
+/**
+ * You, and everything that is about you.
+ *
+ * This replaces the bare "Sasha  Sign out" pair. Sign out was the only account action
+ * that had anywhere to live, so it sat in the bar next to a name that did nothing; now
+ * the name is the button and the actions are behind it, which is where anybody who has
+ * used a web application in the last fifteen years will look for them.
+ *
+ * "Your reviews" is here rather than in the target shape's four items, and deliberately:
+ * `/reviews/mine` is a signed-in page about your own writing, so it belongs with your
+ * profile and your settings. Dropping it from the nav entirely would have left the route
+ * reachable only by typing the URL.
+ *
+ * The display name stays in the DOM at every width and truncates with CSS rather than
+ * being hidden below `sm`. A trigger that is an unlabelled 24px circle on a phone is a
+ * button a screen reader announces as nothing at all.
+ */
+function AccountMenu({ user }: { user: User }) {
   const { logout } = useAuth()
   const navigate = useNavigate()
 
   return (
-    <span className="ml-2 flex items-center gap-2 border-l border-brand-200 pl-3 dark:border-neutral-800">
-      <span className="hidden text-sm text-neutral-500 dark:text-neutral-400 sm:inline">
-        {name}
-      </span>
-      <button
-        type="button"
-        data-testid="sign-out"
+    <Menu
+      align="right"
+      triggerTestId="account-menu"
+      menuTestId="account-menu-items"
+      triggerClassName="max-w-40"
+      trigger={
+        <>
+          <Avatar
+            src={user.avatar_url}
+            name={user.display_name}
+            size="xs"
+            testId="nav-account-avatar"
+          />
+          <span className="max-w-20 truncate sm:max-w-32">{user.display_name}</span>
+        </>
+      }
+    >
+      <MenuLink to={`/users/${user.id}`} testId="nav-profile">
+        Your profile
+      </MenuLink>
+      <MenuLink to="/reviews/mine" testId="nav-my-reviews">
+        Your reviews
+      </MenuLink>
+      <MenuLink to="/settings" testId="nav-settings">
+        Settings
+      </MenuLink>
+      {user.role === 'admin' && (
+        <MenuLink to="/admin" testId="nav-admin">
+          Admin
+        </MenuLink>
+      )}
+      <MenuButton
+        testId="sign-out"
         onClick={() => {
           void logout().then(() => navigate('/'))
         }}
-        className="rounded-lg px-2 py-1 text-sm font-medium text-brand-700 transition hover:bg-brand-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-300 dark:hover:bg-neutral-800"
       >
         Sign out
-      </button>
-    </span>
+      </MenuButton>
+    </Menu>
   )
 }
 
+/**
+ * The bar every page wears: eight flat items, regrouped into four plus you.
+ *
+ * `NavLink` sets `aria-current="page"` on the active entry for free, which is the whole
+ * reason to use it over `Link`. The wordmark points at /teas for a signed-out visitor:
+ * sending someone to a sign-in screen for clicking a logo is a small betrayal.
+ *
+ * The row is `🍵 Herbatka … Activity Households Friends[badge] Catalog ▾ … [avatar] Name ▾`
+ * signed in, and `🍵 Herbatka … Catalog ▾ Sign in` signed out. Activity leads because it
+ * is the thing that changes without you; everything after it is somewhere you go on
+ * purpose. RequireAuth guards the routes themselves — this ordering is tidiness, not
+ * security.
+ *
+ * **Below `sm`** the four primary entries collapse behind a hamburger and stack full
+ * width, while the wordmark and the account menu stay on the bar. Two reasons for that
+ * split rather than sweeping everything into the panel: the avatar is how you confirm
+ * which account you are in, which is worth a permanent 24px; and a second copy of the
+ * account items inside the panel would be two of every menu item in the DOM, which is
+ * how "Sign out" ends up ambiguous to a screen reader and to a test.
+ *
+ * Signed out there is no hamburger at all — two items fit at 320px, and a disclosure
+ * button that reveals one link is a control that costs more than it saves.
+ *
+ * The panel is ordered last on a phone (`order-last`) and back in place at `sm`, so the
+ * links appear below the bar rather than shoving the account menu onto a third line.
+ */
 function SiteNav() {
   const { user } = useAuth()
+  const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
+
+  // A panel that survives the navigation it caused would hang over the new page.
+  // Adjusted during render rather than in an effect, for the reason `menu.tsx` gives.
+  const [lastPath, setLastPath] = useState(pathname)
+  if (lastPath !== pathname) {
+    setLastPath(pathname)
+    setOpen(false)
+  }
 
   return (
     <header className="border-b border-brand-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <nav
         aria-label="Main"
-        className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 sm:px-6"
+        className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:px-6"
       >
         <Link
           to={user ? '/' : '/teas'}
@@ -86,60 +187,58 @@ function SiteNav() {
           </span>
           Herbatka
         </Link>
-        {/* Signed-in only, and first: the catalog is browsing, these are the app. The
-            feed leads because it is the thing that changes without you — everything
-            after it is somewhere you go on purpose. RequireAuth guards the routes
-            themselves; this ordering is tidiness, not security. */}
+
         {user && (
-          <NavLink to="/feed" className={navClass} data-testid="nav-feed">
-            Activity
-          </NavLink>
+          <button
+            type="button"
+            data-testid="nav-toggle"
+            aria-expanded={open}
+            aria-controls="nav-primary"
+            onClick={() => setOpen((value) => !value)}
+            className="rounded-lg px-2 py-1 text-lg leading-none text-neutral-600 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-neutral-300 dark:hover:bg-neutral-800 sm:hidden"
+          >
+            <span aria-hidden="true">☰</span>
+            <span className="sr-only">Menu</span>
+          </button>
         )}
-        {user && (
-          <NavLink to="/friends" className={navClass} data-testid="nav-friends">
-            Friends
-            <IncomingBadge />
-          </NavLink>
-        )}
-        {user && (
-          <NavLink to="/households" className={navClass} data-testid="nav-households">
-            Households
-          </NavLink>
-        )}
-        <NavLink to="/teas" className={navClass}>
-          Teas
-        </NavLink>
-        <NavLink to="/ingredients" className={navClass}>
-          Ingredients
-        </NavLink>
-        {/* Public, and next to the catalog it belongs beside: a shop is the other half
-            of "what is this tea" — the half that answers where to get it. */}
-        <NavLink to="/shops" className={navClass} data-testid="nav-shops">
-          Shops
-        </NavLink>
-        {/* After the catalog it belongs to, and signed-in only: /reviews/mine is behind
-            RequireAuth, and an entry that only ever leads to a login screen is worse
-            than no entry. */}
-        {user && (
-          <NavLink to="/reviews/mine" className={navClass} data-testid="nav-my-reviews">
-            My reviews
-          </NavLink>
-        )}
-        {user?.role === 'admin' && (
-          <NavLink to="/admin" className={navClass} data-testid="nav-admin">
-            Admin
-          </NavLink>
-        )}
-        {!user && (
-          <NavLink to="/login" className={navClass}>
+
+        <div
+          id="nav-primary"
+          data-testid="nav-primary"
+          // Signed out this group is one entry with no hamburger to reveal it, so it is
+          // never collapsed and never reordered — the mobile machinery is for the four.
+          className={
+            user
+              ? `${open ? 'flex' : 'hidden'} order-last w-full basis-full flex-col items-stretch gap-1 sm:order-none sm:flex sm:w-auto sm:basis-auto sm:flex-row sm:items-center sm:gap-2`
+              : 'flex items-center gap-2'
+          }
+        >
+          {user && (
+            <NavLink to="/feed" className={navClass} data-testid="nav-feed">
+              Activity
+            </NavLink>
+          )}
+          {user && (
+            <NavLink to="/households" className={navClass} data-testid="nav-households">
+              Households
+            </NavLink>
+          )}
+          {user && (
+            <NavLink to="/friends" className={navClass} data-testid="nav-friends">
+              Friends
+              <IncomingBadge />
+            </NavLink>
+          )}
+          <CatalogMenu />
+        </div>
+
+        {user ? (
+          <AccountMenu user={user} />
+        ) : (
+          <NavLink to="/login" className={navClass} data-testid="nav-sign-in">
             Sign in
           </NavLink>
         )}
-        {/* Signing out lives here, not on the home page. It used to be a button on a
-            "signed in as" card that home no longer has — and a global action reachable
-            from one page only was always the wrong shape. The name doubles as the
-            answer to "who am I signed in as", which is the other thing that card did. */}
-        {user && <SignOut name={user.display_name} />}
       </nav>
     </header>
   )

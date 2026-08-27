@@ -63,6 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await logoutRequest().catch(() => undefined)
         setUser(null)
       },
+      // Guarded on there being a session: a PATCH that lands after a logout in another
+      // tab must not resurrect a signed-in shell over a dead token.
+      updateUser: (next) => setUser((current) => (current ? next : current)),
     }),
     [user, isLoading],
   )

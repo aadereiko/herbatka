@@ -73,6 +73,10 @@ const ada: User = {
   display_name: 'Ada Lovelace',
   role: 'user',
   avatar_url: null,
+  pronouns: null,
+  bio: null,
+  location: null,
+  favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
 
