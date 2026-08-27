@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Float, Select, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -10,10 +10,43 @@ from app.models.household import HouseholdMember, StockEvent, StockItem
 from app.models.shop import Shop, ShopListing
 from app.models.user import User
 from app.schemas.shop import BuyRequest, ListingCreate, ListingUpdate, ShopCreate, ShopUpdate
+from app.services import geocoding
 from app.services.catalog import _unique_slug
 from app.services.errors import AlreadyExists, NotAMember, NotFound
 
 _LISTING_LOADS = (selectinload(ShopListing.tea), selectinload(ShopListing.shop))
+
+
+EARTH_RADIUS_KM = 6371.0088
+
+
+def distance_km_expression(lat: float, lng: float):
+    """Great-circle distance from a point to each shop, in kilometres.
+
+    Haversine written out in SQL rather than PostGIS or the earthdistance extension:
+    it needs nothing installed, it is exact enough for "which tea shop is nearest"
+    (sub-metre over city distances), and it keeps the deployment to one plain Postgres.
+
+    The cost is that it cannot use an index — every candidate row is computed. With
+    tens of thousands of shops that would matter and the answer would be PostGIS with a
+    GiST index; with a catalogue of tea shops it does not.
+    """
+    lat_radians = func.radians(cast(Shop.latitude, Float))
+    lng_radians = func.radians(cast(Shop.longitude, Float))
+    origin_lat = func.radians(lat)
+    origin_lng = func.radians(lng)
+
+    return EARTH_RADIUS_KM * (
+        2
+        * func.asin(
+            func.sqrt(
+                func.power(func.sin((lat_radians - origin_lat) / 2), 2)
+                + func.cos(origin_lat)
+                * func.cos(lat_radians)
+                * func.power(func.sin((lng_radians - origin_lng) / 2), 2)
+            )
+        )
+    )
 
 
 def listing_count_subquery():
@@ -51,10 +84,12 @@ async def list_shops(
     city: str | None = None,
     country: str | None = None,
     approved: bool | None = True,
+    near: tuple[float, float] | None = None,
+    radius_km: float | None = None,
     page: int = 1,
     size: int = 24,
-) -> tuple[list[tuple[Shop, int]], int]:
-    query = select(Shop).order_by(Shop.name)
+) -> tuple[list[tuple[Shop, int, float | None]], int]:
+    query = select(Shop)
     if approved is not None:
         query = query.where(Shop.is_approved.is_(approved))
     if q:
@@ -63,7 +98,30 @@ async def list_shops(
         query = query.where(Shop.city.ilike(city))
     if country:
         query = query.where(Shop.country.ilike(country))
-    return await _paginate_shops(db, query, page, size)
+
+    if near is None:
+        query = query.order_by(Shop.name)
+        rows, total = await _paginate_shops(db, query, page, size)
+        return [(shop, count, None) for shop, count in rows], total
+
+    # A shop with no pin has no distance, so it cannot take part in a nearest-first
+    # ordering at all. Excluded rather than sorted last: "nearest shops" that includes
+    # ones whose location nobody knows is a worse answer than a shorter list.
+    distance = distance_km_expression(*near).label("distance_km")
+    query = query.where(Shop.latitude.is_not(None), Shop.longitude.is_not(None))
+    if radius_km is not None:
+        query = query.where(distance <= radius_km)
+
+    total = await db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = await db.execute(
+        query.add_columns(listing_count_subquery().label("listing_count"), distance)
+        .order_by(distance)
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    return [
+        (row[0], row.listing_count, round(float(row.distance_km), 2)) for row in rows.unique().all()
+    ], total
 
 
 async def get_shop_by_slug(
@@ -309,3 +367,22 @@ async def buy(
     )
     assert fresh is not None
     return fresh
+
+
+async def geocode_shop(db: AsyncSession, shop_id: uuid.UUID) -> tuple[Shop, int]:
+    """Look the shop's written address up and move its pin to the result.
+
+    Deliberately a separate, explicit action rather than something that happens quietly
+    on every save. Geocoding is a guess — "Rynek 7" exists in a dozen Polish towns — so
+    an admin asks for it, sees where the pin landed, and drags it if it is wrong.
+    """
+    shop = await db.get(Shop, shop_id)
+    if shop is None:
+        raise NotFound("shop")
+
+    point = await geocoding.lookup(shop.address, shop.city, shop.country)
+    shop.latitude = point.latitude
+    shop.longitude = point.longitude
+    shop.geocoded_at = datetime.now(UTC)
+    await db.flush()
+    return await get_shop(db, shop_id)

@@ -34,6 +34,7 @@ from app.schemas.shop import (
 from app.services import catalog as catalog_service
 from app.services import shop as shop_service
 from app.services.errors import AlreadyExists, IngredientInUse, NotFound
+from app.services.geocoding import AddressNotFound, GeocodingUnavailable
 
 # AdminUser is declared as a router-wide dependency rather than per route: a new
 # endpoint added here is protected by default, instead of being public until somebody
@@ -174,7 +175,7 @@ async def list_shops(
     rows, total = await shop_service.list_shops(
         db, approved=approved, page=paging.page, size=paging.size
     )
-    return Page.build([shop_summary(s, n) for s, n in rows], total, paging.page, paging.size)
+    return Page.build([shop_summary(s, n, d) for s, n, d in rows], total, paging.page, paging.size)
 
 
 @router.get("/shops/{shop_id}", response_model=ShopDetail)
@@ -255,3 +256,24 @@ async def delete_listing(shop_id: uuid.UUID, listing_id: uuid.UUID, db: DbSessio
         await shop_service.delete_listing(db, shop_id, listing_id)
     except NotFound as exc:
         raise _not_found(exc) from exc
+
+
+@router.post("/shops/{shop_id}/geocode", response_model=ShopDetail)
+async def geocode_shop(shop_id: uuid.UUID, db: DbSession) -> ShopDetail:
+    """Set the pin from the written address. The admin can still drag it afterwards."""
+    try:
+        return shop_detail(*await shop_service.geocode_shop(db, shop_id))
+    except NotFound as exc:
+        raise _not_found(exc) from exc
+    except AddressNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="We could not find that address. Drop the pin on the map instead.",
+        ) from exc
+    except GeocodingUnavailable as exc:
+        # 503, not 422: nothing is wrong with the address, the lookup service is simply
+        # not answering — and the caller may reasonably try again later.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Address lookup is unavailable right now. Drop the pin on the map instead.",
+        ) from exc

@@ -38,12 +38,33 @@ async def list_shops(
     q: Annotated[str | None, Query(max_length=120)] = None,
     city: Annotated[str | None, Query(max_length=120)] = None,
     country: Annotated[str | None, Query(max_length=60)] = None,
+    near_lat: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    near_lng: Annotated[float | None, Query(ge=-180, le=180)] = None,
+    radius_km: Annotated[float | None, Query(gt=0, le=20000)] = None,
 ) -> Page[ShopSummary]:
-    """Public, like the tea catalog: you can see where to buy tea without an account."""
+    """Public, like the tea catalog: you can see where to buy tea without an account.
+
+    A position sorts the results nearest-first. It is read from the query and used for
+    that one comparison — never written to the database and never logged. Where somebody
+    is standing is not this app's business beyond answering the question they asked.
+    """
+    if (near_lat is None) != (near_lng is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="near_lat and near_lng must be given together",
+        )
+
     rows, total = await shop_service.list_shops(
-        db, q=q, city=city, country=country, page=paging.page, size=paging.size
+        db,
+        q=q,
+        city=city,
+        country=country,
+        near=(near_lat, near_lng) if near_lat is not None and near_lng is not None else None,
+        radius_km=radius_km,
+        page=paging.page,
+        size=paging.size,
     )
-    return Page.build([shop_summary(s, n) for s, n in rows], total, paging.page, paging.size)
+    return Page.build([shop_summary(s, n, d) for s, n, d in rows], total, paging.page, paging.size)
 
 
 @router.get("/shops/{slug}", response_model=ShopDetail)

@@ -83,7 +83,7 @@ async def seed() -> dict[str, int]:
 
         # Shops, and what they sell. Flushed first so the listings can reference them.
         existing_shops = {s.slug: s for s in await session.scalars(select(Shop))}
-        for name, website, address, city, country, description in SHOPS:
+        for name, website, address, city, country, description, lat, lng in SHOPS:
             slug = slugify(name)
             if slug in existing_shops:
                 continue
@@ -95,6 +95,8 @@ async def seed() -> dict[str, int]:
                 city=city,
                 country=country,
                 description=description,
+                latitude=Decimal(str(lat)) if lat is not None else None,
+                longitude=Decimal(str(lng)) if lng is not None else None,
                 is_approved=True,
             )
             session.add(shop)

@@ -243,6 +243,26 @@ export function useUpdateShop() {
   })
 }
 
+/**
+ * "Find from address" — the server looks the shop's address up and stores the pin.
+ *
+ * It takes no body, which is the important thing about it: it geocodes the address the
+ * shop *has*, not the one currently in the admin's unsaved form. The button says so.
+ *
+ * The response is the whole updated shop, so the caller moves its own pin from it rather
+ * than waiting for a refetch. The invalidation is still needed for everything else that
+ * prints this shop — the browse map most of all, where a shop that had no pin a moment
+ * ago now has one.
+ */
+export function useGeocodeShop() {
+  const invalidate = useInvalidateShops()
+  return useMutation({
+    mutationFn: (shopId: string) =>
+      api<ShopDetail>(`/admin/shops/${encodeURIComponent(shopId)}/geocode`, { method: 'POST' }),
+    onSuccess: invalidate,
+  })
+}
+
 export function useApproveShop() {
   const invalidate = useInvalidateShops()
   return useMutation({

@@ -1,3 +1,4 @@
+import { ApiError, describeApiError } from '../../lib/api'
 import { formatGrams, formatPrice } from '../../lib/format'
 import type { Listing, ShopSummary } from '../../lib/shop'
 
@@ -7,6 +8,34 @@ import type { Listing, ShopSummary } from '../../lib/shop'
 export function describePlace(shop: ShopSummary): string | null {
   const parts = [shop.city, shop.country].filter(Boolean)
   return parts.length > 0 ? parts.join(', ') : null
+}
+
+/**
+ * What went wrong looking an address up, in words that say what to do next.
+ *
+ * The three statuses are three different situations and deserve three different
+ * sentences. A 422 is the address's fault and the admin can fix it in ten seconds by
+ * clicking the map — so the message says so instead of inviting them to retry a lookup
+ * that will fail identically. A 503 is nobody's fault and *will* work later, so it says
+ * that instead. Collapsing the two into "Geocoding failed" makes the fixable one look
+ * permanent and the temporary one look fixable.
+ *
+ * The server's own `detail` is deliberately dropped for the 422: it says which
+ * geocoding service found nothing, which is true and useless.
+ */
+export function describeGeocodeError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 422) {
+      return 'We could not find that address on a map — drop the pin yourself instead.'
+    }
+    if (error.status === 503) {
+      return 'The address lookup is not answering just now. Try again in a minute, or drop the pin yourself.'
+    }
+    if (error.status === 404) {
+      return 'That shop is no longer there. Reload the page.'
+    }
+  }
+  return describeApiError(error)
 }
 
 /**

@@ -29,6 +29,21 @@ function sessionFor(user: User): Session {
   return { access_token: 'access-1', token_type: 'bearer', expires_in: 900, user }
 }
 
+/**
+ * jsdom has no layout and no canvas, so a Leaflet map cannot be instantiated in it at
+ * all. Every Leaflet import in the app lives in `./ShopMap` for exactly this reason —
+ * one mock covers the browse map, the shop's own map and the admin pin editor, and the
+ * suites that never think about maps do not have to grow one each.
+ *
+ * The M6 tests in this file are not about maps; they only need the module to be inert.
+ * `map.test.tsx` mocks it with stubs that report their props.
+ */
+vi.mock('./ShopMap', () => ({
+  ShopMap: () => <div data-testid="shop-map" />,
+  ShopPointMap: () => <div data-testid="shop-point-map" />,
+  ShopPinPicker: () => <div data-testid="shop-pin-picker" />,
+}))
+
 const kruka: ShopSummary = {
   id: 'shop-1',
   slug: 'u-kruka',
@@ -39,6 +54,10 @@ const kruka: ShopSummary = {
   image_url: null,
   is_approved: true,
   listing_count: 2,
+  latitude: 50.0625,
+  longitude: 19.937,
+  // Null unless the request carried a position, which none of the M6 tests do.
+  distance_km: null,
 }
 
 const krukaDetail: ShopDetail = {

@@ -21,6 +21,11 @@ class ShopSummary(ShopRef):
     image_url: str | None
     is_approved: bool
     listing_count: int
+    latitude: float | None
+    longitude: float | None
+    # Only when the request supplied a position. null otherwise — not 0, which would
+    # read as "you are standing in it".
+    distance_km: float | None
 
 
 class ShopDetail(ShopSummary):
@@ -37,6 +42,8 @@ class ShopCreate(BaseModel):
     country: str | None = Field(default=None, max_length=60)
     description: str | None = None
     image_url: str | None = Field(default=None, max_length=500)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
 
     @model_validator(mode="after")
     def reachable_somehow(self) -> "ShopCreate":
@@ -56,6 +63,15 @@ class ShopUpdate(BaseModel):
     country: str | None = Field(default=None, max_length=60)
     description: str | None = None
     image_url: str | None = Field(default=None, max_length=500)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def pin_is_complete(self) -> "ShopUpdate":
+        # Mirrors ck_shop_pin_is_complete: half a pin is not a place.
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("latitude and longitude must be given together")
+        return self
 
 
 class Listing(BaseModel):
@@ -117,7 +133,7 @@ class UploadedImage(BaseModel):
     url: str
 
 
-def shop_summary(shop: object, listing_count: int) -> ShopSummary:
+def shop_summary(shop: object, listing_count: int, distance_km: float | None = None) -> ShopSummary:
     return ShopSummary(
         id=shop.id,  # type: ignore[attr-defined]
         slug=shop.slug,  # type: ignore[attr-defined]
@@ -128,12 +144,15 @@ def shop_summary(shop: object, listing_count: int) -> ShopSummary:
         image_url=shop.image_url,  # type: ignore[attr-defined]
         is_approved=shop.is_approved,  # type: ignore[attr-defined]
         listing_count=listing_count,
+        latitude=float(shop.latitude) if shop.latitude is not None else None,  # type: ignore[attr-defined]
+        longitude=float(shop.longitude) if shop.longitude is not None else None,  # type: ignore[attr-defined]
+        distance_km=distance_km,
     )
 
 
-def shop_detail(shop: object, listing_count: int) -> ShopDetail:
+def shop_detail(shop: object, listing_count: int, distance_km: float | None = None) -> ShopDetail:
     return ShopDetail(
-        **shop_summary(shop, listing_count).model_dump(),
+        **shop_summary(shop, listing_count, distance_km).model_dump(),
         description=shop.description,  # type: ignore[attr-defined]
         address=shop.address,  # type: ignore[attr-defined]
         created_at=shop.created_at,  # type: ignore[attr-defined]

@@ -70,6 +70,10 @@ function EditShopPanel({ shop, onSaved }: { shop: ShopSummary; onSaved: (name: s
         error={update.isError ? describeApiError(update.error) : null}
         initial={draftFromShop(detail.data)}
         withImage
+        withPin
+        // Only here, not on the create form: the geocode endpoint is addressed by shop
+        // id, and a shop being created does not have one yet.
+        geocodeShopId={shop.id}
         onSubmit={(draft) =>
           update.mutate(
             { id: shop.id, patch: toShopPatch(draft) },
@@ -213,6 +217,7 @@ export function AdminShopsPage() {
             pending={create.isPending}
             error={create.isError ? describeApiError(create.error) : null}
             withImage
+            withPin
             onSubmit={(draft) =>
               create.mutate(toShopInput(draft, true), {
                 onSuccess: () => setFormKey((key) => key + 1),

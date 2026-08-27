@@ -304,7 +304,12 @@ TEAS: list[
 ]
 
 # (name, website, address, city, country, description)
-SHOPS: list[tuple[str, str | None, str | None, str | None, str | None, str]] = [
+# Coordinates are real points on the named streets, so the map and "shops near me"
+# have something honest to work with straight after `make seed`. The two online-only
+# shops have none, which is the case the UI has to handle anyway.
+SHOPS: list[
+    tuple[str, str | None, str | None, str | None, str | None, str, float | None, float | None]
+] = [
     (
         "Czajnik",
         "https://czajnik.example",
@@ -312,6 +317,8 @@ SHOPS: list[tuple[str, str | None, str | None, str | None, str | None, str]] = [
         "Kraków",
         "Poland",
         "A narrow shop off the main square with more oolong than shelf space.",
+        50.0617,
+        19.9392,
     ),
     (
         "Herbaciarnia Pod Wierzbą",
@@ -320,6 +327,8 @@ SHOPS: list[tuple[str, str | None, str | None, str | None, str | None, str]] = [
         "Warsaw",
         "Poland",
         "Tea room first, shop second. They will let you taste before you buy.",
+        52.2496,
+        21.0123,
     ),
     (
         "Leaf & Lore",
@@ -328,6 +337,8 @@ SHOPS: list[tuple[str, str | None, str | None, str | None, str | None, str]] = [
         None,
         "United Kingdom",
         "Online only. Small batches, honest harvest dates, sensible postage.",
+        None,
+        None,
     ),
     (
         "Yunnan Direct",
@@ -336,6 +347,8 @@ SHOPS: list[tuple[str, str | None, str | None, str | None, str | None, str]] = [
         None,
         "China",
         "Ships pu-erh and Yunnan blacks direct from the producer.",
+        None,
+        None,
     ),
     (
         "Tørret Blad",
@@ -344,6 +357,8 @@ SHOPS: list[tuple[str, str | None, str | None, str | None, str | None, str]] = [
         "Copenhagen",
         "Denmark",
         "Nordic minimalism applied to tea. Excellent whites.",
+        55.6928,
+        12.5456,
     ),
     (
         "Basar Herbat",
@@ -352,6 +367,8 @@ SHOPS: list[tuple[str, str | None, str | None, str | None, str | None, str]] = [
         "Wrocław",
         "Poland",
         "Market stall. Cash only, but the masala chai is worth the trip.",
+        51.1098,
+        17.0327,
     ),
 ]
 

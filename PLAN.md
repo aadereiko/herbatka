@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6 done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6b done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -318,6 +318,31 @@ Two things this milestone taught, both found in a browser and neither by a test:
   now greps every revision for `create_foreign_key(None` and `drop_constraint(None`,
   because the failure is silent: `upgrade` succeeds, only `downgrade` breaks, and the
   failed downgrade makes the next upgrade a no-op.
+
+### M6b — A map, and shops around you ✅
+`shop` gains `latitude` / `longitude` (a CHECK enforces both-or-neither — half a pin is
+not a place) and `geocoded_at`.
+
+**Finding a shop's point** is geocode-then-correct. `POST /admin/shops/{id}/geocode`
+asks OpenStreetMap's Nominatim, and the admin drags the pin if it landed wrong —
+geocoding is a guess, since "Rynek 7" exists in a dozen Polish towns. It is a separate,
+explicit action rather than something that happens quietly on save, so a bad result is
+visible rather than stored. Off by default (`GEOCODING_ENABLED`) so the suite never
+depends on a third party; the client enforces Nominatim's one-request-per-second policy
+and sends a User-Agent naming the app, because breaching it gets the IP blocked.
+
+**"Around me"** is `GET /shops?near_lat=&near_lng=&radius_km=`, sorted nearest-first
+with a `distance_km` on each result. Haversine written out in SQL rather than PostGIS:
+nothing to install, exact enough for "which tea shop is nearest", and it keeps the
+deployment to one plain Postgres. It cannot use an index, so every candidate row is
+computed — with tens of thousands of shops the answer would be PostGIS and a GiST index;
+with a catalogue of tea shops it does not matter. A shop with no pin is excluded from a
+nearest-first list entirely, rather than sorted last.
+
+The position is used for that one comparison and never stored server-side or logged.
+The browser remembers it locally so a later visit opens on your area.
+
+Map rendering is Leaflet with OpenStreetMap tiles: free, no API key, no billing account.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

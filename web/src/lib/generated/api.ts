@@ -452,6 +452,26 @@ export interface paths {
         patch: operations["update_listing_api_v1_admin_shops__shop_id__listings__listing_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/shops/{shop_id}/geocode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Geocode Shop
+         * @description Set the pin from the written address. The admin can still drag it afterwards.
+         */
+        post: operations["geocode_shop_api_v1_admin_shops__shop_id__geocode_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/households": {
         parameters: {
             query?: never;
@@ -826,6 +846,10 @@ export interface paths {
         /**
          * List Shops
          * @description Public, like the tea catalog: you can see where to buy tea without an account.
+         *
+         *     A position sorts the results nearest-first. It is read from the query and used for
+         *     that one comparison — never written to the database and never logged. Where somebody
+         *     is standing is not this app's business beyond answering the question they asked.
          */
         get: operations["list_shops_api_v1_shops_get"];
         put?: never;
@@ -1723,6 +1747,10 @@ export interface components {
             description?: string | null;
             /** Image Url */
             image_url?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
         };
         /** ShopDetail */
         ShopDetail: {
@@ -1747,6 +1775,12 @@ export interface components {
             is_approved: boolean;
             /** Listing Count */
             listing_count: number;
+            /** Latitude */
+            latitude: number | null;
+            /** Longitude */
+            longitude: number | null;
+            /** Distance Km */
+            distance_km: number | null;
             /** Description */
             description: string | null;
             /** Address */
@@ -1792,6 +1826,12 @@ export interface components {
             is_approved: boolean;
             /** Listing Count */
             listing_count: number;
+            /** Latitude */
+            latitude: number | null;
+            /** Longitude */
+            longitude: number | null;
+            /** Distance Km */
+            distance_km: number | null;
         };
         /** ShopUpdate */
         ShopUpdate: {
@@ -1809,6 +1849,10 @@ export interface components {
             description?: string | null;
             /** Image Url */
             image_url?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
         };
         /**
          * StockAdjust
@@ -3343,6 +3387,37 @@ export interface operations {
             };
         };
     };
+    geocode_shop_api_v1_admin_shops__shop_id__geocode_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shop_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_households_api_v1_households_get: {
         parameters: {
             query?: never;
@@ -4232,6 +4307,9 @@ export interface operations {
                 q?: string | null;
                 city?: string | null;
                 country?: string | null;
+                near_lat?: number | null;
+                near_lng?: number | null;
+                radius_km?: number | null;
                 page?: number;
                 size?: number;
             };

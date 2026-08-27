@@ -15,7 +15,9 @@ import { ApiError, describeApiError } from '../../lib/api'
 import { pluralise } from '../catalog/format'
 import { describePlace } from './format'
 import { ListingRow } from './ListingRow'
+import { directionsUrl, isPinned } from './nearby'
 import { useShopDetail, useShopListings } from './queries'
+import { ShopPointMap } from './ShopMap'
 
 const LISTING_PAGE_SIZE = 20
 
@@ -65,6 +67,10 @@ export function ShopDetailPage() {
   const detail = shop.data
   const place = describePlace(detail)
   const items = listings.data?.items ?? []
+  // Nothing at all when there is no pin — an online-only shop is not somewhere you can
+  // stand, and a grey square captioned "no location" is a hole in the page rather than
+  // an answer to anything.
+  const pinned = isPinned(detail)
 
   return (
     <PageShell>
@@ -177,6 +183,29 @@ export function ShopDetailPage() {
               </div>
             )}
           </dl>
+
+          {pinned && (
+            <div className="mt-4 space-y-2">
+              <ShopPointMap
+                latitude={detail.latitude}
+                longitude={detail.longitude}
+                name={detail.name}
+              />
+              {/* Out to OpenStreetMap rather than a routing engine of our own: the point
+                  is to hand the coordinates to something that already knows how to get
+                  somebody there, on whatever device they are holding. */}
+              <a
+                href={directionsUrl(detail.latitude, detail.longitude)}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="shop-directions"
+                className="inline-block text-sm font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-300"
+              >
+                Directions
+                <span className="sr-only"> to {detail.name} (opens in a new tab)</span>
+              </a>
+            </div>
+          )}
 
           {detail.description && (
             <p

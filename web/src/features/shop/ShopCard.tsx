@@ -5,11 +5,15 @@ import { Badge } from '../../components/ui/page'
 import type { ShopSummary } from '../../lib/shop'
 import { pluralise } from '../catalog/format'
 import { describePlace } from './format'
+import { formatDistance } from './nearby'
 
 /** One shop in the browse grid. The whole card is the link — a tap target the size of a
  *  card rather than the size of a word, because this list is read on a phone. */
 export function ShopCard({ shop }: { shop: ShopSummary }) {
   const place = describePlace(shop)
+  // Null on every ordinary browse — the server only fills it in when the request carried
+  // a position — and the badge is absent rather than empty when it is.
+  const distance = formatDistance(shop.distance_km)
 
   return (
     <li className="list-none">
@@ -39,6 +43,11 @@ export function ShopCard({ shop }: { shop: ShopSummary }) {
             <Badge tone={shop.listing_count > 0 ? 'brand' : 'neutral'}>
               {pluralise(shop.listing_count, 'tea')}
             </Badge>
+            {distance && (
+              <span data-testid="shop-card-distance">
+                <Badge tone="amber">{distance}</Badge>
+              </span>
+            )}
             {!shop.is_approved && <Badge tone="rose">Awaiting review</Badge>}
           </div>
         </div>

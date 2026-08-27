@@ -472,3 +472,146 @@ class TestAdminShopDetail:
         assert (
             await client.get(f"{ADMIN_SHOPS}/{shop['id']}", headers=user_headers)
         ).status_code == 403
+
+
+class TestSlugsWithAwkwardLetters:
+    async def test_letters_nfkd_cannot_decompose_still_survive(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        """ø, ł, ß and æ are single characters with no ASCII base to strip back to, so
+        NFKD alone turned "Tørret Blad" into "trret-blad"."""
+        response = await client.post(
+            ADMIN_SHOPS,
+            headers=admin_headers,
+            json={"name": "Tørret Blad", "city": "Copenhagen"},
+        )
+
+        assert response.json()["slug"] == "torret-blad"
+
+
+class TestNearby:
+    KRAKOW = (50.0617, 19.9392)
+
+    async def _shop_at(
+        self,
+        client: AsyncClient,
+        admin_headers: dict[str, str],
+        name: str,
+        lat: float | None,
+        lng: float | None,
+    ) -> dict:
+        body: dict = {"name": name, "city": "Somewhere"}
+        if lat is not None:
+            body |= {"latitude": lat, "longitude": lng}
+        response = await client.post(ADMIN_SHOPS, headers=admin_headers, json=body)
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    async def test_sorts_nearest_first(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        await self._shop_at(client, admin_headers, "Warsaw shop", 52.2496, 21.0123)
+        await self._shop_at(client, admin_headers, "Kraków shop", 50.0617, 19.9392)
+        await self._shop_at(client, admin_headers, "Wrocław shop", 51.1098, 17.0327)
+
+        lat, lng = self.KRAKOW
+        body = (await client.get(f"{SHOPS}?near_lat={lat}&near_lng={lng}")).json()
+
+        assert [s["name"] for s in body["items"]] == [
+            "Kraków shop",
+            "Wrocław shop",
+            "Warsaw shop",
+        ]
+
+    async def test_reports_the_distance(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        """Kraków to Warsaw is about 252 km as the crow flies."""
+        await self._shop_at(client, admin_headers, "Warsaw shop", 52.2496, 21.0123)
+
+        lat, lng = self.KRAKOW
+        item = (await client.get(f"{SHOPS}?near_lat={lat}&near_lng={lng}")).json()["items"][0]
+
+        assert 250 < item["distance_km"] < 256
+
+    async def test_distance_is_null_without_a_position(
+        self, client: AsyncClient, shop: dict
+    ) -> None:
+        """null, not 0 — 0 would read as "you are standing in it"."""
+        item = (await client.get(SHOPS)).json()["items"][0]
+
+        assert item["distance_km"] is None
+
+    async def test_a_radius_excludes_what_is_beyond_it(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        await self._shop_at(client, admin_headers, "Warsaw shop", 52.2496, 21.0123)
+        await self._shop_at(client, admin_headers, "Kraków shop", 50.0617, 19.9392)
+
+        lat, lng = self.KRAKOW
+        body = (await client.get(f"{SHOPS}?near_lat={lat}&near_lng={lng}&radius_km=50")).json()
+
+        assert [s["name"] for s in body["items"]] == ["Kraków shop"]
+        assert body["total"] == 1
+
+    async def test_a_shop_with_no_pin_is_left_out_of_a_nearest_first_list(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        """ "Nearest shops" that includes ones whose location nobody knows is a worse
+        answer than a shorter list."""
+        await self._shop_at(client, admin_headers, "Online only", None, None)
+        await self._shop_at(client, admin_headers, "Kraków shop", 50.0617, 19.9392)
+
+        lat, lng = self.KRAKOW
+        near = (await client.get(f"{SHOPS}?near_lat={lat}&near_lng={lng}")).json()
+        plain = (await client.get(SHOPS)).json()
+
+        assert [s["name"] for s in near["items"]] == ["Kraków shop"]
+        assert plain["total"] == 2  # still listed the ordinary way
+
+    async def test_half_a_position_is_rejected(self, client: AsyncClient) -> None:
+        assert (await client.get(f"{SHOPS}?near_lat=50")).status_code == 422
+        assert (await client.get(f"{SHOPS}?near_lng=20")).status_code == 422
+
+    async def test_an_impossible_latitude_is_rejected(self, client: AsyncClient) -> None:
+        assert (await client.get(f"{SHOPS}?near_lat=999&near_lng=20")).status_code == 422
+
+
+class TestPins:
+    async def test_half_a_pin_is_rejected(
+        self, client: AsyncClient, admin_headers: dict[str, str], shop: dict
+    ) -> None:
+        response = await client.patch(
+            f"{ADMIN_SHOPS}/{shop['id']}", headers=admin_headers, json={"latitude": 50.0}
+        )
+
+        assert response.status_code == 422
+
+    async def test_an_admin_can_drop_a_pin(
+        self, client: AsyncClient, admin_headers: dict[str, str], shop: dict
+    ) -> None:
+        response = await client.patch(
+            f"{ADMIN_SHOPS}/{shop['id']}",
+            headers=admin_headers,
+            json={"latitude": 50.0617, "longitude": 19.9392},
+        )
+
+        assert response.json()["latitude"] == 50.0617
+        assert response.json()["longitude"] == 19.9392
+
+    async def test_geocoding_is_off_unless_switched_on(
+        self, client: AsyncClient, admin_headers: dict[str, str], shop: dict
+    ) -> None:
+        """503, not 422: nothing is wrong with the address — the lookup is disabled, and
+        the suite must never depend on a third party being reachable."""
+        response = await client.post(f"{ADMIN_SHOPS}/{shop['id']}/geocode", headers=admin_headers)
+
+        assert response.status_code == 503
+        assert "pin" in response.json()["detail"].lower()
+
+    async def test_a_plain_user_cannot_geocode(
+        self, client: AsyncClient, user_headers: dict[str, str], shop: dict
+    ) -> None:
+        assert (
+            await client.post(f"{ADMIN_SHOPS}/{shop['id']}/geocode", headers=user_headers)
+        ).status_code == 403

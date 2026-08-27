@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     media_root: str = str(REPO_ROOT / "api" / "media")
     media_url_prefix: str = "/media"
 
+    # Geocoding is off unless switched on, so tests and CI never reach a third party.
+    # OpenStreetMap's Nominatim requires a User-Agent identifying the application; the
+    # default names this app rather than pretending to be a browser.
+    geocoding_enabled: bool = False
+    geocoding_base_url: str = "https://nominatim.openstreetmap.org"
+    geocoding_user_agent: str = "Herbatka/0.1 (tea tracker; https://github.com/local/herbatka)"
+    geocoding_timeout_seconds: float = 8.0
+
     jwt_secret: str = "change-me-in-any-non-local-environment"
     access_token_ttl_seconds: int = 900
     refresh_token_ttl_days: int = 30

@@ -1,9 +1,11 @@
 import uuid
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -38,6 +40,15 @@ class Shop(UUIDPrimaryKey, Timestamps, Base):
     description: Mapped[str | None] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(String(500))
 
+    # Numeric, not float: a pin is a fixed-precision fact about a place, and six decimal
+    # places is roughly 11 cm — far finer than any doorway needs.
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    # When the address was last looked up, so an unchanged address is not re-geocoded on
+    # every save — Nominatim's usage policy allows one request a second, and bulk
+    # geocoding is explicitly not allowed.
+    geocoded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     is_approved: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
@@ -53,6 +64,15 @@ class Shop(UUIDPrimaryKey, Timestamps, Base):
         CheckConstraint(
             "website IS NOT NULL OR address IS NOT NULL OR city IS NOT NULL",
             name="ck_shop_reachable_somehow",
+        ),
+        # A pin is both coordinates or neither; half a pin is not a place.
+        CheckConstraint("(latitude IS NULL) = (longitude IS NULL)", name="ck_shop_pin_is_complete"),
+        CheckConstraint(
+            "latitude IS NULL OR (latitude BETWEEN -90 AND 90)", name="ck_shop_latitude_range"
+        ),
+        CheckConstraint(
+            "longitude IS NULL OR (longitude BETWEEN -180 AND 180)",
+            name="ck_shop_longitude_range",
         ),
         Index("ix_shop_approved_city", "is_approved", "city"),
     )
