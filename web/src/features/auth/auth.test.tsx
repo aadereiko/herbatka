@@ -29,6 +29,20 @@ const session: Session = {
 
 const healthy = { status: 'ok', database: 'ok', version: '0.1.0' }
 
+/** The signed-in home is a dashboard now, not a list of links, so landing on it means
+ *  one request to /home rather than the health check it used to render. */
+const homeSummary = {
+  display_name: 'Ada Lovelace',
+  household_count: 0,
+  tin_count: 0,
+  low_stock: [],
+  friend_count: 0,
+  pending_requests: 0,
+  review_count: 0,
+  recent_activity: [],
+  unrated: [],
+}
+
 type Handler = (init?: RequestInit) => Response | Promise<Response>
 
 function json(body: unknown, status = 200) {
@@ -78,19 +92,24 @@ test('a successful login lands on the protected home', async () => {
     },
     '/auth/login': () => json(session),
     '/health': () => json(healthy),
+    '/home': () => json(homeSummary),
+    '/friends/requests': () => json([]),
   })
 
-  renderApp('/')
+  // Straight to the form. "/" is public now — it shows a landing page to strangers
+  // rather than bouncing them, so it is no longer the way to reach the sign-in screen.
+  renderApp('/login')
 
-  // No cookie, so RequireAuth sent us to the form — remembering that we wanted "/".
   const form = await screen.findByTestId('login-page')
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ada@herbatka.test' } })
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'correct-horse' } })
   fireEvent.submit(form)
 
   expect(await screen.findByTestId('home-greeting')).toHaveTextContent('Ada Lovelace')
-  expect(screen.getByTestId('role-badge')).toHaveTextContent('user')
   expect(screen.queryByTestId('login-page')).toBeNull()
+  // The role badge this used to assert on is gone with the old home page. Being an admin
+  // now shows as the Admin entry in the nav, which is where it is actually useful — a
+  // badge reading "user" told nobody anything.
   // A 401 from /auth/login must not kick off a refresh-and-retry of its own.
   expect(refreshCalls).toBe(1)
 })
@@ -117,6 +136,8 @@ test('a hard reload restores the session without flashing the login page', async
   mockFetch({
     '/auth/refresh': () => json(session),
     '/health': () => json(healthy),
+    '/home': () => json(homeSummary),
+    '/friends/requests': () => json([]),
   })
 
   // A synchronous assertion only proves the first frame. This watches every DOM
@@ -248,4 +269,34 @@ test('signing in returns you to the page you were bounced off', async () => {
   fireEvent.submit(form)
 
   expect(await screen.findByText('Kitchen shelf')).toBeInTheDocument()
+})
+
+
+/**
+ * "/" used to be behind RequireAuth, so a signed-out visitor was bounced to the sign-in
+ * form and never saw the app at all. The catalog is public and is the best argument for
+ * making an account, so hiding it behind the door was backwards.
+ */
+test('a signed-out visitor gets the landing page, not a redirect to sign in', async () => {
+  let signedInHomeCalls = 0
+  mockFetch({
+    '/auth/refresh': () => json({ detail: 'Missing refresh cookie' }, 401),
+    '/home/public': () =>
+      json({ tea_count: 24, shop_count: 6, ingredient_count: 39, featured: [] }),
+    // Registered only so a request here is counted rather than rejected. It must never
+    // fire: /home is the signed-in dashboard, and asking for it anonymously is a 401.
+    '/home': () => {
+      signedInHomeCalls += 1
+      return json({ detail: 'Not authenticated' }, 401)
+    },
+  })
+
+  renderApp('/')
+
+  expect(await screen.findByRole('link', { name: /Create an account/ })).toHaveAttribute(
+    'href',
+    '/register',
+  )
+  expect(screen.queryByTestId('login-page')).toBeNull()
+  expect(signedInHomeCalls).toBe(0)
 })

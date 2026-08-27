@@ -149,10 +149,8 @@ async def search_users(
     ]
 
 
-@router.get("/feed", response_model=Page[FeedItem])
-async def get_feed(user: CurrentUser, db: DbSession, paging: PageParams) -> Page[FeedItem]:
-    entries, total = await feed_service.page(db, user.id, page=paging.page, size=paging.size)
-
+def _feed_items(entries: list[dict]) -> list[FeedItem]:
+    """Shared with the home page, which shows the first few of the same timeline."""
     items: list[FeedItem] = []
     for entry in entries:
         row = entry["row"]
@@ -176,4 +174,12 @@ async def get_feed(user: CurrentUser, db: DbSession, paging: PageParams) -> Page
                     grams=float(row.quantity_grams),
                 )
             )
+    return items
+
+
+@router.get("/feed", response_model=Page[FeedItem])
+async def get_feed(user: CurrentUser, db: DbSession, paging: PageParams) -> Page[FeedItem]:
+    entries, total = await feed_service.page(db, user.id, page=paging.page, size=paging.size)
+
+    items = _feed_items(entries)
     return Page.build(items, total, paging.page, paging.size)

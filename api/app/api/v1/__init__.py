@@ -6,6 +6,7 @@ from app.api.v1.routers import (
     catalog,
     friends,
     health,
+    home,
     households,
     reviews,
     shops,
@@ -22,3 +23,4 @@ api_router.include_router(stock.router)
 api_router.include_router(reviews.router)
 api_router.include_router(friends.router)
 api_router.include_router(shops.router)
+api_router.include_router(home.router)

@@ -268,21 +268,37 @@ test('/feed is signed-in only, and the home page does not bury it', async () => 
   // RequireAuth sends a stranger to the sign-in page rather than to an empty stream.
   expect(await screen.findByTestId('login-page')).toBeInTheDocument()
   expect(calls.some((call) => call.path === '/feed')).toBe(false)
+})
 
-  feed({ 'GET /health': () => json({ status: 'ok', version: '0.1.0' }) })
+/**
+ * The home page used to be a stack of link cards, and this asserted the feed sat in the
+ * first of them. It is a dashboard now: the first few feed items are on the page itself,
+ * with a link through to the rest. Showing beats linking, so the assertion moved with it.
+ */
+test('the signed-in home shows the start of the feed and links to the rest', async () => {
+  mockFetch({
+    'POST /auth/refresh': () => json(session),
+    'GET /home': () =>
+      json({
+        display_name: 'Ada Lovelace',
+        household_count: 1,
+        tin_count: 2,
+        low_stock: [],
+        friend_count: 1,
+        pending_requests: 0,
+        review_count: 0,
+        recent_activity: [graceRated],
+        unrated: [],
+      }),
+  })
+
   renderApp('/')
 
-  // Above the kitchen and the catalog, in the first nav block on the page.
-  const groups = await screen.findAllByRole('navigation')
-  const people = groups.find((group) => group.getAttribute('aria-label') === 'People')
-  expect(people).toBeDefined()
-  expect(within(people as HTMLElement).getByRole('link', { name: /Activity/ })).toHaveAttribute(
+  const activity = await screen.findByTestId('home-activity')
+  expect(within(activity).getByText(/Jasmine Pearls/)).toBeInTheDocument()
+  expect(within(activity).getByRole('link', { name: /All activity/ })).toHaveAttribute(
     'href',
     '/feed',
-  )
-  expect(within(people as HTMLElement).getByRole('link', { name: /Friends/ })).toHaveAttribute(
-    'href',
-    '/friends',
   )
 })
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link, NavLink } from 'react-router'
+import { Link, NavLink, useNavigate } from 'react-router'
 
 import { useAuth } from '../../features/auth/auth-context'
 import { useIncomingRequestCount } from '../../features/friend/queries'
@@ -41,6 +41,29 @@ function IncomingBadge() {
       className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-xs font-semibold text-white"
     >
       {count}
+    </span>
+  )
+}
+
+function SignOut({ name }: { name: string }) {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  return (
+    <span className="ml-2 flex items-center gap-2 border-l border-brand-200 pl-3 dark:border-neutral-800">
+      <span className="hidden text-sm text-neutral-500 dark:text-neutral-400 sm:inline">
+        {name}
+      </span>
+      <button
+        type="button"
+        data-testid="sign-out"
+        onClick={() => {
+          void logout().then(() => navigate('/'))
+        }}
+        className="rounded-lg px-2 py-1 text-sm font-medium text-brand-700 transition hover:bg-brand-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-300 dark:hover:bg-neutral-800"
+      >
+        Sign out
+      </button>
     </span>
   )
 }
@@ -112,6 +135,11 @@ function SiteNav() {
             Sign in
           </NavLink>
         )}
+        {/* Signing out lives here, not on the home page. It used to be a button on a
+            "signed in as" card that home no longer has — and a global action reachable
+            from one page only was always the wrong shape. The name doubles as the
+            answer to "who am I signed in as", which is the other thing that card did. */}
+        {user && <SignOut name={user.display_name} />}
       </nav>
     </header>
   )

@@ -93,11 +93,11 @@ export function AppRoutes() {
       />
       <Route
         path="/"
-        element={
-          <RequireAuth>
-            <HomePage />
-          </RequireAuth>
-        }
+        // Public. HomePage renders a dashboard when you are signed in and a landing
+        // page when you are not — sending a stranger straight to /login would hide the
+        // catalog, which is browsable without an account and is the best argument for
+        // making one.
+        element={<HomePage />}
       />
 
       {/* The catalog is deliberately outside RequireAuth. Browsing what a tea is made of

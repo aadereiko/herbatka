@@ -106,7 +106,9 @@ function StockedItem({ item }: { item: FeedStockedItem }) {
 /** The discriminator does the work. Two kinds, two shapes on screen — collapsing them
  *  into one row with a verb slot would make "rated 9" and "added 100 g" look like the
  *  same event, which they are not. */
-function FeedRow({ item }: { item: FeedItem }) {
+/** Exported so the home page can show the first few of the same timeline
+ *  without a second rendering of the same data that could drift from this one. */
+export function FeedRow({ item }: { item: FeedItem }) {
   return item.kind === 'review' ? <ReviewItem item={item} /> : <StockedItem item={item} />
 }
 

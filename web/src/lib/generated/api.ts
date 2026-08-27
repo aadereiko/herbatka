@@ -933,6 +933,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Home
+         * @description One request for the whole signed-in landing page.
+         */
+        get: operations["home_api_v1_home_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/home/public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Home
+         * @description What a signed-out visitor sees: public counts and a few well-rated teas.
+         */
+        get: operations["public_home_api_v1_home_public_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1084,6 +1124,34 @@ export interface components {
             database: "ok" | "unreachable";
             /** Version */
             version: string;
+        };
+        /**
+         * HomeSummary
+         * @description Everything the signed-in home page needs, in one request.
+         *
+         *     Assembled server-side rather than by the client firing one call per household:
+         *     the page's whole job is to be the first thing you see, and a waterfall of five
+         *     requests is exactly what that must not be.
+         */
+        HomeSummary: {
+            /** Display Name */
+            display_name: string;
+            /** Household Count */
+            household_count: number;
+            /** Tin Count */
+            tin_count: number;
+            /** Low Stock */
+            low_stock: components["schemas"]["LowTin"][];
+            /** Friend Count */
+            friend_count: number;
+            /** Pending Requests */
+            pending_requests: number;
+            /** Review Count */
+            review_count: number;
+            /** Recent Activity */
+            recent_activity: (components["schemas"]["ReviewFeedItem"] | components["schemas"]["StockedFeedItem"])[];
+            /** Unrated */
+            unrated: components["schemas"]["TeaSummary"][];
         };
         /** HouseholdCreate */
         HouseholdCreate: {
@@ -1336,6 +1404,14 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * LowTin
+         * @description A tin running out, and which shelf it is on.
+         */
+        LowTin: {
+            item: components["schemas"]["StockItem"];
+            household: components["schemas"]["HouseholdRef"];
+        };
         /** Member */
         Member: {
             user: components["schemas"]["UserRef"];
@@ -1511,6 +1587,20 @@ export interface components {
             size: number;
             /** Pages */
             pages: number;
+        };
+        /**
+         * PublicSummary
+         * @description What a signed-out visitor is shown. Public counts only — nothing about anyone.
+         */
+        PublicSummary: {
+            /** Tea Count */
+            tea_count: number;
+            /** Shop Count */
+            shop_count: number;
+            /** Ingredient Count */
+            ingredient_count: number;
+            /** Featured */
+            featured: components["schemas"]["TeaSummary"][];
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -4368,6 +4458,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    home_api_v1_home_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeSummary"];
+                };
+            };
+        };
+    };
+    public_home_api_v1_home_public_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSummary"];
                 };
             };
         };

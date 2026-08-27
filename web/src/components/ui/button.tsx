@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 
@@ -72,5 +73,38 @@ export function Button({
     >
       {children}
     </button>
+  )
+}
+
+
+/**
+ * A link that looks like a button. A separate component rather than an `as` prop on
+ * Button, because the two are different elements with different semantics: this one
+ * navigates and belongs in the tab order as a link, and it must never grow `onClick`,
+ * `type` or `disabled` — a disabled link is not a thing.
+ */
+export function LinkButton({
+  to,
+  children,
+  variant = 'secondary',
+  size = 'md',
+  className = '',
+  testId,
+}: {
+  to: string
+  children: ReactNode
+  variant?: ButtonVariant
+  size?: ButtonSize
+  className?: string
+  testId?: string
+}) {
+  return (
+    <Link
+      to={to}
+      data-testid={testId}
+      className={`${BASE} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
+    >
+      {children}
+    </Link>
   )
 }
