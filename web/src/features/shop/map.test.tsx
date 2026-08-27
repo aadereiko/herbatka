@@ -100,6 +100,11 @@ const kruka: ShopSummary = {
   latitude: 50.0625,
   longitude: 19.937,
   distance_km: null,
+  // M8: the star, and the rating rollup a shop now carries alongside a tea's.
+  is_favourite: false,
+  average_score: null,
+  review_count: 0,
+  my_score: null,
 }
 
 /** Pinned, in Warsaw — far enough away that a distance from Kraków is a different
@@ -135,6 +140,7 @@ const krukaDetail: ShopDetail = {
   description: 'A room the size of a kitchen with four hundred tins in it.',
   address: 'ul. Sławkowska 12',
   created_at: '2026-04-01T09:00:00Z',
+  my_review: null,
 }
 
 const pocztaDetail: ShopDetail = {
@@ -142,6 +148,7 @@ const pocztaDetail: ShopDetail = {
   description: 'A postal-only shop with no front door.',
   address: null,
   created_at: '2026-04-02T09:00:00Z',
+  my_review: null,
 }
 
 /** What the server would answer for each shop, given a reader in central Kraków. Fixed
@@ -642,6 +649,8 @@ test('a pinned shop gets a small map and a way to be walked to', async () => {
     'POST /auth/refresh': () => json({ detail: 'Missing refresh cookie' }, 401),
     'GET /shops/u-kruka': () => json(krukaDetail),
     'GET /shops/u-kruka/listings': () => json(pageOf([])),
+    // M8's ratings panel, registered for the same reason every other endpoint here is.
+    'GET /shops/u-kruka/reviews': () => json(pageOf([])),
   })
   renderApp('/shops/u-kruka')
 
@@ -662,6 +671,7 @@ test('an online-only shop gets no map and no directions to nowhere', async () =>
     'POST /auth/refresh': () => json({ detail: 'Missing refresh cookie' }, 401),
     'GET /shops/poczta-herbaty': () => json(pocztaDetail),
     'GET /shops/poczta-herbaty/listings': () => json(pageOf([])),
+    'GET /shops/poczta-herbaty/reviews': () => json(pageOf([])),
   })
   renderApp('/shops/poczta-herbaty')
 

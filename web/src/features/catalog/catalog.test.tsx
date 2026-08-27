@@ -5,7 +5,8 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { AppRoutes } from '../../app/router'
-import type { Ingredient, Page, TeaDetail, TeaSummary } from '../../lib/catalog'
+import type { Session, User } from '../../lib/api'
+import type { BrewingNote, Ingredient, Page, TeaDetail, TeaSummary } from '../../lib/catalog'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
 
@@ -44,6 +45,9 @@ const jasminePearls: TeaSummary = {
   average_score: null,
   review_count: 0,
   my_score: null,
+  // M8 widened both tea schemas again, with the star. Unstarred here, as an untouched
+  // tea is — and as every signed-out reader is told, whatever the truth.
+  is_favourite: false,
 }
 
 const jasminePearlsDetail: TeaDetail = {
@@ -62,6 +66,9 @@ const jasminePearlsDetail: TeaDetail = {
   average_aroma: null,
   average_flavour: null,
   average_aftertaste: null,
+  // M8. Null: this tea's brewing figures are the catalog's, which is what the brewing
+  // assertions below are about.
+  my_brewing: null,
 }
 
 function pageOf<T>(items: T[], extra: Partial<Page<T>> = {}): Page<T> {
@@ -320,4 +327,165 @@ test('the ingredients page filters by category through the URL', async () => {
     const requests = calls.filter((call) => call.path === '/catalog/ingredients')
     expect(requests.at(-1)?.search).toContain('category=flower')
   })
+})
+
+/* ----------------------------------------------- your own brewing numbers (M8) */
+
+const ada: User = {
+  id: 'user-1',
+  email: 'ada@herbatka.test',
+  display_name: 'Ada Lovelace',
+  role: 'user',
+  avatar_url: null,
+  pronouns: null,
+  bio: null,
+  location: null,
+  favourite_tea_type: null,
+  created_at: '2026-01-01T09:00:00Z',
+}
+
+const session: Session = { access_token: 'access-1', token_type: 'bearer', expires_in: 900, user: ada }
+
+/** Hotter and shorter than the catalog says, and silent about the leaf — the mixed case
+ *  is the whole point: the fallback is per field, not per note. */
+const myBrewing: BrewingNote = {
+  brew_temp_c: 95,
+  brew_seconds: 60,
+  grams_per_100ml: null,
+  note: 'Second steep is the good one.',
+  updated_at: '2026-08-20T18:00:00Z',
+}
+
+/** Signed in as Ada, on one tea's page. The reviews and shops panels are registered
+ *  because they hang off the same page and an unhandled request rejects loudly. */
+function teaPage(overrides: Record<string, Handler> = {}) {
+  return mockFetch({
+    'POST /auth/refresh': () => json(session),
+    'GET /friends/requests': () => json([]),
+    'GET /catalog/teas/jasmine-pearls': () => json(jasminePearlsDetail),
+    'GET /catalog/teas/jasmine-pearls/reviews': () => json(pageOf([])),
+    'GET /catalog/teas/jasmine-pearls/shops': () => json(pageOf([])),
+    ...overrides,
+  })
+}
+
+const countOf = (method: string, path: string) =>
+  calls.filter((call) => call.method === method && call.path === path).length
+
+test('your brewing figures stand in front of the catalog’s, field by field, both labelled', async () => {
+  teaPage({
+    'GET /catalog/teas/jasmine-pearls': () => json({ ...jasminePearlsDetail, my_brewing: myBrewing }),
+  })
+  renderApp('/teas/jasmine-pearls')
+
+  const brewing = await screen.findByTestId('tea-brewing')
+  // Yours where you gave one…
+  expect(brewing).toHaveTextContent('95°C')
+  expect(brewing).toHaveTextContent('1 min')
+  expect(brewing).not.toHaveTextContent('80°C')
+  expect(brewing).not.toHaveTextContent('3 min 30 s')
+  // …and the catalog's where you did not. A note that only sets the temperature must not
+  // wipe the two figures it says nothing about.
+  expect(brewing).toHaveTextContent('1.5 g / 100 ml')
+
+  // Which is which is on the page, not left to be inferred from a number changing.
+  expect(brewing).toHaveTextContent('yours')
+  expect(brewing).toHaveTextContent('the catalog’s')
+  expect(screen.getByTestId('brewing-yours-badge')).toHaveTextContent('Your numbers')
+
+  // The catalog's own answer stays visible rather than being replaced silently.
+  const theirs = screen.getByTestId('tea-brewing-catalog')
+  expect(theirs).toHaveTextContent('80°C')
+  expect(theirs).toHaveTextContent('3 min 30 s')
+  expect(screen.getByTestId('tea-brewing-note')).toHaveTextContent('Second steep is the good one.')
+})
+
+test('saving your own numbers sends all four keys, nulls included', async () => {
+  let detail: TeaDetail = jasminePearlsDetail
+  teaPage({
+    'GET /catalog/teas/jasmine-pearls': () => json(detail),
+    'PUT /catalog/teas/jasmine-pearls/brewing': ({ init }) => {
+      const input = JSON.parse(String(init?.body)) as BrewingNote
+      const saved: BrewingNote = { ...input, updated_at: '2026-08-27T09:00:00Z' }
+      detail = { ...detail, my_brewing: saved }
+      return json(saved)
+    },
+  })
+  renderApp('/teas/jasmine-pearls')
+
+  fireEvent.click(await screen.findByTestId('toggle-brewing-form'))
+  fireEvent.change(screen.getByLabelText('Water'), { target: { value: '95' } })
+  fireEvent.change(screen.getByLabelText('Steep'), { target: { value: '60' } })
+  fireEvent.change(screen.getByLabelText('Note (optional)'), {
+    target: { value: 'Second steep is the good one.' },
+  })
+  fireEvent.submit(screen.getByTestId('brewing-form'))
+
+  // Every key, every time. The empty leaf box travels as an explicit null: a PUT that
+  // omitted it could not express clearing a dose you had set on an earlier save.
+  await waitFor(() =>
+    expect(
+      JSON.parse(
+        calls.find(
+          (call) => call.method === 'PUT' && call.path === '/catalog/teas/jasmine-pearls/brewing',
+        )?.body ?? 'null',
+      ),
+    ).toEqual({
+      brew_temp_c: 95,
+      brew_seconds: 60,
+      grams_per_100ml: null,
+      note: 'Second steep is the good one.',
+    }),
+  )
+
+  // And the tea refetched, so the panel is showing what the server kept rather than what
+  // was typed into a form that has since closed.
+  await waitFor(() => expect(countOf('GET', '/catalog/teas/jasmine-pearls')).toBe(2))
+  expect(await screen.findByTestId('brewing-yours-badge')).toBeInTheDocument()
+  expect(screen.getByTestId('tea-brewing')).toHaveTextContent('95°C')
+})
+
+test('removing your numbers falls back to the catalog’s', async () => {
+  let detail: TeaDetail = { ...jasminePearlsDetail, my_brewing: myBrewing }
+  teaPage({
+    'GET /catalog/teas/jasmine-pearls': () => json(detail),
+    'DELETE /catalog/teas/jasmine-pearls/brewing': () => {
+      detail = { ...detail, my_brewing: null }
+      return new Response(null, { status: 204 })
+    },
+  })
+  renderApp('/teas/jasmine-pearls')
+
+  expect(await screen.findByTestId('tea-brewing')).toHaveTextContent('95°C')
+
+  fireEvent.click(screen.getByTestId('toggle-brewing-form'))
+  // Two steps and no `window.confirm`: this is the only control on the page that can
+  // throw away something you typed.
+  fireEvent.click(screen.getByTestId('remove-brewing'))
+  fireEvent.click(screen.getByTestId('confirm-remove-brewing'))
+
+  await waitFor(() => expect(screen.getByTestId('tea-brewing')).toHaveTextContent('80°C'))
+  const brewing = screen.getByTestId('tea-brewing')
+  expect(brewing).not.toHaveTextContent('95°C')
+  expect(brewing).toHaveTextContent('3 min 30 s')
+  // With one source again, nothing is labelled and there is no second line to compare to.
+  expect(brewing).not.toHaveTextContent('yours')
+  expect(screen.queryByTestId('tea-brewing-catalog')).toBeNull()
+  expect(screen.queryByTestId('brewing-yours-badge')).toBeNull()
+  expect(screen.queryByTestId('tea-brewing-note')).toBeNull()
+})
+
+test('a signed-out reader gets the catalog’s figures and no way to overwrite them', async () => {
+  signedOutCatalog({
+    'GET /catalog/teas/jasmine-pearls': () => json(jasminePearlsDetail),
+    'GET /catalog/teas/jasmine-pearls/reviews': () => json(pageOf([])),
+    'GET /catalog/teas/jasmine-pearls/shops': () => json(pageOf([])),
+  })
+  renderApp('/teas/jasmine-pearls')
+
+  expect(await screen.findByTestId('tea-brewing')).toHaveTextContent('80°C')
+  expect(screen.queryByTestId('toggle-brewing-form')).toBeNull()
+  expect(screen.queryByTestId('brewing-form')).toBeNull()
+  // Nothing to label when there is only one source, signed in or not.
+  expect(screen.getByTestId('tea-brewing')).not.toHaveTextContent('the catalog’s')
 })

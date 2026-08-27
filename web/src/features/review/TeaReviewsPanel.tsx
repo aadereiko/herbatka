@@ -6,7 +6,7 @@ import type { TeaDetail } from '../../lib/catalog'
 import { useAuth } from '../auth/auth-context'
 import { pluralise } from '../catalog/format'
 import { useTeaReviews } from './queries'
-import { RatingSummary } from './RatingSummary'
+import { RatingSummary, SubscoreAverages } from './RatingSummary'
 import { ReviewForm } from './ReviewForm'
 import { ReviewList } from './ReviewList'
 
@@ -28,7 +28,12 @@ export function TeaReviewsPanel({ tea }: { tea: TeaDetail }) {
 
   return (
     <div className="space-y-6">
-      <RatingSummary tea={tea} />
+      <RatingSummary
+        rating={tea}
+        emptyTitle="Nobody has rated this yet"
+        emptyBody="Be the first to say what it is like."
+        details={<SubscoreAverages tea={tea} />}
+      />
 
       <Panel ariaLabel="Your review" testId="your-review">
         <h2 className="mb-1 text-lg font-semibold text-brand-900 dark:text-brand-100">

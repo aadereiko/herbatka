@@ -13,6 +13,8 @@ import {
 } from '../../components/ui/page'
 import { ApiError, describeApiError } from '../../lib/api'
 import { pluralise } from '../catalog/format'
+import { FavouriteStar } from '../favourite/FavouriteStar'
+import { ShopReviewsPanel } from '../review/ShopReviewsPanel'
 import { describePlace } from './format'
 import { ListingRow } from './ListingRow'
 import { directionsUrl, isPinned } from './nearby'
@@ -78,12 +80,23 @@ export function ShopDetailPage() {
         title={detail.name}
         subtitle={place ?? 'Online only'}
         actions={
-          <Link
-            to="/shops"
-            className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
-          >
-            ← All shops
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Beside the name, as on a tea: starring is about the shop as a whole, and
+                for a signed-out reader it is not on the page at all. */}
+            <FavouriteStar
+              kind="shop"
+              slug={detail.slug}
+              name={detail.name}
+              isFavourite={detail.is_favourite}
+              size="md"
+            />
+            <Link
+              to="/shops"
+              className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
+            >
+              ← All shops
+            </Link>
+          </div>
         }
       />
 
@@ -138,6 +151,11 @@ export function ShopDetailPage() {
               onPageChange={setPage}
             />
           </Panel>
+
+          {/* Below what they stock, for the same reason the tea page puts reviews below
+              the ingredients: somebody arrives asking "do they have it", and only then
+              asks "is it worth the trip". */}
+          <ShopReviewsPanel shop={detail} />
         </div>
 
         <Panel ariaLabel="About this shop" className="h-fit">

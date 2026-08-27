@@ -13,7 +13,9 @@
  * Prices are integer minor units plus a currency (3400 + "PLN" = 34.00 zł). Never render
  * `price_minor` directly; `formatPrice` exists for that.
  */
+import type { Favouritable } from './favourite'
 import type { components } from './generated/api'
+import type { RatingRollup, ReviewAuthor } from './review'
 
 /* --------------------------------------------------------------------------- shops */
 
@@ -41,9 +43,50 @@ export type ShopRef = components['schemas']['ShopRef']
  * disagreeing with the ordering the server sorted by — it is the same number that
  * decided which shop came first, so it has to come from the same place.
  */
-export type ShopSummary = components['schemas']['ShopSummary']
+export type ShopSummary = components['schemas']['ShopSummary'] &
+  Favouritable &
+  ShopRatingSummary
 
-export type ShopDetail = components['schemas']['ShopDetail']
+export type ShopDetail = components['schemas']['ShopDetail'] &
+  Favouritable &
+  ShopRatingSummary & {
+    /** Yours in full, so the form is pre-filled without a second request — the same
+     *  reason `TeaDetail` carries `my_review`. */
+    my_review: ShopReview | null
+  }
+
+/* -------------------------------------------------------------- rating a shop (M8) */
+
+/**
+ * A shop's ratings are the tea contract with the tea-specific half removed: one score per
+ * person per shop, optional words, no aroma and no brew date — neither means anything
+ * about a room you buy leaves in.
+ *
+ * Hand-written for the same reason as everything else in M8: `npm run types` against
+ * today's server would delete these again. When the generated file catches up,
+ * `ShopReview` becomes `components['schemas']['ShopReview']`, `ShopReviewInput` becomes
+ * `components['schemas']['ShopReviewInput']`, and `ShopRatingSummary` is folded into the
+ * two schemas above and deleted.
+ */
+export type ShopReview = {
+  id: string
+  author: ReviewAuthor
+  score: number
+  body: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** The body of `PUT /shops/{slug}/review` — create and edit are the same request,
+ *  because there is only ever one of these per person per shop to distinguish. */
+export type ShopReviewInput = {
+  score: number
+  body: string | null
+}
+
+/** The rollup both shop schemas carry — the same three numbers a tea carries, and the
+ *  same type, so the one summary component can print either. See `RatingRollup`. */
+export type ShopRatingSummary = RatingRollup
 
 /* ------------------------------------------------------------------------ listings */
 

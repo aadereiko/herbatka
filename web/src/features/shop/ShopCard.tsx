@@ -4,19 +4,38 @@ import { EntityImage } from '../../components/ui/image'
 import { Badge } from '../../components/ui/page'
 import type { ShopSummary } from '../../lib/shop'
 import { pluralise } from '../catalog/format'
+import { FavouriteStar } from '../favourite/FavouriteStar'
+import { formatAverage, formatScore } from '../review/format'
 import { describePlace } from './format'
 import { formatDistance } from './nearby'
 
-/** One shop in the browse grid. The whole card is the link — a tap target the size of a
- *  card rather than the size of a word, because this list is read on a phone. */
+/**
+ * One shop in the browse grid. The whole card is the link — a tap target the size of a
+ * card rather than the size of a word, because this list is read on a phone.
+ *
+ * The star is a sibling of that link rather than a child of it, for the reason `TeaCard`
+ * spells out: a button inside an anchor is invalid markup that navigates when pressed.
+ */
 export function ShopCard({ shop }: { shop: ShopSummary }) {
   const place = describePlace(shop)
   // Null on every ordinary browse — the server only fills it in when the request carried
   // a position — and the badge is absent rather than empty when it is.
   const distance = formatDistance(shop.distance_km)
+  // `review_count > 0` rather than `!== 0`, as on a tea card: a server that has not
+  // shipped these fields yet lands in the unrated branch instead of printing "NaN".
+  const average = shop.average_score
+  const rated = average != null && shop.review_count > 0
 
   return (
-    <li className="list-none">
+    <li className="relative list-none">
+      <div className="absolute right-2 top-2 z-10">
+        <FavouriteStar
+          kind="shop"
+          slug={shop.slug}
+          name={shop.name}
+          isFavourite={shop.is_favourite}
+        />
+      </div>
       <Link
         to={`/shops/${shop.slug}`}
         data-testid="shop-card"
@@ -39,10 +58,30 @@ export function ShopCard({ shop }: { shop: ShopSummary }) {
             </p>
           )}
 
+          {/* The crowd's number, and — beside it, never folded into it — yours. A grid
+              where you cannot tell which shops you have already rated is a grid you rate
+              the same shop in twice. */}
+          {rated && (
+            <p data-testid="shop-card-rating" className="text-sm text-neutral-700 dark:text-neutral-300">
+              <span className="sr-only">
+                Rated {formatAverage(average)} out of 10, from{' '}
+                {pluralise(shop.review_count, 'review')}.
+              </span>
+              <span aria-hidden="true" className="font-medium tabular-nums">
+                {`★ ${formatAverage(average)} · ${shop.review_count}`}
+              </span>
+            </p>
+          )}
+
           <div className="mt-auto flex flex-wrap items-center gap-1.5">
             <Badge tone={shop.listing_count > 0 ? 'brand' : 'neutral'}>
               {pluralise(shop.listing_count, 'tea')}
             </Badge>
+            {shop.my_score != null && (
+              <span data-testid="shop-card-my-score">
+                <Badge tone="brand">You rated {formatScore(shop.my_score)}</Badge>
+              </span>
+            )}
             {distance && (
               <span data-testid="shop-card-distance">
                 <Badge tone="amber">{distance}</Badge>

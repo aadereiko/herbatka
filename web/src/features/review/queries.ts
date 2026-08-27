@@ -4,24 +4,32 @@ import { api } from '../../lib/api'
 import type { Page } from '../../lib/catalog'
 import { toQuery } from '../../lib/query-string'
 import type { MyReview, Review, ReviewInput, ReviewListParams } from '../../lib/review'
+import type { ShopReview, ShopReviewInput } from '../../lib/shop'
 import { catalogKeys } from '../catalog/queries'
+import { shopKeys } from '../shop/queries'
 
 /**
  * Query keys as data, same as `catalog/queries.ts` and `stock/queries.ts`.
  *
  *   ['reviews', 'tea', slug]           every page of one tea's reviews
  *   ['reviews', 'tea', slug, params]   one of them
+ *   ['reviews', 'shop', slug]          every page of one shop's reviews
+ *   ['reviews', 'shop', slug, params]  one of them
  *   ['reviews', 'mine']                every page of your own list
  *   ['reviews', 'mine', params]        one of them
  *
  * The `'tea', slug` segment sits above the params so one invalidation covers whichever
  * page of reviews happens to be on screen, and rating a *different* tea leaves this
- * one's cache alone.
+ * one's cache alone. `'shop', slug` is the same arrangement for the same reason — and it
+ * is a sibling rather than a reuse of `'tea'`, so a tea and a shop that happen to share a
+ * slug cannot read each other's reviews out of the cache.
  */
 export const reviewKeys = {
   all: ['reviews'] as const,
   teaLists: (slug: string) => ['reviews', 'tea', slug] as const,
   teaList: (slug: string, params: ReviewListParams) => ['reviews', 'tea', slug, params] as const,
+  shopLists: (slug: string) => ['reviews', 'shop', slug] as const,
+  shopList: (slug: string, params: ReviewListParams) => ['reviews', 'shop', slug, params] as const,
   mineLists: ['reviews', 'mine'] as const,
   mineList: (params: ReviewListParams) => ['reviews', 'mine', params] as const,
 }
@@ -105,6 +113,70 @@ export function useDeleteReview(slug: string) {
   const invalidate = useInvalidateAfterReview(slug)
   return useMutation({
     mutationFn: () => api<void>(reviewPath(slug), { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
+}
+
+/* --------------------------------------------------------------- rating a shop (M8) */
+
+const shopPath = (slug: string) => `/shops/${encodeURIComponent(slug)}`
+
+const shopReviewPath = (slug: string) => `${shopPath(slug)}/review`
+
+export const fetchShopReviews = (slug: string, params: ReviewListParams) =>
+  api<Page<ShopReview>>(`${shopPath(slug)}/reviews${toQuery(params)}`)
+
+/** Public, exactly as a tea's reviews are: what people think of a shop is the part of
+ *  this feature a signed-out visitor is here for. */
+export function useShopReviews(slug: string, params: ReviewListParams) {
+  return useQuery({
+    queryKey: reviewKeys.shopList(slug, params),
+    queryFn: () => fetchShopReviews(slug, params),
+    enabled: slug !== '',
+    placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * Three caches move when you rate a shop, and each is a visible staleness if it is
+ * missed:
+ *
+ * - the shop's **detail**, because the average, `my_score` and `my_review` all moved;
+ * - every cached shop **list**, because the card carries the average and your badge too —
+ *   and the browse grid is usually not mounted while you are rating, which makes this the
+ *   invalidation that is easiest to forget and hardest to notice missing;
+ * - this shop's **reviews**, because yours has just joined or changed.
+ *
+ * Deliberately three calls rather than one `shopKeys.all` sweep: that prefix also covers
+ * every listing page and every "where to buy" row, none of which a rating can have
+ * changed. The parameters and the viewer segment sit below each of these, so one call
+ * still covers every cached filter and reader.
+ */
+function useInvalidateAfterShopReview(slug: string) {
+  const client = useQueryClient()
+  return () => {
+    void client.invalidateQueries({ queryKey: shopKeys.detail(slug) })
+    void client.invalidateQueries({ queryKey: shopKeys.lists })
+    void client.invalidateQueries({ queryKey: reviewKeys.shopLists(slug) })
+  }
+}
+
+/** One review per person per shop, so PUT and there is nothing to decide. Not optimistic,
+ *  for the same reason the tea upsert is not: guessing at the new average would mean
+ *  reimplementing the server's arithmetic to display a number about to be corrected. */
+export function useUpsertShopReview(slug: string) {
+  const invalidate = useInvalidateAfterShopReview(slug)
+  return useMutation({
+    mutationFn: (input: ShopReviewInput) =>
+      api<ShopReview>(shopReviewPath(slug), { method: 'PUT', body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteShopReview(slug: string) {
+  const invalidate = useInvalidateAfterShopReview(slug)
+  return useMutation({
+    mutationFn: () => api<void>(shopReviewPath(slug), { method: 'DELETE' }),
     onSuccess: invalidate,
   })
 }

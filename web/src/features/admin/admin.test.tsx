@@ -55,6 +55,9 @@ const pendingTea: TeaSummary = {
   average_score: null,
   review_count: 0,
   my_score: null,
+  // M8 widened both tea schemas with the star. False is what an untouched tea comes
+  // back as, and what every signed-out reader is sent.
+  is_favourite: false,
 }
 
 const approvedTea: TeaDetail = {
@@ -71,6 +74,8 @@ const approvedTea: TeaDetail = {
   average_aroma: null,
   average_flavour: null,
   average_aftertaste: null,
+  // M8. Null unless a test says otherwise: nobody has written their own numbers.
+  my_brewing: null,
 }
 
 function pageOf<T>(items: T[], extra: Partial<Page<T>> = {}): Page<T> {

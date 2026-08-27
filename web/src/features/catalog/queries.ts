@@ -1,9 +1,11 @@
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '../../lib/api'
 import type {
   Brand,
   BrandListParams,
+  BrewingInput,
+  BrewingNote,
   Ingredient,
   IngredientListParams,
   Page,
@@ -103,5 +105,45 @@ export function useSuggestTea() {
   return useMutation({
     mutationFn: (input: TeaInput) =>
       api<TeaDetail>('/catalog/teas', { method: 'POST', body: JSON.stringify(input) }),
+  })
+}
+
+/* --------------------------------------------------- your own brewing numbers (M8) */
+
+const brewingPath = (slug: string) => `/catalog/teas/${encodeURIComponent(slug)}/brewing`
+
+/**
+ * Only the tea's own detail moves. The card in a grid prints a name, a type and a rating
+ * and has never printed a brewing spec, so sweeping `teaLists` here would refetch every
+ * cached page of the catalog to change nothing on any of them.
+ *
+ * Not optimistic either, for the same reason the review upsert is not: this is four boxes
+ * typed into a form and submitted once, and the round trip costs nothing anybody notices.
+ */
+function useInvalidateBrewing(slug: string) {
+  const client = useQueryClient()
+  return () => {
+    void client.invalidateQueries({ queryKey: catalogKeys.teaDetail(slug) })
+  }
+}
+
+/** Upsert: there is one of these per person per tea, so PUT and there is nothing to
+ *  decide — the server creates or replaces and the form is the same either way. */
+export function useSetBrewing(slug: string) {
+  const invalidate = useInvalidateBrewing(slug)
+  return useMutation({
+    mutationFn: (input: BrewingInput) =>
+      api<BrewingNote>(brewingPath(slug), { method: 'PUT', body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+/** "Go back to the catalog's numbers". A 404 means you had none to remove — after a
+ *  delete that raced with another tab, a state the caller should read as done. */
+export function useDeleteBrewing(slug: string) {
+  const invalidate = useInvalidateBrewing(slug)
+  return useMutation({
+    mutationFn: () => api<void>(brewingPath(slug), { method: 'DELETE' }),
+    onSuccess: invalidate,
   })
 }

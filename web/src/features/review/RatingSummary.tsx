@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react'
+
 import { Panel } from '../../components/ui/page'
 import type { TeaDetail } from '../../lib/catalog'
-import type { Subscore } from '../../lib/review'
+import type { RatingRollup, Subscore } from '../../lib/review'
 import { SUBSCORES, SUBSCORE_LABELS } from '../../lib/review'
 import { pluralise } from '../catalog/format'
 import { formatAverage, formatScore } from './format'
@@ -8,8 +10,12 @@ import { formatAverage, formatScore } from './format'
 type GivenAverage = { key: Subscore; value: number }
 
 /** The per-aspect averages, and only the ones anybody has actually given. A row of three
- *  em-dashes tells the reader nothing they could not infer from its absence. */
-function SubscoreAverages({ tea }: { tea: TeaDetail }) {
+ *  em-dashes tells the reader nothing they could not infer from its absence.
+ *
+ *  Tea-only, and stays that way: a shop has no aroma. It is handed to `RatingSummary` as
+ *  `details` rather than read out of the rollup, which is what lets the same summary
+ *  serve both without growing a "what am I a summary of" flag. */
+export function SubscoreAverages({ tea }: { tea: TeaDetail }) {
   const values: Record<Subscore, number | null> = {
     aroma: tea.average_aroma,
     flavour: tea.average_flavour,
@@ -46,11 +52,28 @@ function SubscoreAverages({ tea }: { tea: TeaDetail }) {
  * the 8.2, and a design that shows only one of them leaves you hunting for whether your
  * rating registered at all. So the average is the big number, your score is its own
  * labelled block beside it, and neither is ever rendered as the other's fallback.
+ *
+ * M8 gives shops the same three numbers, so this takes a `RatingRollup` rather than a
+ * `TeaDetail` — the only tea-shaped thing left on it is the optional `details` slot, which
+ * the tea page fills with its per-aspect averages and the shop page leaves empty. The copy
+ * for the "nobody has rated this" branch is a prop for the same reason: "be the first to
+ * say what it is like" is about a cup, and a shop wants its own sentence.
  */
-export function RatingSummary({ tea }: { tea: TeaDetail }) {
-  const average = tea.average_score
-  const count = tea.review_count
-  const mine = tea.my_score
+export function RatingSummary({
+  rating,
+  emptyTitle,
+  emptyBody,
+  details,
+}: {
+  rating: RatingRollup
+  emptyTitle: string
+  emptyBody: string
+  /** Rendered under the numbers, and only when there are numbers. */
+  details?: ReactNode
+}) {
+  const average = rating.average_score
+  const count = rating.review_count
+  const mine = rating.my_score
   // `count > 0` rather than `count !== 0`: this also survives an API that has not shipped
   // the field yet and sends nothing, where "0 reviews" would be a guess dressed as a fact.
   const rated = average != null && count > 0
@@ -76,11 +99,9 @@ export function RatingSummary({ tea }: { tea: TeaDetail }) {
         ) : (
           <div data-testid="rating-empty">
             <h2 className="text-lg font-semibold text-brand-900 dark:text-brand-100">
-              Nobody has rated this yet
+              {emptyTitle}
             </h2>
-            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-              Be the first to say what it is like.
-            </p>
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{emptyBody}</p>
           </div>
         )}
 
@@ -99,7 +120,7 @@ export function RatingSummary({ tea }: { tea: TeaDetail }) {
         )}
       </div>
 
-      {rated && <SubscoreAverages tea={tea} />}
+      {rated && details}
     </Panel>
   )
 }

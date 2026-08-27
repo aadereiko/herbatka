@@ -1,9 +1,30 @@
 import uuid
+from dataclasses import dataclass
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+# A direct import, not a forward reference: schemas.preference does not import this
+# module, so there is no cycle to work around here.
 from app.schemas.household import StockItem, StockItemDetail, TeaRef
+from app.schemas.preference import ShopReview
+
+
+@dataclass(frozen=True)
+class ShopAggregates:
+    """Everything about a shop that is computed rather than stored.
+
+    A dataclass instead of six more positional arguments: `shop_summary(shop, 5, None,
+    7.5, 2, None, True)` is unreadable at the call site and one transposition away from
+    reporting a rating as a distance.
+    """
+
+    listing_count: int = 0
+    distance_km: float | None = None
+    average_score: float | None = None
+    review_count: int = 0
+    my_score: int | None = None
+    is_favourite: bool = False
 
 
 class ShopRef(BaseModel):
@@ -26,12 +47,18 @@ class ShopSummary(ShopRef):
     # Only when the request supplied a position. null otherwise — not 0, which would
     # read as "you are standing in it".
     distance_km: float | None
+    # null, never 0, when nobody has rated it — the same rule teas follow.
+    average_score: float | None
+    review_count: int
+    my_score: int | None
+    is_favourite: bool
 
 
 class ShopDetail(ShopSummary):
     description: str | None
     address: str | None
     created_at: datetime
+    my_review: ShopReview | None = None
 
 
 class ShopCreate(BaseModel):
@@ -133,7 +160,7 @@ class UploadedImage(BaseModel):
     url: str
 
 
-def shop_summary(shop: object, listing_count: int, distance_km: float | None = None) -> ShopSummary:
+def shop_summary(shop: object, agg: ShopAggregates) -> ShopSummary:
     return ShopSummary(
         id=shop.id,  # type: ignore[attr-defined]
         slug=shop.slug,  # type: ignore[attr-defined]
@@ -143,16 +170,21 @@ def shop_summary(shop: object, listing_count: int, distance_km: float | None = N
         website=shop.website,  # type: ignore[attr-defined]
         image_url=shop.image_url,  # type: ignore[attr-defined]
         is_approved=shop.is_approved,  # type: ignore[attr-defined]
-        listing_count=listing_count,
+        listing_count=agg.listing_count,
         latitude=float(shop.latitude) if shop.latitude is not None else None,  # type: ignore[attr-defined]
         longitude=float(shop.longitude) if shop.longitude is not None else None,  # type: ignore[attr-defined]
-        distance_km=distance_km,
+        distance_km=agg.distance_km,
+        average_score=agg.average_score,
+        review_count=agg.review_count,
+        my_score=agg.my_score,
+        is_favourite=agg.is_favourite,
     )
 
 
-def shop_detail(shop: object, listing_count: int, distance_km: float | None = None) -> ShopDetail:
+def shop_detail(shop: object, agg: ShopAggregates, my_review: object = None) -> ShopDetail:
     return ShopDetail(
-        **shop_summary(shop, listing_count, distance_km).model_dump(),
+        **shop_summary(shop, agg).model_dump(),
+        my_review=my_review,  # type: ignore[arg-type]
         description=shop.description,  # type: ignore[attr-defined]
         address=shop.address,  # type: ignore[attr-defined]
         created_at=shop.created_at,  # type: ignore[attr-defined]
@@ -171,10 +203,10 @@ def listing_out(row: object) -> Listing:
     )
 
 
-def listing_with_shop(row: object, listing_count: int) -> ListingWithShop:
+def listing_with_shop(row: object, agg: ShopAggregates) -> ListingWithShop:
     return ListingWithShop(
         **listing_out(row).model_dump(),
-        shop=shop_summary(row.shop, listing_count),  # type: ignore[attr-defined]
+        shop=shop_summary(row.shop, agg),  # type: ignore[attr-defined]
     )
 
 

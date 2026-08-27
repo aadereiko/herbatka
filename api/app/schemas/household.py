@@ -126,6 +126,9 @@ class StockItemDetail(StockItem):
 
 class StockItemCreate(BaseModel):
     tea_id: uuid.UUID
+    # Optional, and settable when adding a tin by hand — not only when the buy flow
+    # sets it. A tin bought in a shop is a tin bought in a shop either way.
+    shop_id: uuid.UUID | None = None
     quantity_grams: float = Field(ge=0, le=999999)
     location: str | None = Field(default=None, max_length=120)
     opened_at: date | None = None
@@ -148,6 +151,8 @@ class StockItemCreate(BaseModel):
 class StockItemUpdate(BaseModel):
     """Metadata only. Quantity is absent by design — it moves through the ledger, and
     a patchable quantity would let the cached total drift from its events."""
+
+    shop_id: uuid.UUID | None = None
 
     location: str | None = Field(default=None, max_length=120)
     opened_at: date | None = None

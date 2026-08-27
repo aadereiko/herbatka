@@ -13,15 +13,11 @@
  * | `Review`             | `components['schemas']['Review']`                          |
  * | `MyReview`           | `components['schemas']['MyReview']`                        |
  * | `ReviewInput`        | `components['schemas']['ReviewInput']`                     |
- * | `TeaRatingSummary`   | folded into `TeaSummary` / `TeaDetail`; delete it          |
- * | `TeaRatingDetail`    | folded into `TeaDetail`; delete it                         |
  *
- * The last two rows are the ones to do something about rather than merely rename: they
- * exist because `TeaSummary` and `TeaDetail` *gain* these fields server-side, so
- * `lib/catalog.ts` intersects the generated schema with them for now. When the
- * regenerated schemas carry the fields, drop the intersections there and these two types
- * with them — leaving them in place would be harmless but would quietly stop the
- * generated file from being the single source of truth.
+ * The last two rows of that table — `TeaRatingSummary` and `TeaRatingDetail` — have since
+ * been done and are gone: their fields are on the generated `TeaSummary` and `TeaDetail`,
+ * and `RatingRollup` below is what remains, kept because M8 gives shops the same three
+ * numbers and one shared shape is better than two that agree by coincidence.
  *
  * As in `catalog.ts` and `household.ts`, the label/const objects below stay hand-written
  * whatever the generator says: OpenAPI gives the type of a field, not an ordered
@@ -70,27 +66,47 @@ export type ReviewNotes = {
   body: string | null
 }
 
-/* --------------------------------------------------- what a tea gains from ratings */
-
-/** The rollup both `TeaSummary` and `TeaDetail` carry. `average_score` is null rather
- *  than 0 when nobody has rated it: an unrated tea is not a tea that scored zero, and
- *  rendering it as one is the single most misleading thing this screen could do. */
-export type TeaRatingSummary = {
-  average_score: number | null
-  review_count: number
-  /** Your own score, and null when you are signed out as well as when you have not rated
-   *  it — the two look the same from here, which is why the page asks `user` and not
-   *  this field when it decides whether to show a form. */
-  my_score: number | null
+/**
+ * A review as the *list* renders one, whatever it is a review of.
+ *
+ * M8 gives shops the same ratings teas have, and a `ShopReview` is a `Review` with the
+ * tea-specific half removed — no aroma, no brew date, because neither means anything
+ * about a room. Rather than a second `ShopReviewList` that would have to be kept looking
+ * identical to this one, `ReviewRow` and `ReviewList` are widened to this shape: the four
+ * tea-only fields are optional *keys*, exactly as on `ReviewNotes` and for the same
+ * reason. A `Review` and a `ShopReview` are both assignable to it, and the row renders
+ * whichever parts it was handed.
+ */
+export type AnyReview = ReviewNotes & {
+  author: ReviewAuthor
+  score: number
+  brewed_at?: string | null
+  created_at: string
+  updated_at: string
 }
 
-/** What only the detail endpoint carries: your review in full, so the form can be
- *  pre-filled without a second request, and the per-aspect averages. */
-export type TeaRatingDetail = {
-  my_review: Review | null
-  average_aroma: number | null
-  average_flavour: number | null
-  average_aftertaste: number | null
+/* ------------------------------------------------- what a rateable thing gains */
+
+/**
+ * The three numbers a rating summary prints, whatever it is a summary of.
+ *
+ * M4's `TeaRatingSummary` and `TeaRatingDetail` are gone from here: the fields they
+ * described are on the generated `TeaSummary` and `TeaDetail` now, exactly as the note at
+ * the top of this file said they would be, and leaving the duplicates in place would have
+ * let them drift. What survives is this — the shape `RatingSummary` reads, shared because
+ * M8 gives shops the same rollup and a second identical triple would be the same mistake
+ * one milestone later.
+ *
+ * `average_score` is null rather than 0 when nobody has rated it: an unrated thing is not
+ * a thing that scored zero, and rendering it as one is the single most misleading thing
+ * these screens could do. `my_score` is null when you are signed out as well as when you
+ * simply have not rated it — the two look the same from here, which is why the page asks
+ * the session and not this field when it decides whether to show a form.
+ */
+export type RatingRollup = {
+  average_score: number | null
+  review_count: number
+  my_score: number | null
 }
 
 /* ------------------------------------------------------------------------ scoring */

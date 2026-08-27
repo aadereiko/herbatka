@@ -6,7 +6,7 @@ import { AppRoutes } from '../../app/router'
 import type { Session, User } from '../../lib/api'
 import type { Page, TeaDetail } from '../../lib/catalog'
 import type { HouseholdSummary, StockItemDetail } from '../../lib/household'
-import type { Listing, ListingWithShop, ShopDetail, ShopSummary } from '../../lib/shop'
+import type { Listing, ListingWithShop, ShopDetail, ShopReview, ShopSummary } from '../../lib/shop'
 import { MAX_IMAGE_BYTES } from '../../lib/upload'
 import { clearAccessToken } from '../../lib/token'
 import { MemoryRouter } from 'react-router'
@@ -62,6 +62,13 @@ const kruka: ShopSummary = {
   longitude: 19.937,
   // Null unless the request carried a position, which none of the M6 tests do.
   distance_km: null,
+  // M8 widened both shop schemas the way M4 widened the tea ones: the star, and the
+  // same three rating numbers a tea carries. Unstarred and unrated unless a test says
+  // otherwise — null and 0 are what an untouched shop actually comes back as.
+  is_favourite: false,
+  average_score: null,
+  review_count: 0,
+  my_score: null,
 }
 
 const krukaDetail: ShopDetail = {
@@ -69,6 +76,7 @@ const krukaDetail: ShopDetail = {
   description: 'A room the size of a kitchen with four hundred tins in it.',
   address: 'ul. Sławkowska 12',
   created_at: '2026-04-01T09:00:00Z',
+  my_review: null,
 }
 
 const senchaTea = {
@@ -129,6 +137,8 @@ const jasminePearls: TeaDetail = {
   average_aroma: null,
   average_flavour: null,
   average_aftertaste: null,
+  is_favourite: false,
+  my_brewing: null,
 }
 
 const home: HouseholdSummary = {
@@ -230,6 +240,10 @@ function shopPage(overrides: Record<string, Handler> = {}) {
     'GET /friends/requests': () => json([]),
     'GET /shops/u-kruka': () => json(krukaDetail),
     'GET /shops/u-kruka/listings': () => json(pageOf([pricedListing, unpricedListing])),
+    // M8 hangs a ratings panel off the bottom of this page. Registered so the request
+    // it makes is one the harness knows about — an unhandled one rejects loudly, which
+    // is the point of the router.
+    'GET /shops/u-kruka/reviews': () => json(pageOf([])),
     'GET /households': () => json([home]),
     ...overrides,
   })
@@ -663,4 +677,174 @@ test('the upload sends no JSON content type, so the browser can write the bounda
   // `multipart/form-data` is unparseable without the `boundary=` parameter, and only
   // fetch can supply it — so we must not set the header at all.
   expect(contentType).toBeNull()
+})
+
+/* --------------------------------------------------------------- rating a shop (M8) */
+
+/** Somebody else's, so the public list is never empty by accident. */
+const graceReview: ShopReview = {
+  id: 'srev-1',
+  author: { id: grace.id, display_name: grace.display_name, avatar_url: null },
+  score: 8,
+  body: 'Four hundred tins and somebody behind the counter who knows all of them.',
+  created_at: '2026-08-03T09:00:00Z',
+  updated_at: '2026-08-03T09:00:00Z',
+}
+
+/** Ada's own, for the pre-fill and the "apart from the average" journey. */
+const myReview: ShopReview = {
+  id: 'srev-2',
+  author: { id: ada.id, display_name: ada.display_name, avatar_url: null },
+  score: 7,
+  body: null,
+  created_at: '2026-08-21T08:00:00Z',
+  updated_at: '2026-08-21T08:00:00Z',
+}
+
+const countOf = (method: string, path: string) =>
+  calls.filter((call) => call.method === method && call.path === path).length
+
+test('rating a shop PUTs what the form says, and the average comes back changed', async () => {
+  // Stateful, so the refetch can disagree with what was on screen before it. A fixture
+  // frozen at 8.0 would pass even if nothing were invalidated.
+  let detail: ShopDetail = { ...krukaDetail, average_score: 8, review_count: 1 }
+  shopPage({
+    'GET /shops/u-kruka': () => json(detail),
+    'GET /shops/u-kruka/reviews': () => json(pageOf([graceReview])),
+    'PUT /shops/u-kruka/review': ({ init }) => {
+      const input = JSON.parse(String(init?.body)) as { score: number; body: string | null }
+      const saved: ShopReview = { ...myReview, score: input.score, body: input.body }
+      detail = {
+        ...detail,
+        my_review: saved,
+        my_score: input.score,
+        average_score: 8.5,
+        review_count: 2,
+      }
+      return json(saved)
+    },
+  })
+  renderApp('/shops/u-kruka')
+
+  await screen.findByTestId('shop-review-form')
+  expect(screen.queryByTestId('your-score')).toBeNull()
+
+  fireEvent.change(screen.getByLabelText('Your score'), { target: { value: '9' } })
+  fireEvent.change(screen.getByLabelText('Notes (optional)'), {
+    target: { value: '  Worth the tram ride.  ' },
+  })
+  fireEvent.submit(screen.getByTestId('shop-review-form'))
+
+  expect(await screen.findByTestId('shop-review-saved')).toBeInTheDocument()
+
+  // Two fields and no more: a shop has no aroma and no brew date, and sending either
+  // would be inventing a contract the server did not agree to. The note is trimmed.
+  expect(bodyOf('PUT', '/shops/u-kruka/review')).toEqual({
+    score: 9,
+    body: 'Worth the tram ride.',
+  })
+
+  // The detail refetched, and the page is showing what came back rather than what it
+  // had. Both halves matter: the request, and the number on screen.
+  await waitFor(() => expect(countOf('GET', '/shops/u-kruka')).toBe(2))
+  expect(await screen.findByTestId('your-score')).toHaveTextContent('You rated 9')
+  expect(screen.getByTestId('rating-average')).toHaveTextContent('8.5')
+})
+
+test('your own score for a shop is shown apart from the average, not folded into it', async () => {
+  shopPage({
+    'GET /shops/u-kruka': () =>
+      json({
+        ...krukaDetail,
+        average_score: 8.2,
+        review_count: 14,
+        my_score: 9,
+        my_review: myReview,
+      }),
+    'GET /shops/u-kruka/reviews': () => json(pageOf([myReview, graceReview])),
+  })
+  renderApp('/shops/u-kruka')
+
+  const yours = await screen.findByTestId('your-score')
+  expect(yours).toHaveTextContent('You rated 9')
+
+  // The crowd's number is the crowd's number: 8.2 from 14 people, with your 9 nowhere
+  // inside that block. Two facts, two places on the page.
+  const average = screen.getByTestId('rating-average')
+  expect(average).toHaveTextContent('8.2')
+  expect(average).toHaveTextContent('from 14 reviews')
+  expect(average).not.toHaveTextContent('You rated')
+  expect(within(average).queryByTestId('your-score')).toBeNull()
+
+  // Having one turns the form into an edit of it, pre-filled, with a way to remove it.
+  expect(screen.getByLabelText('Your score')).toHaveValue('7')
+  expect(screen.getByRole('button', { name: 'Save changes to your review' })).toBeInTheDocument()
+  expect(screen.getByTestId('delete-shop-review')).toBeInTheDocument()
+})
+
+test('a shop nobody has rated invites a first rating rather than reading zero', async () => {
+  shopPage({ 'GET /shops/u-kruka/reviews': () => json(pageOf([])) })
+  renderApp('/shops/u-kruka')
+
+  const empty = await screen.findByTestId('rating-empty')
+  expect(empty).toHaveTextContent('Nobody has rated this shop yet')
+  expect(screen.queryByTestId('rating-average')).toBeNull()
+  // Nowhere on the panel does an unrated shop read as a shop that scored zero.
+  expect(screen.getByTestId('rating-summary')).not.toHaveTextContent('0.0')
+  expect(await screen.findByTestId('review-list-empty')).toHaveTextContent(
+    'No reviews written yet',
+  )
+})
+
+test('a signed-out visitor reads a shop’s reviews and is offered a sign-in, not a form', async () => {
+  mockFetch({
+    'POST /auth/refresh': () => json({ detail: 'Missing refresh cookie' }, 401),
+    'GET /shops/u-kruka': () => json({ ...krukaDetail, average_score: 8.2, review_count: 14 }),
+    'GET /shops/u-kruka/listings': () => json(pageOf([])),
+    'GET /shops/u-kruka/reviews': () => json(pageOf([graceReview])),
+  })
+  renderApp('/shops/u-kruka')
+
+  // The reviews themselves are public and fully readable.
+  const list = await screen.findByTestId('review-list')
+  expect(within(list).getByText('Grace Hopper')).toBeInTheDocument()
+  expect(within(list).getByText(/four hundred tins/i)).toBeInTheDocument()
+  expect(screen.getByTestId('rating-average')).toHaveTextContent('8.2')
+  // The shared row renders a shop review without inventing the tea-only half of one.
+  expect(screen.queryByTestId(`review-subscores-${graceReview.id}`)).toBeNull()
+
+  // The form is absent, not disabled, and there is a way in.
+  expect(screen.queryByTestId('shop-review-form')).toBeNull()
+  expect(screen.queryByLabelText('Your score')).toBeNull()
+  expect(screen.queryByTestId('your-score')).toBeNull()
+  const prompt = screen.getByTestId('shop-review-signed-out')
+  // Scoped: the nav carries a "Sign in" of its own, and the one that matters here is
+  // the one sitting where the form would have been.
+  expect(within(prompt).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login')
+})
+
+test('a shop’s star is on its page for a member and absent for a stranger', async () => {
+  shopPage({ 'PUT /shops/u-kruka/favourite': () => new Response(null, { status: 204 }) })
+  renderApp('/shops/u-kruka')
+
+  const star = await screen.findByTestId('favourite-shop-u-kruka')
+  expect(star).toHaveAttribute('aria-pressed', 'false')
+  expect(star).toHaveAccessibleName('Add Herbaciarnia u Kruka to your favourites')
+
+  fireEvent.click(star)
+  await waitFor(() =>
+    expect(screen.getByTestId('favourite-shop-u-kruka')).toHaveAttribute('aria-pressed', 'true'),
+  )
+
+  cleanup()
+  mockFetch({
+    'POST /auth/refresh': () => json({ detail: 'Missing refresh cookie' }, 401),
+    'GET /shops/u-kruka': () => json(krukaDetail),
+    'GET /shops/u-kruka/listings': () => json(pageOf([])),
+    'GET /shops/u-kruka/reviews': () => json(pageOf([])),
+  })
+  renderApp('/shops/u-kruka')
+
+  await screen.findByRole('heading', { level: 1, name: 'Herbaciarnia u Kruka' })
+  expect(screen.queryByTestId('favourite-shop-u-kruka')).toBeNull()
 })

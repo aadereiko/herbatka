@@ -113,6 +113,11 @@ function AccountMenu({ user }: { user: User }) {
       <MenuLink to="/reviews/mine" testId="nav-my-reviews">
         Your reviews
       </MenuLink>
+      {/* Beside your reviews rather than beside the catalog: a star is a fact about you,
+          not about the tea, and the page it opens is a page of your own things. */}
+      <MenuLink to="/favourites" testId="nav-favourites">
+        Your favourites
+      </MenuLink>
       <MenuLink to="/settings" testId="nav-settings">
         Settings
       </MenuLink>

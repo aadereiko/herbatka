@@ -20,6 +20,7 @@ from app.models.household import (
     StockEventKindEnum,
     StockItem,
 )
+from app.models.preference import BrewingNote, FavouriteShop, FavouriteTea, ShopReview
 from app.models.review import Review
 from app.models.shop import Shop, ShopListing
 from app.models.user import AuthIdentity, AuthProvider, RefreshToken, User, UserRole
@@ -28,10 +29,13 @@ __all__ = [
     "AuthIdentity",
     "AuthProvider",
     "Base",
+    "BrewingNote",
     "Brand",
     "CaffeineLevelEnum",
     "Friendship",
     "FriendshipStatusEnum",
+    "FavouriteShop",
+    "FavouriteTea",
     "Household",
     "HouseholdInvite",
     "HouseholdMember",
@@ -42,6 +46,7 @@ __all__ = [
     "Review",
     "Shop",
     "ShopListing",
+    "ShopReview",
     "StockEvent",
     "StockEventKindEnum",
     "StockItem",

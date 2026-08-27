@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
+    from app.schemas.preference import BrewingNote
     from app.schemas.review import Review
 
 TeaType = Literal["green", "black", "oolong", "puerh", "white", "herbal", "rooibos", "blend"]
@@ -91,6 +92,8 @@ class TeaSummary(BaseModel):
     # than an unrated one.
     average_score: float | None
     review_count: int
+    # A star, not a score: you can love a tea you have never got round to rating.
+    is_favourite: bool
     # The caller's own score, kept separate from the crowd average so the UI can show
     # "8.2 average · you rated 9" instead of blending the two.
     my_score: int | None
@@ -115,6 +118,9 @@ class TeaDetail(TeaSummary):
     # optional would generate `my_review?: Review | null` and push a needless undefined
     # branch onto every client.
     my_review: "Review | None"
+    # Your own brewing figures, when you have set any. The catalog's stay on the
+    # summary fields above — this does not overwrite them, it sits beside them.
+    my_brewing: "BrewingNote | None" = None
 
 
 class TeaCreate(BaseModel):
@@ -151,6 +157,7 @@ def _summary_fields(tea: Any, ratings: Any) -> dict[str, Any]:
         "average_score": ratings.average_score,
         "review_count": ratings.review_count,
         "my_score": ratings.my_score,
+        "is_favourite": ratings.is_favourite,
         "id": tea.id,
         "slug": tea.slug,
         "name": tea.name,
@@ -173,13 +180,14 @@ def tea_summary(tea: Any, ratings: Any) -> TeaSummary:
     return TeaSummary(**_summary_fields(tea, ratings))
 
 
-def tea_detail(tea: Any, ratings: Any, my_review: Any = None) -> TeaDetail:
+def tea_detail(tea: Any, ratings: Any, my_review: Any = None, my_brewing: Any = None) -> TeaDetail:
     return TeaDetail(
         **_summary_fields(tea, ratings),
         average_aroma=ratings.average_aroma,
         average_flavour=ratings.average_flavour,
         average_aftertaste=ratings.average_aftertaste,
         my_review=my_review,
+        my_brewing=my_brewing,
         description=tea.description,
         origin_country=tea.origin_country,
         brew_temp_c=tea.brew_temp_c,

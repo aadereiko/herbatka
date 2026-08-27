@@ -72,6 +72,9 @@ def my_review_out(row: Any) -> MyReview:
     return MyReview(**review_out(row).model_dump(), tea=TeaRef.model_validate(row.tea))
 
 
-# Resolves TeaDetail.my_review, which is a forward reference to Review because
-# schemas.catalog cannot import this module at runtime without a cycle.
-TeaDetail.model_rebuild()
+# TeaDetail carries two forward references — my_review (Review, here) and my_brewing
+# (BrewingNote, in schemas.preference) — because schemas.catalog cannot import either at
+# runtime without a cycle. Neither module can see both names, so this attempt resolves
+# what it can and stays quiet about the rest; schemas.preference imports both and does
+# the definitive rebuild.
+TeaDetail.model_rebuild(raise_errors=False)

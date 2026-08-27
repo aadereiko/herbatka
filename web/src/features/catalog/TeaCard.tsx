@@ -4,6 +4,7 @@ import { EntityImage } from '../../components/ui/image'
 import { Badge } from '../../components/ui/page'
 import type { TeaSummary } from '../../lib/catalog'
 import { CAFFEINE_LEVEL_LABELS, TEA_TYPE_LABELS } from '../../lib/catalog'
+import { FavouriteStar } from '../favourite/FavouriteStar'
 import { formatAverage, formatScore } from '../review/format'
 import { pluralise } from './format'
 
@@ -43,11 +44,21 @@ function Rating({ tea }: { tea: TeaSummary }) {
   )
 }
 
-/** One tea in the browse grid. The whole card is the link — a tap target the size of a
- *  card rather than the size of a word, because this list is read on a phone. */
+/**
+ * One tea in the browse grid. The whole card is the link — a tap target the size of a
+ * card rather than the size of a word, because this list is read on a phone.
+ *
+ * Which is exactly why the star is a *sibling* of that link rather than something inside
+ * it: a `<button>` nested in an `<a>` is invalid markup, and in practice it navigates to
+ * the tea instead of starring it. Absolutely positioned over the corner of the picture,
+ * so it costs no layout, and absent altogether for a signed-out reader.
+ */
 export function TeaCard({ tea }: { tea: TeaSummary }) {
   return (
-    <li className="list-none">
+    <li className="relative list-none">
+      <div className="absolute right-2 top-2 z-10">
+        <FavouriteStar kind="tea" slug={tea.slug} name={tea.name} isFavourite={tea.is_favourite} />
+      </div>
       <Link
         to={`/teas/${tea.slug}`}
         data-testid="tea-card"

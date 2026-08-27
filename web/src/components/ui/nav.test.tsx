@@ -178,6 +178,7 @@ test('the arrow keys walk the menu and Home/End jump to its ends', async () => {
 
   const profile = screen.getByTestId('nav-profile')
   const reviews = screen.getByTestId('nav-my-reviews')
+  const favourites = screen.getByTestId('nav-favourites')
   const settings = screen.getByTestId('nav-settings')
   const signOut = screen.getByTestId('sign-out')
 
@@ -187,9 +188,15 @@ test('the arrow keys walk the menu and Home/End jump to its ends', async () => {
   expect(document.activeElement).toBe(reviews)
 
   fireEvent.keyDown(reviews, { key: 'ArrowDown' })
+  expect(document.activeElement).toBe(favourites)
+
+  fireEvent.keyDown(favourites, { key: 'ArrowDown' })
   expect(document.activeElement).toBe(settings)
 
   fireEvent.keyDown(settings, { key: 'ArrowUp' })
+  expect(document.activeElement).toBe(favourites)
+
+  fireEvent.keyDown(favourites, { key: 'ArrowUp' })
   expect(document.activeElement).toBe(reviews)
 
   fireEvent.keyDown(reviews, { key: 'End' })

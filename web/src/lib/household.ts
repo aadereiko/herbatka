@@ -96,8 +96,18 @@ export type InviteInput = Omit<components['schemas']['InviteCreate'], 'expires_i
   expires_in_days?: number
 }
 
+/**
+ * M8 adds `shop_id`: where the tin came from, for a tin typed in by hand rather than
+ * bought through a listing.
+ *
+ * Hand-written like the rest of M8 — the generated `StockItemCreate` has not seen it yet.
+ * Optional *and* nullable: omitted is how a create says "I did not say", which is what
+ * `JSON.stringify` does with `undefined` and does not do with `null`; explicit null is
+ * what the PATCH needs to take a wrong shop back off a tin.
+ */
 export type StockItemInput = Omit<components['schemas']['StockItemCreate'], 'low_stock_grams'> & {
   low_stock_grams?: number
+  shop_id?: string | null
 }
 
 /**
@@ -108,7 +118,12 @@ export type StockItemInput = Omit<components['schemas']['StockItemCreate'], 'low
  * The nullable fields are `T | null` rather than optional-only, because clearing a
  * best-before date has to be expressible as something other than "leave it alone".
  */
-export type StockItemPatch = components['schemas']['StockItemUpdate']
+export type StockItemPatch = components['schemas']['StockItemUpdate'] & {
+  /** M8, hand-written until the generated schema catches up. Nullable for the reason
+   *  every other field on this body is: "the shop was wrong, forget it" and "I am not
+   *  editing the shop" have to be two different requests. */
+  shop_id?: string | null
+}
 
 export type StockEventInput = components['schemas']['StockEventCreate']
 

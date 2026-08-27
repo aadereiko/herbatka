@@ -13,6 +13,7 @@ import type {
   StockItem,
   StockItemDetail,
 } from '../../lib/household'
+import type { ShopSummary } from '../../lib/shop'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
 
@@ -113,6 +114,28 @@ const senchaTea: TeaSummary = {
   brand: null,
   is_approved: true,
   primary_ingredients: ['Green tea'],
+  average_score: null,
+  review_count: 0,
+  my_score: null,
+  is_favourite: false,
+}
+
+/** M8: the tin form gained an optional shop, so this suite needs something for its
+ *  picker to find. */
+const kruka: ShopSummary = {
+  id: 'shop-1',
+  slug: 'u-kruka',
+  name: 'Herbaciarnia u Kruka',
+  city: 'Kraków',
+  country: 'Poland',
+  website: null,
+  image_url: null,
+  is_approved: true,
+  listing_count: 2,
+  latitude: null,
+  longitude: null,
+  distance_km: null,
+  is_favourite: false,
   average_score: null,
   review_count: 0,
   my_score: null,
@@ -605,4 +628,79 @@ test('a 404 on a tin reads as “not found or not yours”, with no retry', asyn
   expect(missing).toHaveTextContent('Not found, or not yours')
   expect(screen.queryByTestId('tin-error')).toBeNull()
   expect(screen.queryByTestId('adjust-form')).toBeNull()
+})
+
+test('the tin form sends the shop when one is picked, and no key at all when not', async () => {
+  shelf({
+    'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })),
+    'GET /shops': () => json(pageOf([kruka], { size: 8 })),
+    'POST /households/hh-1/stock': () => json({ ...senchaDetail, shop: kruka }, 201),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+  fireEvent.change(screen.getByLabelText('How much is in it?'), { target: { value: '80' } })
+
+  // Not on screen until the optional half is opened. The two questions that must be
+  // answered to put a tin on a shelf are still the only two you are shown first, which is
+  // the rule this form was written around.
+  expect(screen.queryByLabelText('Where did it come from?')).toBeNull()
+  expect(calls.some((call) => call.path === '/shops')).toBe(false)
+
+  fireEvent.click(screen.getByTestId('toggle-tin-details'))
+
+  // A search box and a short result list — never a <select> of every shop there is.
+  await screen.findByTestId('shop-picker-results')
+  expect(calls.find((call) => call.path === '/shops')?.search).toContain('size=8')
+
+  fireEvent.click(screen.getByTestId('shop-result-shop-1'))
+  expect(screen.getByTestId('shop-picked')).toHaveTextContent('Herbaciarnia u Kruka')
+
+  fireEvent.submit(screen.getByTestId('add-tin-form'))
+
+  await screen.findByTestId('stock-notice')
+  expect(bodyOf('POST', '/households/hh-1/stock')).toEqual({
+    tea_id: 'tea-1',
+    quantity_grams: 80,
+    shop_id: 'shop-1',
+  })
+
+  // The other half: a tin nobody said anything about sends no `shop_id` at all rather
+  // than a null, which is a different statement for the server to store.
+  cleanup()
+  shelf({
+    'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })),
+    'GET /shops': () => json(pageOf([kruka], { size: 8 })),
+    'POST /households/hh-1/stock': () => json(senchaDetail, 201),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+  fireEvent.change(screen.getByLabelText('How much is in it?'), { target: { value: '80' } })
+  // Opened and left alone, so this is "I did not say" rather than "I never looked".
+  fireEvent.click(screen.getByTestId('toggle-tin-details'))
+  await screen.findByTestId('shop-picker-results')
+  fireEvent.submit(screen.getByTestId('add-tin-form'))
+
+  await screen.findByTestId('stock-notice')
+  const body = bodyOf('POST', '/households/hh-1/stock') as Record<string, unknown>
+  expect('shop_id' in body).toBe(false)
+  expect(body).toEqual({ tea_id: 'tea-1', quantity_grams: 80 })
+})
+
+test('a tin that came from a shop says where, on the tin’s own page', async () => {
+  shelf({ 'GET /households/hh-1/stock/item-1': () => json(senchaDetail) })
+  renderApp('/households/hh-1/stock/item-1')
+
+  const where = await screen.findByTestId('tin-shop')
+  expect(where).toHaveTextContent('Bought at')
+  // A link, because "buy another one" is the reason anybody looks at where a tin came from.
+  expect(within(where).getByRole('link', { name: 'Herbaciarnia u Kruka' })).toHaveAttribute(
+    'href',
+    '/shops/u-kruka',
+  )
 })

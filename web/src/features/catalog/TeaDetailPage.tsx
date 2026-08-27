@@ -12,21 +12,11 @@ import {
 import { ApiError, describeApiError } from '../../lib/api'
 import type { TeaIngredient } from '../../lib/catalog'
 import { CAFFEINE_LEVEL_LABELS, INGREDIENT_CATEGORY_LABELS, TEA_TYPE_LABELS } from '../../lib/catalog'
+import { FavouriteStar } from '../favourite/FavouriteStar'
 import { TeaReviewsPanel } from '../review/TeaReviewsPanel'
 import { WhereToBuyPanel } from '../shop/WhereToBuyPanel'
-import { formatBrewTime } from './format'
+import { BrewingPanel } from './BrewingPanel'
 import { useTeaDetail } from './queries'
-
-function SpecRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-brand-50 p-3 text-center dark:bg-neutral-800">
-      <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-        {label}
-      </dt>
-      <dd className="mt-1 text-lg font-semibold text-brand-900 dark:text-brand-100">{value}</dd>
-    </div>
-  )
-}
 
 function IngredientRow({ entry }: { entry: TeaIngredient }) {
   return (
@@ -86,21 +76,30 @@ export function TeaDetailPage() {
     )
   }
 
-  const hasBrewing =
-    tea.brew_temp_c !== null || tea.brew_seconds !== null || tea.grams_per_100ml !== null
-
   return (
     <PageShell>
       <PageHeading
         title={tea.name}
         subtitle={tea.brand ? tea.brand.name : 'Unbranded'}
         actions={
-          <Link
-            to="/teas"
-            className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
-          >
-            ← All teas
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Next to the title rather than down beside the reviews: starring is about
+                the tea as a whole, and it is the one thing on this page somebody comes
+                back to do in two seconds without reading anything. */}
+            <FavouriteStar
+              kind="tea"
+              slug={tea.slug}
+              name={tea.name}
+              isFavourite={tea.is_favourite}
+              size="md"
+            />
+            <Link
+              to="/teas"
+              className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
+            >
+              ← All teas
+            </Link>
+          </div>
         }
       />
 
@@ -168,24 +167,11 @@ export function TeaDetailPage() {
           <TeaReviewsPanel tea={tea} />
         </div>
 
-        {hasBrewing && (
-          <Panel ariaLabel="How to brew it" className="h-fit">
-            <h2 className="mb-3 text-lg font-semibold text-brand-900 dark:text-brand-100">
-              How to brew it
-            </h2>
-            <dl className="grid grid-cols-3 gap-2 lg:grid-cols-1" data-testid="tea-brewing">
-              {tea.brew_temp_c !== null && (
-                <SpecRow label="Water" value={`${tea.brew_temp_c}°C`} />
-              )}
-              {tea.brew_seconds !== null && (
-                <SpecRow label="Steep" value={formatBrewTime(tea.brew_seconds)} />
-              )}
-              {tea.grams_per_100ml !== null && (
-                <SpecRow label="Leaf" value={`${tea.grams_per_100ml} g / 100 ml`} />
-              )}
-            </dl>
-          </Panel>
-        )}
+        {/* The catalog's numbers, and yours over the top of them where you have any.
+            The panel decides for itself whether there is anything to show — see
+            `BrewingPanel`, which is also where the "signed out means no form" rule
+            lives. */}
+        <BrewingPanel tea={tea} />
       </div>
     </PageShell>
   )

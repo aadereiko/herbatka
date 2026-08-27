@@ -15,8 +15,10 @@ from app.schemas.catalog import (
     tea_summary,
 )
 from app.schemas.common import Page
+from app.schemas.preference import BrewingNote, BrewingNoteInput, brewing_note
 from app.schemas.review import Review, ReviewInput, review_out
 from app.services import catalog as catalog_service
+from app.services import preference as preference_service
 from app.services import review as review_service
 from app.services.errors import NotFound
 
@@ -62,7 +64,13 @@ async def get_tea(slug: str, db: DbSession, viewer: OptionalUser) -> TeaDetail:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tea not found") from exc
 
     mine = await review_service.get_mine(db, tea.id, viewer.id) if viewer else None
-    return tea_detail(tea, ratings, review_out(mine) if mine else None)
+    brewing = await preference_service.get_brewing(db, viewer.id, tea.id) if viewer else None
+    return tea_detail(
+        tea,
+        ratings,
+        review_out(mine) if mine else None,
+        brewing_note(brewing) if brewing else None,
+    )
 
 
 @router.post("/teas", response_model=TeaDetail, status_code=status.HTTP_201_CREATED)
@@ -131,4 +139,71 @@ async def delete_review(slug: str, user: CurrentUser, db: DbSession) -> None:
     except NotFound as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="You have not reviewed that tea"
+        ) from exc
+
+
+# --------------------------------------------------------------------- favourites
+
+
+async def _approved_tea(db: DbSession, slug: str):
+    from app.services import catalog as service
+
+    try:
+        tea, _ = await service.get_tea_by_slug(db, slug)
+    except NotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tea not found") from exc
+    return tea
+
+
+@router.put("/teas/{slug}/favourite", status_code=status.HTTP_204_NO_CONTENT)
+async def favourite_tea(slug: str, user: CurrentUser, db: DbSession) -> None:
+    """A star, not a score — you can love a tea you have never got round to rating.
+    Idempotent, so a double tap is not a 409."""
+    tea = await _approved_tea(db, slug)
+    await preference_service.set_favourite_tea(db, user.id, tea.id, on=True)
+
+
+@router.delete("/teas/{slug}/favourite", status_code=status.HTTP_204_NO_CONTENT)
+async def unfavourite_tea(slug: str, user: CurrentUser, db: DbSession) -> None:
+    tea = await _approved_tea(db, slug)
+    await preference_service.set_favourite_tea(db, user.id, tea.id, on=False)
+
+
+# ------------------------------------------------------------------ brewing notes
+
+
+@router.put("/teas/{slug}/brewing", response_model=BrewingNote)
+async def set_brewing(
+    slug: str, payload: BrewingNoteInput, user: CurrentUser, db: DbSession
+) -> BrewingNote:
+    """How *you* brew it, as opposed to what the packet says.
+
+    An entirely blank note is a row that says nothing, so it deletes instead — which is
+    also what the CHECK constraint would otherwise refuse.
+    """
+    tea = await _approved_tea(db, slug)
+    if payload.is_empty():
+        # Refused, and nothing changes. An earlier version deleted the existing note on
+        # the way to raising this, which is the worst of both: the caller is told the
+        # request failed while something did happen. Removing a note is what DELETE is
+        # for, and it says so.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "Set at least one of temperature, time, dose or a note — "
+                "or delete the note to go back to the catalog's figures."
+            ),
+        )
+    return brewing_note(await preference_service.upsert_brewing(db, user.id, tea.id, payload))
+
+
+@router.delete("/teas/{slug}/brewing", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_brewing(slug: str, user: CurrentUser, db: DbSession) -> None:
+    """Removing yours falls back to the catalog's figures, which never went anywhere."""
+    tea = await _approved_tea(db, slug)
+    try:
+        await preference_service.delete_brewing(db, user.id, tea.id)
+    except NotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="You have no notes for that tea"
         ) from exc

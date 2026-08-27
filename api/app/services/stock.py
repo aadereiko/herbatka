@@ -39,6 +39,11 @@ async def _get_item(db: AsyncSession, household_id: uuid.UUID, item_id: uuid.UUI
     item = await db.scalar(
         select(StockItem)
         .options(*_LOADS)
+        # populate_existing, because this is called *after* a mutation to re-read the
+        # row. Without it SQLAlchemy hands back the identity-mapped object and leaves an
+        # already-loaded relationship alone — so changing shop_id would leave `shop`
+        # reporting whatever it was before, including None.
+        .execution_options(populate_existing=True)
         .where(StockItem.id == item_id, StockItem.household_id == household_id)
     )
     if item is None:

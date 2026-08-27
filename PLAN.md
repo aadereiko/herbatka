@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6c done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6d done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -364,6 +364,22 @@ a role, and changing an identity wants its own confirmation flow.
 
 Avatars fall back to initials on a name-hashed colour rather than a generic silhouette,
 and appear in the nav, friend rows, review authors, feed actors and household members.
+
+### M6d — Favourites, shop ratings, and your own brewing ✅
+- **Favourites** are a star, in their own tables — not a flag derived from a high score.
+  You can love a tea you have never got round to rating, and score one 9 without wanting
+  it on a shortlist. Idempotent: starring twice is not a 409.
+- **Shop ratings** mirror tea reviews exactly — one per person per shop, PUT, average
+  and your own score reported separately. A second table rather than a polymorphic
+  `review(subject_type, subject_id)`, because a polymorphic key cannot be a real foreign
+  key and that is how orphaned rows happen.
+- **Brewing notes** are your figures for a tea, beside the catalog's rather than instead
+  of them — the packet's suggestion and the one you arrived at after it came out bitter
+  are different facts. Per field: leave the dose blank and the catalog's dose still shows.
+- **A tin can name its shop** when added by hand, not only through the buy flow.
+- `make people e=you@example.com` seeds six friends with profiles, opinions and
+  favourites. Its own module, never run by the catalog seed: creating accounts with a
+  known password anywhere but a laptop is a security bug, not a convenience.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

@@ -227,6 +227,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/teas/{slug}/favourite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Favourite Tea
+         * @description A star, not a score — you can love a tea you have never got round to rating.
+         *     Idempotent, so a double tap is not a 409.
+         */
+        put: operations["favourite_tea_api_v1_catalog_teas__slug__favourite_put"];
+        post?: never;
+        /** Unfavourite Tea */
+        delete: operations["unfavourite_tea_api_v1_catalog_teas__slug__favourite_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/teas/{slug}/brewing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Brewing
+         * @description How *you* brew it, as opposed to what the packet says.
+         *
+         *     An entirely blank note is a row that says nothing, so it deletes instead — which is
+         *     also what the CHECK constraint would otherwise refuse.
+         */
+        put: operations["set_brewing_api_v1_catalog_teas__slug__brewing_put"];
+        post?: never;
+        /**
+         * Clear Brewing
+         * @description Removing yours falls back to the catalog's figures, which never went anywhere.
+         */
+        delete: operations["clear_brewing_api_v1_catalog_teas__slug__brewing_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/teas": {
         parameters: {
             query?: never;
@@ -958,6 +1007,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/shops/{slug}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Shop Reviews
+         * @description Public: you can read what people think of a shop before making an account.
+         */
+        get: operations["list_shop_reviews_api_v1_shops__slug__reviews_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shops/{slug}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Write Shop Review
+         * @description PUT, like the tea review: one opinion per person per shop, so writing it is
+         *     idempotent and the client never has to choose between create and update.
+         */
+        put: operations["write_shop_review_api_v1_shops__slug__review_put"];
+        post?: never;
+        /** Delete Shop Review */
+        delete: operations["delete_shop_review_api_v1_shops__slug__review_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shops/{slug}/favourite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Favourite Shop
+         * @description Idempotent: starring twice is the same as starring once. A double tap on a phone
+         *     should not be a 409.
+         */
+        put: operations["favourite_shop_api_v1_shops__slug__favourite_put"];
+        post?: never;
+        /** Unfavourite Shop */
+        delete: operations["unfavourite_shop_api_v1_shops__slug__favourite_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/home": {
         parameters: {
             query?: never;
@@ -1010,6 +1123,40 @@ export interface paths {
          * @description Public, like the reviews it shows. Signed out, friend_state is simply null.
          */
         get: operations["get_profile_api_v1_users__user_id__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/favourites/teas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Favourite Teas */
+        get: operations["my_favourite_teas_api_v1_favourites_teas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/favourites/shops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Favourite Shops */
+        get: operations["my_favourite_shops_api_v1_favourites_shops_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1082,6 +1229,37 @@ export interface components {
             country?: string | null;
             /** Website */
             website?: string | null;
+        };
+        /**
+         * BrewingNote
+         * @description Your own figures for a tea. Every field optional — somebody who only ever changes
+         *     the temperature should not have to restate the dose to say so.
+         */
+        BrewingNote: {
+            /** Brew Temp C */
+            brew_temp_c: number | null;
+            /** Brew Seconds */
+            brew_seconds: number | null;
+            /** Grams Per 100Ml */
+            grams_per_100ml: number | null;
+            /** Note */
+            note: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** BrewingNoteInput */
+        BrewingNoteInput: {
+            /** Brew Temp C */
+            brew_temp_c?: number | null;
+            /** Brew Seconds */
+            brew_seconds?: number | null;
+            /** Grams Per 100Ml */
+            grams_per_100ml?: number | null;
+            /** Note */
+            note?: string | null;
         };
         /**
          * BuyRequest
@@ -1594,6 +1772,19 @@ export interface components {
             /** Pages */
             pages: number;
         };
+        /** Page[ShopReview] */
+        Page_ShopReview_: {
+            /** Items */
+            items: components["schemas"]["ShopReview"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Pages */
+            pages: number;
+        };
         /** Page[ShopSummary] */
         Page_ShopSummary_: {
             /** Items */
@@ -1883,6 +2074,14 @@ export interface components {
             longitude: number | null;
             /** Distance Km */
             distance_km: number | null;
+            /** Average Score */
+            average_score: number | null;
+            /** Review Count */
+            review_count: number;
+            /** My Score */
+            my_score: number | null;
+            /** Is Favourite */
+            is_favourite: boolean;
             /** Description */
             description: string | null;
             /** Address */
@@ -1892,6 +2091,7 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            my_review?: components["schemas"]["ShopReview"] | null;
         };
         /** ShopRef */
         ShopRef: {
@@ -1904,6 +2104,36 @@ export interface components {
             slug: string;
             /** Name */
             name: string;
+        };
+        /** ShopReview */
+        ShopReview: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            author: components["schemas"]["ReviewAuthor"];
+            /** Score */
+            score: number;
+            /** Body */
+            body: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ShopReviewInput */
+        ShopReviewInput: {
+            /** Score */
+            score: number;
+            /** Body */
+            body?: string | null;
         };
         /** ShopSummary */
         ShopSummary: {
@@ -1934,6 +2164,14 @@ export interface components {
             longitude: number | null;
             /** Distance Km */
             distance_km: number | null;
+            /** Average Score */
+            average_score: number | null;
+            /** Review Count */
+            review_count: number;
+            /** My Score */
+            my_score: number | null;
+            /** Is Favourite */
+            is_favourite: boolean;
         };
         /** ShopUpdate */
         ShopUpdate: {
@@ -2035,6 +2273,8 @@ export interface components {
              * Format: uuid
              */
             tea_id: string;
+            /** Shop Id */
+            shop_id?: string | null;
             /** Quantity Grams */
             quantity_grams: number;
             /** Location */
@@ -2100,6 +2340,8 @@ export interface components {
          *     a patchable quantity would let the cached total drift from its events.
          */
         StockItemUpdate: {
+            /** Shop Id */
+            shop_id?: string | null;
             /** Location */
             location?: string | null;
             /** Opened At */
@@ -2199,6 +2441,8 @@ export interface components {
             average_score: number | null;
             /** Review Count */
             review_count: number;
+            /** Is Favourite */
+            is_favourite: boolean;
             /** My Score */
             my_score: number | null;
             /** Description */
@@ -2225,6 +2469,7 @@ export interface components {
             /** Average Aftertaste */
             average_aftertaste: number | null;
             my_review: components["schemas"]["Review"] | null;
+            my_brewing?: components["schemas"]["BrewingNote"] | null;
         };
         /** TeaIngredientIn */
         TeaIngredientIn: {
@@ -2300,6 +2545,8 @@ export interface components {
             average_score: number | null;
             /** Review Count */
             review_count: number;
+            /** Is Favourite */
+            is_favourite: boolean;
             /** My Score */
             my_score: number | null;
         };
@@ -2854,6 +3101,128 @@ export interface operations {
         };
     };
     delete_review_api_v1_catalog_teas__slug__review_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    favourite_tea_api_v1_catalog_teas__slug__favourite_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unfavourite_tea_api_v1_catalog_teas__slug__favourite_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_brewing_api_v1_catalog_teas__slug__brewing_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrewingNoteInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrewingNote"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_brewing_api_v1_catalog_teas__slug__brewing_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -4683,6 +5052,162 @@ export interface operations {
             };
         };
     };
+    list_shop_reviews_api_v1_shops__slug__reviews_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ShopReview_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    write_shop_review_api_v1_shops__slug__review_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShopReviewInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopReview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_shop_review_api_v1_shops__slug__review_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    favourite_shop_api_v1_shops__slug__favourite_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unfavourite_shop_api_v1_shops__slug__favourite_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     home_api_v1_home_get: {
         parameters: {
             query?: never;
@@ -4741,6 +5266,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_favourite_teas_api_v1_favourites_teas_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TeaSummary_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_favourite_shops_api_v1_favourites_shops_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ShopSummary_"];
                 };
             };
             /** @description Validation Error */

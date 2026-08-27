@@ -21,6 +21,7 @@ from app.schemas.catalog import (
     TeaUpdate,
 )
 from app.services.errors import IngredientInUse, NotFound
+from app.services.preference import favourite_tea_ids
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class TeaRatings:
     average_aroma: float | None = None
     average_flavour: float | None = None
     average_aftertaste: float | None = None
+    is_favourite: bool = False
 
 
 def _round(value: object) -> float | None:
@@ -80,6 +82,9 @@ def _with_ratings(query: Select, viewer_id: uuid.UUID | None):
         agg.c.avg_flavour,
         agg.c.avg_aftertaste,
         mine.score.label("my_score"),
+        # A boolean column rather than another outer join: one IN against a small
+        # subquery, and no chance of multiplying the tea rows.
+        Tea.id.in_(favourite_tea_ids(viewer_id)).label("is_favourite"),
     ).outerjoin(agg, agg.c.tea_id == Tea.id)
 
     if viewer_id is not None:
@@ -99,6 +104,7 @@ def _ratings_from_row(row: object) -> TeaRatings:
         average_aroma=_round(row.avg_aroma),
         average_flavour=_round(row.avg_flavour),
         average_aftertaste=_round(row.avg_aftertaste),
+        is_favourite=bool(row.is_favourite),
     )
 
 
@@ -271,6 +277,7 @@ async def list_teas(
     brand_slug: str | None = None,
     approved: bool | None = True,
     viewer_id: uuid.UUID | None = None,
+    favourites_only: bool = False,
     page: int = 1,
     size: int = 24,
 ) -> tuple[list[tuple[Tea, TeaRatings]], int]:
@@ -282,6 +289,8 @@ async def list_teas(
         query = query.where(Tea.name.ilike(f"%{q}%"))
     if tea_type:
         query = query.where(Tea.tea_type == tea_type)
+    if favourites_only:
+        query = query.where(Tea.id.in_(favourite_tea_ids(viewer_id)))
     if brand_slug:
         query = query.join(Tea.brand).where(Brand.slug == brand_slug)
     if ingredient_slug:

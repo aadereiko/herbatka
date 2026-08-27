@@ -38,6 +38,9 @@ downgrade: ## Roll back one migration
 admin: ## Promote a user to admin: make admin e=ada@example.com
 	cd api && uv run python -m app.cli promote-admin "$(e)"
 
+people: ## Dev only: create some friends for you. make people e=you@example.com
+	cd api && uv run python -m app.seed.people "$(e)"
+
 seed: ## Load starter ingredients and teas
 	cd api && uv run python -m app.seed
 
@@ -62,4 +65,4 @@ dev: db migrate ## Start the database, migrate, then run api + web together
 	( cd web && npm run dev ) & \
 	wait
 
-.PHONY: help db db-down db-reset adminer api web install migrate revision downgrade admin seed test-db-drop test lint dev
+.PHONY: help db db-down db-reset adminer api web install migrate revision downgrade admin people seed test-db-drop test lint dev

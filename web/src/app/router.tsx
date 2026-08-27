@@ -13,6 +13,7 @@ import { RegisterPage } from '../features/auth/RegisterPage'
 import { IngredientListPage } from '../features/catalog/IngredientListPage'
 import { TeaDetailPage } from '../features/catalog/TeaDetailPage'
 import { TeaListPage } from '../features/catalog/TeaListPage'
+import { FavouritesPage } from '../features/favourite/FavouritesPage'
 import { FeedPage } from '../features/feed/FeedPage'
 import { FriendsPage } from '../features/friend/FriendsPage'
 import { HomePage } from '../features/home/HomePage'
@@ -124,6 +125,18 @@ export function AppRoutes() {
         element={
           <RequireAuth>
             <MyReviewsPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* Your stars, both kinds. Signed-in only for the same reason `/reviews/mine` is:
+          every favourites endpoint answers relative to the caller, so there is no
+          signed-out version of this page to fall back to. */}
+      <Route
+        path="/favourites"
+        element={
+          <RequireAuth>
+            <FavouritesPage />
           </RequireAuth>
         }
       />

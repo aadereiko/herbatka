@@ -4,7 +4,7 @@ import { Avatar } from '../../components/ui/avatar'
 import { Badge, ErrorNote, Pagination, Skeleton } from '../../components/ui/page'
 import { describeApiError } from '../../lib/api'
 import { formatDay } from '../../lib/format'
-import type { Review, ReviewNotes, Subscore } from '../../lib/review'
+import type { AnyReview, ReviewNotes, Subscore } from '../../lib/review'
 import { SUBSCORES, SUBSCORE_LABELS } from '../../lib/review'
 import { formatScore } from './format'
 
@@ -47,10 +47,17 @@ export function ReviewDetails({ review }: { review: ReviewNotes }) {
   )
 }
 
-/** One review. `isMine` is not a permission — the list is public and the server sends
- *  everybody's — it is a label, so you can find your own words in the list you are
- *  reading and know why there is no second copy of them. */
-export function ReviewRow({ review, isMine = false }: { review: Review; isMine?: boolean }) {
+/**
+ * One review. `isMine` is not a permission — the list is public and the server sends
+ * everybody's — it is a label, so you can find your own words in the list you are reading
+ * and know why there is no second copy of them.
+ *
+ * Typed as `AnyReview` rather than `Review` since M8: a shop review is the same row minus
+ * the aroma line and the brew date, and both of those already render conditionally. A
+ * second component for shops would have been a copy of this one that somebody has to keep
+ * looking identical.
+ */
+export function ReviewRow({ review, isMine = false }: { review: AnyReview; isMine?: boolean }) {
   return (
     <li
       data-testid="review-row"
@@ -91,7 +98,7 @@ export function ReviewRow({ review, isMine = false }: { review: Review; isMine?:
 }
 
 /**
- * Everybody's reviews of one tea, newest first — the order is the server's, and
+ * Everybody's reviews of one thing, newest first — the order is the server's, and
  * re-sorting the page in the browser would only reorder the twenty rows it happened to
  * send rather than the list as a whole.
  */
@@ -106,7 +113,7 @@ export function ReviewList({
   error,
   myReviewId,
 }: {
-  reviews: Review[]
+  reviews: AnyReview[]
   total: number
   page: number
   pages: number

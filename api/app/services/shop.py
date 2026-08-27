@@ -2,17 +2,27 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import Float, Select, cast, func, select
+from sqlalchemy import Float, Select, and_, cast, func, select
+from sqlalchemy import false as sa_false
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from app.models.household import HouseholdMember, StockEvent, StockItem
+from app.models.preference import ShopReview
 from app.models.shop import Shop, ShopListing
 from app.models.user import User
-from app.schemas.shop import BuyRequest, ListingCreate, ListingUpdate, ShopCreate, ShopUpdate
+from app.schemas.shop import (
+    BuyRequest,
+    ListingCreate,
+    ListingUpdate,
+    ShopAggregates,
+    ShopCreate,
+    ShopUpdate,
+)
 from app.services import geocoding
 from app.services.catalog import _unique_slug
 from app.services.errors import AlreadyExists, NotAMember, NotFound
+from app.services.preference import favourite_shop_ids
 
 _LISTING_LOADS = (selectinload(ShopListing.tea), selectinload(ShopListing.shop))
 
@@ -49,6 +59,55 @@ def distance_km_expression(lat: float, lng: float):
     )
 
 
+def _rating_subquery():
+    """One grouped pass over shop_review, joined once — the same shape the tea catalog
+    uses, and for the same reason: a correlated AVG per row means one query per shop."""
+    return (
+        select(
+            ShopReview.shop_id.label("shop_id"),
+            func.avg(ShopReview.score).label("avg_score"),
+            func.count(ShopReview.id).label("review_count"),
+        )
+        .group_by(ShopReview.shop_id)
+        .subquery()
+    )
+
+
+def _with_extras(query: Select, viewer_id: uuid.UUID | None) -> Select:
+    """Attach listing count, ratings, the viewer's own score and their star."""
+    agg = _rating_subquery()
+    mine = aliased(ShopReview)
+
+    query = query.add_columns(
+        listing_count_subquery().label("listing_count"),
+        agg.c.avg_score,
+        agg.c.review_count,
+        mine.score.label("my_score"),
+        Shop.id.in_(favourite_shop_ids(viewer_id)).label("is_favourite"),
+    ).outerjoin(agg, agg.c.shop_id == Shop.id)
+
+    if viewer_id is not None:
+        query = query.outerjoin(mine, and_(mine.shop_id == Shop.id, mine.user_id == viewer_id))
+    else:
+        # Still selected, so the row shape does not depend on who is asking; an
+        # impossible join condition keeps it NULL.
+        query = query.outerjoin(mine, and_(mine.shop_id == Shop.id, sa_false()))
+    return query
+
+
+def _aggregates(row: object, distance_km: float | None = None) -> ShopAggregates:
+    return ShopAggregates(
+        listing_count=row.listing_count,  # type: ignore[attr-defined]
+        distance_km=distance_km,
+        average_score=(
+            round(float(row.avg_score), 1) if row.avg_score is not None else None  # type: ignore[attr-defined]
+        ),
+        review_count=row.review_count or 0,  # type: ignore[attr-defined]
+        my_score=row.my_score,  # type: ignore[attr-defined]
+        is_favourite=bool(row.is_favourite),  # type: ignore[attr-defined]
+    )
+
+
 def listing_count_subquery():
     """How many teas a shop carries.
 
@@ -66,15 +125,13 @@ def listing_count_subquery():
 
 
 async def _paginate_shops(
-    db: AsyncSession, query: Select, page: int, size: int
-) -> tuple[list[tuple[Shop, int]], int]:
+    db: AsyncSession, query: Select, viewer_id: uuid.UUID | None, page: int, size: int
+) -> tuple[list[tuple[Shop, ShopAggregates]], int]:
+    # Counted before the extras are attached: they change the shape of a row, never how
+    # many shops match.
     total = await db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
-    rows = await db.execute(
-        query.add_columns(listing_count_subquery().label("listing_count"))
-        .offset((page - 1) * size)
-        .limit(size)
-    )
-    return [(row[0], row.listing_count) for row in rows.unique().all()], total
+    rows = await db.execute(_with_extras(query, viewer_id).offset((page - 1) * size).limit(size))
+    return [(row[0], _aggregates(row)) for row in rows.unique().all()], total
 
 
 async def list_shops(
@@ -86,9 +143,11 @@ async def list_shops(
     approved: bool | None = True,
     near: tuple[float, float] | None = None,
     radius_km: float | None = None,
+    viewer_id: uuid.UUID | None = None,
+    favourites_only: bool = False,
     page: int = 1,
     size: int = 24,
-) -> tuple[list[tuple[Shop, int, float | None]], int]:
+) -> tuple[list[tuple[Shop, ShopAggregates]], int]:
     query = select(Shop)
     if approved is not None:
         query = query.where(Shop.is_approved.is_(approved))
@@ -98,11 +157,12 @@ async def list_shops(
         query = query.where(Shop.city.ilike(city))
     if country:
         query = query.where(Shop.country.ilike(country))
+    if favourites_only:
+        query = query.where(Shop.id.in_(favourite_shop_ids(viewer_id)))
 
     if near is None:
         query = query.order_by(Shop.name)
-        rows, total = await _paginate_shops(db, query, page, size)
-        return [(shop, count, None) for shop, count in rows], total
+        return await _paginate_shops(db, query, viewer_id, page, size)
 
     # A shop with no pin has no distance, so it cannot take part in a nearest-first
     # ordering at all. Excluded rather than sorted last: "nearest shops" that includes
@@ -114,41 +174,44 @@ async def list_shops(
 
     total = await db.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = await db.execute(
-        query.add_columns(listing_count_subquery().label("listing_count"), distance)
+        _with_extras(query, viewer_id)
+        .add_columns(distance)
         .order_by(distance)
         .offset((page - 1) * size)
         .limit(size)
     )
     return [
-        (row[0], row.listing_count, round(float(row.distance_km), 2)) for row in rows.unique().all()
+        (row[0], _aggregates(row, round(float(row.distance_km), 2))) for row in rows.unique().all()
     ], total
 
 
 async def get_shop_by_slug(
-    db: AsyncSession, slug: str, *, include_unapproved: bool = False
-) -> tuple[Shop, int]:
+    db: AsyncSession,
+    slug: str,
+    *,
+    include_unapproved: bool = False,
+    viewer_id: uuid.UUID | None = None,
+) -> tuple[Shop, ShopAggregates]:
     query = select(Shop).where(Shop.slug == slug)
     if not include_unapproved:
         query = query.where(Shop.is_approved.is_(True))
-    row = (
-        await db.execute(query.add_columns(listing_count_subquery().label("listing_count")))
-    ).first()
+    row = (await db.execute(_with_extras(query, viewer_id))).unique().first()
     if row is None:
         raise NotFound("shop")
-    return row[0], row.listing_count
+    return row[0], _aggregates(row)
 
 
-async def get_shop(db: AsyncSession, shop_id: uuid.UUID) -> tuple[Shop, int]:
+async def get_shop(
+    db: AsyncSession, shop_id: uuid.UUID, *, viewer_id: uuid.UUID | None = None
+) -> tuple[Shop, ShopAggregates]:
     row = (
-        await db.execute(
-            select(Shop)
-            .where(Shop.id == shop_id)
-            .add_columns(listing_count_subquery().label("listing_count"))
-        )
-    ).first()
+        (await db.execute(_with_extras(select(Shop).where(Shop.id == shop_id), viewer_id)))
+        .unique()
+        .first()
+    )
     if row is None:
         raise NotFound("shop")
-    return row[0], row.listing_count
+    return row[0], _aggregates(row)
 
 
 async def create_shop(
@@ -216,8 +279,13 @@ async def list_listings(
 
 
 async def listings_for_tea(
-    db: AsyncSession, tea_id: uuid.UUID, *, page: int = 1, size: int = 24
-) -> tuple[list[tuple[ShopListing, int]], int]:
+    db: AsyncSession,
+    tea_id: uuid.UUID,
+    *,
+    viewer_id: uuid.UUID | None = None,
+    page: int = 1,
+    size: int = 24,
+) -> tuple[list[tuple[ShopListing, ShopAggregates]], int]:
     """Where to buy a given tea. Only approved shops — an unapproved one is not yet part
     of the shared catalog, and pointing people at it would sidestep the review."""
     base = (
@@ -227,13 +295,12 @@ async def listings_for_tea(
     )
     total = await db.scalar(select(func.count()).select_from(base.order_by(None).subquery())) or 0
     rows = await db.execute(
-        base.options(*_LISTING_LOADS)
-        .add_columns(listing_count_subquery().label("listing_count"))
+        _with_extras(base.options(*_LISTING_LOADS), viewer_id)
         .order_by(ShopListing.is_available.desc(), Shop.name)
         .offset((page - 1) * size)
         .limit(size)
     )
-    return [(row[0], row.listing_count) for row in rows.unique().all()], total
+    return [(row[0], _aggregates(row)) for row in rows.unique().all()], total
 
 
 async def get_listing(db: AsyncSession, shop: Shop, listing_id: uuid.UUID) -> ShopListing:

@@ -3,9 +3,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile, status
 
-from app.api.deps import CurrentUser, DbSession, PageParams
+from app.api.deps import CurrentUser, DbSession, OptionalUser, PageParams
 from app.schemas.common import Page
 from app.schemas.household import StockItemDetail, stock_item_detail
+from app.schemas.preference import ShopReview as ShopReviewOut
+from app.schemas.preference import ShopReviewInput, shop_review
 from app.schemas.shop import (
     BuyRequest,
     Listing,
@@ -19,6 +21,7 @@ from app.schemas.shop import (
     shop_detail,
     shop_summary,
 )
+from app.services import preference as preference_service
 from app.services import shop as shop_service
 from app.services import stock as stock_service
 from app.services.errors import NotAMember, NotFound
@@ -35,6 +38,7 @@ def _no_shop() -> HTTPException:
 async def list_shops(
     db: DbSession,
     paging: PageParams,
+    viewer: OptionalUser,
     q: Annotated[str | None, Query(max_length=120)] = None,
     city: Annotated[str | None, Query(max_length=120)] = None,
     country: Annotated[str | None, Query(max_length=60)] = None,
@@ -61,19 +65,24 @@ async def list_shops(
         country=country,
         near=(near_lat, near_lng) if near_lat is not None and near_lng is not None else None,
         radius_km=radius_km,
+        viewer_id=viewer.id if viewer else None,
         page=paging.page,
         size=paging.size,
     )
-    return Page.build([shop_summary(s, n, d) for s, n, d in rows], total, paging.page, paging.size)
+    return Page.build([shop_summary(s, a) for s, a in rows], total, paging.page, paging.size)
 
 
 @router.get("/shops/{slug}", response_model=ShopDetail)
-async def get_shop(slug: str, db: DbSession) -> ShopDetail:
+async def get_shop(slug: str, db: DbSession, viewer: OptionalUser) -> ShopDetail:
     try:
-        shop, count = await shop_service.get_shop_by_slug(db, slug)
+        shop, agg = await shop_service.get_shop_by_slug(
+            db, slug, viewer_id=viewer.id if viewer else None
+        )
     except NotFound as exc:
         raise _no_shop() from exc
-    return shop_detail(shop, count)
+
+    mine = await preference_service.get_my_shop_review(db, shop.id, viewer.id) if viewer else None
+    return shop_detail(shop, agg, shop_review(mine) if mine else None)
 
 
 @router.get("/shops/{slug}/listings", response_model=Page[Listing])
@@ -158,3 +167,66 @@ async def upload_image(file: UploadFile, _: CurrentUser) -> UploadedImage:
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="That file is not a JPEG, PNG or WebP image",
         ) from exc
+
+
+# ------------------------------------------------------------------- shop reviews
+
+
+@router.get("/shops/{slug}/reviews", response_model=Page[ShopReviewOut])
+async def list_shop_reviews(slug: str, db: DbSession, paging: PageParams) -> Page[ShopReviewOut]:
+    """Public: you can read what people think of a shop before making an account."""
+    try:
+        shop, _ = await shop_service.get_shop_by_slug(db, slug)
+    except NotFound as exc:
+        raise _no_shop() from exc
+    reviews, total = await preference_service.list_shop_reviews(
+        db, shop.id, page=paging.page, size=paging.size
+    )
+    return Page.build([shop_review(r) for r in reviews], total, paging.page, paging.size)
+
+
+@router.put("/shops/{slug}/review", response_model=ShopReviewOut)
+async def write_shop_review(
+    slug: str, payload: ShopReviewInput, user: CurrentUser, db: DbSession
+) -> ShopReviewOut:
+    """PUT, like the tea review: one opinion per person per shop, so writing it is
+    idempotent and the client never has to choose between create and update."""
+    try:
+        shop, _ = await shop_service.get_shop_by_slug(db, slug)
+    except NotFound as exc:
+        raise _no_shop() from exc
+    return shop_review(await preference_service.upsert_shop_review(db, shop.id, payload, user))
+
+
+@router.delete("/shops/{slug}/review", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_shop_review(slug: str, user: CurrentUser, db: DbSession) -> None:
+    try:
+        shop, _ = await shop_service.get_shop_by_slug(db, slug)
+        await preference_service.delete_shop_review(db, shop.id, user.id)
+    except NotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="You have not rated that shop"
+        ) from exc
+
+
+# --------------------------------------------------------------------- favourites
+
+
+@router.put("/shops/{slug}/favourite", status_code=status.HTTP_204_NO_CONTENT)
+async def favourite_shop(slug: str, user: CurrentUser, db: DbSession) -> None:
+    """Idempotent: starring twice is the same as starring once. A double tap on a phone
+    should not be a 409."""
+    try:
+        shop, _ = await shop_service.get_shop_by_slug(db, slug)
+    except NotFound as exc:
+        raise _no_shop() from exc
+    await preference_service.set_favourite_shop(db, user.id, shop.id, on=True)
+
+
+@router.delete("/shops/{slug}/favourite", status_code=status.HTTP_204_NO_CONTENT)
+async def unfavourite_shop(slug: str, user: CurrentUser, db: DbSession) -> None:
+    try:
+        shop, _ = await shop_service.get_shop_by_slug(db, slug)
+    except NotFound as exc:
+        raise _no_shop() from exc
+    await preference_service.set_favourite_shop(db, user.id, shop.id, on=False)

@@ -45,6 +45,7 @@ const jasminePearls: TeaSummary = {
   average_score: 8.2,
   review_count: 14,
   my_score: null,
+  is_favourite: false,
 }
 
 const jasminePearlsDetail: TeaDetail = {
@@ -60,6 +61,7 @@ const jasminePearlsDetail: TeaDetail = {
   average_aroma: 8.5,
   average_flavour: 8,
   average_aftertaste: null,
+  my_brewing: null,
 }
 
 /** Somebody else's review, so the public list is never empty by accident. */
