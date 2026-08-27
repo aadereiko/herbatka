@@ -1653,6 +1653,14 @@ export interface components {
             description: string | null;
             /** Image Url */
             image_url: string | null;
+            /** Image Attribution */
+            image_attribution: string | null;
+            /** Image License */
+            image_license: string | null;
+            /** Image License Url */
+            image_license_url: string | null;
+            /** Image Source Url */
+            image_source_url: string | null;
         };
         /** IngredientRatingInput */
         IngredientRatingInput: {
@@ -1691,6 +1699,14 @@ export interface components {
             description: string | null;
             /** Image Url */
             image_url: string | null;
+            /** Image Attribution */
+            image_attribution: string | null;
+            /** Image License */
+            image_license: string | null;
+            /** Image License Url */
+            image_license_url: string | null;
+            /** Image Source Url */
+            image_source_url: string | null;
             /** My Score */
             my_score: number | null;
             /** Average Score */

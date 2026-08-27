@@ -165,6 +165,22 @@ async def admin_headers(client: AsyncClient, db: AsyncSession) -> dict[str, str]
 
 
 @pytest.fixture
+def media_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Point the image store at a throwaway directory for the duration of one test.
+
+    The seed writes thirty-nine real files through `services.images.store()`, and the
+    default media root is `api/media/` — a developer's actual upload directory, which the
+    suite has no business dropping files into on every run. `store()` reads the path off
+    the cached settings object at call time, so redirecting the attribute is enough and no
+    production code needs a test-only parameter.
+    """
+    from app.services import images
+
+    monkeypatch.setattr(images.settings, "media_root", str(tmp_path))
+    return tmp_path
+
+
+@pytest.fixture
 async def catalog_fixtures(db: AsyncSession) -> dict[str, object]:
     """A tiny hand-built catalog. Deliberately not the seed data.
 

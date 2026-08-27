@@ -232,6 +232,48 @@ class TestAdminIngredients:
         )
         assert cleared.json()["image_url"] is None
 
+    async def test_replacing_a_seeded_photo_takes_its_credit_down_with_it(
+        self, client: AsyncClient, admin_headers: dict[str, str], db: AsyncSession
+    ) -> None:
+        """A credit belongs to *a* photograph, and does not follow the next one in.
+
+        Left behind, "Photo by Jacek Halicki · CC BY-SA 4.0" would sit under an admin's own
+        picture of clove — not a missing attribution but a false one, naming somebody who
+        has never seen the file. The rename above proves the same thing does not happen
+        when the picture is not mentioned: an edit to the name must leave the credit alone.
+        """
+        seeded = Ingredient(
+            slug="clove",
+            name="Clove",
+            category="spice",
+            is_caffeinated=False,
+            image_url="/media/seeded.jpg",
+            image_attribution="Jacek Halicki",
+            image_license="CC BY-SA 4.0",
+            image_license_url="https://creativecommons.org/licenses/by-sa/4.0",
+            image_source_url="https://commons.wikimedia.org/wiki/File:2023_Go%C5%BAdziki.jpg",
+        )
+        db.add(seeded)
+        await db.flush()
+
+        renamed = await client.patch(
+            f"{ADMIN}/ingredients/{seeded.id}", headers=admin_headers, json={"name": "Cloves"}
+        )
+        assert renamed.json()["image_attribution"] == "Jacek Halicki"
+
+        replaced = await client.patch(
+            f"{ADMIN}/ingredients/{seeded.id}",
+            headers=admin_headers,
+            json={"image_url": "/media/mine.jpg"},
+        )
+
+        body = replaced.json()
+        assert body["image_url"] == "/media/mine.jpg"
+        assert body["image_attribution"] is None
+        assert body["image_license"] is None
+        assert body["image_license_url"] is None
+        assert body["image_source_url"] is None
+
     async def test_refuses_to_delete_an_ingredient_in_use(
         self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
     ) -> None:

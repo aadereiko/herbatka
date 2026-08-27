@@ -234,6 +234,23 @@ async def update_ingredient(
         )
     for key, value in fields.items():
         setattr(ingredient, key, value)
+
+    # A new picture is a new picture's licence, and the old one's credit does not follow it
+    # across. Left in place it would print a stranger's name and a CC BY-SA badge under an
+    # admin's own photograph — not a missing credit but a false one, which is the failure
+    # actually worth avoiding. Nothing here can *set* a credit either: the only pictures we
+    # know the provenance of are the seeded ones, and an attribution typed into an admin
+    # form is a claim nobody has checked.
+    #
+    # Keyed on the field being *mentioned*, not on it changing, because `image_url` is
+    # explicitly nullable — clearing the picture must clear the credit too, and that is the
+    # one case where the new value equals nothing at all.
+    if "image_url" in fields:
+        ingredient.image_attribution = None
+        ingredient.image_license = None
+        ingredient.image_license_url = None
+        ingredient.image_source_url = None
+
     await db.flush()
     return ingredient
 

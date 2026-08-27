@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6i done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6j done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -507,6 +507,25 @@ and appear in the nav, friend rows, review authors, feed actors and household me
 - Accepting does **not** re-check friendship: the offer came from a household, not a
   person, so unfriending afterwards should not 404 a button already on screen. The owner
   revokes if they change their mind.
+
+### M6j — Real photographs for every ingredient ✅
+- All 39 seeded ingredients carry a real Wikimedia Commons photograph, 600×600, 3.3 MB in
+  total, tracked in `api/app/seed/images/` — **not** `api/media/`, which is gitignored
+  upload space where a fresh clone would lose them. The seed copies them in through the
+  existing `store()`, so a clone plus `make seed` reproduces the lot.
+- **Licences are a constraint, not a nicety.** CC0, CC BY and CC BY-SA only; nothing
+  NC, ND or unknown got in. Four columns rather than a display string, because the card
+  renders two different links — photographer → the Commons file page, licence → the deed
+  — and splitting a pre-formatted credit back into two hrefs is where credits rot.
+- Replacing a seeded photo **clears all four credit fields**, keyed on `image_url` being
+  mentioned rather than changed. Left in place, a stranger's name would sit under an
+  admin's own picture: not a missing credit but a false one. Backed by a named CHECK,
+  `ck_ingredient_credit_needs_a_picture`.
+- The category drawings stay for anything added later, and for any future ingredient with
+  no acceptable photo.
+- Three are honest rather than literal: honeybush and lemongrass are the living plant (no
+  usable photo of the dried material exists), and bergamot is the fruit in cross-section,
+  because nobody photographs the oil.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

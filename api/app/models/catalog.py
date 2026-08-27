@@ -77,12 +77,51 @@ class Ingredient(UUIDPrimaryKey, Timestamps, Base):
     )
     description: Mapped[str | None] = mapped_column(Text)
     # Same String(500) as Tea, Shop and Household: an uploaded path from POST /uploads/image,
-    # never a blob. Nullable and expected to stay null for most rows — there is no stock
-    # photography to seed a vocabulary with, so the UI draws a per-category illustration
-    # rather than treating "no picture" as a broken card.
+    # never a blob. Still nullable, and still expected to be null for anything the seed has
+    # never heard of — the UI keeps drawing a per-category illustration for those rather
+    # than treating "no picture" as a broken card.
     image_url: Mapped[str | None] = mapped_column(String(500))
 
+    # ------------------------------------------------------------------ picture credit
+    #
+    # Most seeded pictures are Wikimedia Commons photographs under CC BY or CC BY-SA, and
+    # those licences require attribution *to the reader* — a comment in a data file does
+    # not discharge the obligation, a line on the card does. So the credit is data, and it
+    # travels with the picture rather than living beside it in a table somebody has to
+    # remember to look at.
+    #
+    # Four columns rather than one pre-formatted string, because the card renders two
+    # different links out of them — the photographer's name points at the Commons file
+    # page, the licence name points at the deed — and reconstituting two hrefs by parsing
+    # a display string back apart is how attribution quietly goes wrong. `image_license`
+    # is not derived from a lookup on the short name either: Commons hands us the exact
+    # deed URL, and guessing it would be wrong for the PD and "no restrictions" marks that
+    # are not Creative Commons at all.
+    #
+    # All four are null for an admin's own upload, and that asymmetry is the point: our
+    # photograph of our clove needs no permission from anybody, so the card shows no
+    # credit. See `update_ingredient`, which clears these whenever the picture changes —
+    # a stale credit is worse than none, because it is a false claim about a stranger.
+    image_attribution: Mapped[str | None] = mapped_column(String(200))
+    image_license: Mapped[str | None] = mapped_column(String(60))
+    image_license_url: Mapped[str | None] = mapped_column(String(300))
+    #: The Commons *file page*, not the image bytes — that is where the licence, the full
+    #: author record and the edit history actually live.
+    image_source_url: Mapped[str | None] = mapped_column(String(500))
+
     tea_links: Mapped[list["TeaIngredient"]] = relationship(back_populates="ingredient")
+
+    __table_args__ = (
+        # A credit for a picture that is not there credits nobody for nothing. This is the
+        # invariant that makes "clear the credit whenever the picture changes" enforceable
+        # rather than merely intended: forget the clearing and the very next write fails
+        # loudly, instead of leaving a photographer's name attached to somebody else's
+        # photograph for as long as the row lives.
+        CheckConstraint(
+            "image_attribution IS NULL OR image_url IS NOT NULL",
+            name="ck_ingredient_credit_needs_a_picture",
+        ),
+    )
 
 
 class Tea(UUIDPrimaryKey, Timestamps, Base):

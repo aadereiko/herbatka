@@ -22,9 +22,19 @@ class IngredientOut(BaseModel):
     category: IngredientCategory
     is_caffeinated: bool
     description: str | None
-    #: Almost always null. The client draws a category illustration in its place rather
-    #: than a broken-image box, so this being absent is a normal state, not a gap.
+    #: A seeded Commons photograph for most of the starter vocabulary, an admin upload for
+    #: the rest, and null for anything neither has reached. The client draws a category
+    #: illustration in place of a null, so absent is a normal state, not a gap.
     image_url: str | None
+
+    # The credit, carried on every read of the picture rather than fetched separately —
+    # a CC BY licence is only satisfied while the attribution is actually *shown*, and an
+    # extra round trip is an extra chance for it not to be. Null together for an admin's
+    # own upload, which needs nobody's permission; see `Ingredient` for why that is right.
+    image_attribution: str | None
+    image_license: str | None
+    image_license_url: str | None
+    image_source_url: str | None
 
 
 class IngredientTaste(IngredientOut):

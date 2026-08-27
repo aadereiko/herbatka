@@ -4,13 +4,13 @@ Re-runnable by design: everything is matched on slug and skipped if present, so 
 can be run against a database that already has data — including in a deploy step —
 without creating duplicates or clobbering edits an admin has made.
 
-One deliberate exception to "skipped if present", added when the thirty-nine seeded
-ingredients turned out to have shipped with no descriptions at all: an ingredient that
-already exists but has **no** description gets one. A seed that only helps a fresh
-install helps nobody with a database — the rows are already there, and skipping them
-means the text never arrives without a `db-reset`. It is still not an overwrite: a
-description somebody has typed is left exactly as it is, which is the property that
-makes re-running this safe.
+Two deliberate exceptions to "skipped if present", both of the same shape. An ingredient
+that already exists but has **no** description gets one, and one that has **no** picture
+gets the seeded photograph. A seed that only helps a fresh install helps nobody with a
+database — the rows are already there, and skipping them means the text and the pictures
+never arrive without a `db-reset`. Neither is an overwrite: a description somebody has
+typed and a photograph an admin has uploaded are both left exactly as they are, which is
+the property that makes re-running this safe.
 """
 
 import asyncio
@@ -24,6 +24,42 @@ from app.db.session import SessionLocal
 from app.models.catalog import Brand, Ingredient, Tea, TeaIngredient
 from app.models.shop import Shop, ShopListing
 from app.seed.data import BRANDS, BREWING, INGREDIENTS, LISTINGS, SHOPS, TEAS
+from app.seed.photos import PHOTOS
+from app.services.images import store
+
+
+def _attach_photos(ingredients: dict[str, Ingredient]) -> int:
+    """Copy each seeded photograph into the media root and credit it on its row.
+
+    Two rules, and both of them are about not lying:
+
+      - **Only where there is no picture.** An admin who has uploaded their own photograph
+        of clove has said something we have no business overwriting on the next deploy —
+        and their picture is *theirs*, so stamping a Commons photographer's name onto the
+        row would attribute it to somebody who has never seen it. `is None`, not
+        falsiness, for the same reason the description backfill uses it.
+      - **The credit is written with the picture, in one step.** The CHECK on `ingredient`
+        forbids a credit without a picture; writing them together is what keeps the pair
+        true, and the four fields are set unconditionally rather than only when non-null so
+        that a row can never end up half-credited.
+
+    Synchronous file I/O inside an async function on purpose: this is thirty-nine local
+    reads in a one-shot script, and `store()` is the same call the upload endpoint makes.
+    Reimplementing it as a copy would fork the "where do pictures live and what are they
+    named" decision into a second place.
+    """
+    written = 0
+    for slug, photo in PHOTOS.items():
+        ingredient = ingredients.get(slug)
+        if ingredient is None or ingredient.image_url is not None:
+            continue
+        ingredient.image_url = store(photo.path.read_bytes())
+        ingredient.image_attribution = photo.author
+        ingredient.image_license = photo.licence
+        ingredient.image_license_url = photo.licence_url
+        ingredient.image_source_url = photo.source_url
+        written += 1
+    return written
 
 
 async def seed_catalog(session: AsyncSession) -> dict[str, int]:
@@ -36,6 +72,7 @@ async def seed_catalog(session: AsyncSession) -> dict[str, int]:
     created = {
         "ingredients": 0,
         "descriptions": 0,
+        "photos": 0,
         "brands": 0,
         "teas": 0,
         "shops": 0,
@@ -64,6 +101,8 @@ async def seed_catalog(session: AsyncSession) -> dict[str, int]:
         session.add(ingredient)
         existing_ingredients[slug] = ingredient
         created["ingredients"] += 1
+
+    created["photos"] = _attach_photos(existing_ingredients)
 
     existing_brands = {b.slug: b for b in await session.scalars(select(Brand))}
     for name, country, website in BRANDS:
@@ -182,5 +221,6 @@ def main() -> None:
             f"Seeded {created['ingredients']} ingredients, {created['brands']} brands, "
             f"{created['teas']} teas, {created['shops']} shops, "
             f"{created['listings']} listings. "
-            f"Backfilled {created['descriptions']} ingredient descriptions."
+            f"Backfilled {created['descriptions']} ingredient descriptions "
+            f"and {created['photos']} ingredient photos."
         )

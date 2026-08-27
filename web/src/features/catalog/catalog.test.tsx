@@ -21,13 +21,35 @@ const jasmineFlower: IngredientTaste = {
   category: 'flower',
   is_caffeinated: false,
   description: 'Picked at night, layered with the leaf until it takes the scent.',
-  // Null, like every seeded ingredient: there are no photographs of the vocabulary, so
-  // the drawn fallback is the *normal* case and the fixtures say so. A test that wants a
-  // photo spreads one on.
+  // Null, so the drawn fallback is what this fixture renders. The seed now gives all
+  // thirty-nine starter ingredients a real photograph, but the *component* contract is
+  // still "a picture or a drawing" — anything added later, and anything an admin removes
+  // the picture from, comes back like this. A test that wants a photo spreads one on.
   image_url: null,
+  // Null together with the picture, and enforced that way by a CHECK on the table: a
+  // credit for a photograph that is not there credits nobody for nothing.
+  image_attribution: null,
+  image_license: null,
+  image_license_url: null,
+  image_source_url: null,
   my_score: 9,
   average_score: 8.5,
   rating_count: 2,
+}
+
+/**
+ * A seeded ingredient as it actually comes back now: a Wikimedia Commons photograph plus
+ * the four fields the licence obliges us to show. Spread over `jasmineFlower` rather than
+ * written out, so the credit assertions and the drawing assertions are demonstrably about
+ * the same card differing in one thing.
+ */
+const photographedJasmine: IngredientTaste = {
+  ...jasmineFlower,
+  image_url: '/media/abc123.jpg',
+  image_attribution: 'Zhuwq',
+  image_license: 'CC BY-SA 3.0',
+  image_license_url: 'http://creativecommons.org/licenses/by-sa/3.0/',
+  image_source_url: 'https://commons.wikimedia.org/wiki/File:Arabian-Jasmine.JPG',
 }
 
 /** Nobody has said anything about this one, and nobody has written it up either. Null
@@ -40,6 +62,10 @@ const greenLeaf: IngredientTaste = {
   is_caffeinated: true,
   description: null,
   image_url: null,
+  image_attribution: null,
+  image_license: null,
+  image_license_url: null,
+  image_source_url: null,
   my_score: null,
   average_score: null,
   rating_count: 0,
@@ -695,10 +721,10 @@ test('an ingredient with an uploaded picture shows the picture', async () => {
 /**
  * The placeholder decision, pinned.
  *
- * There is no photograph of clove to seed and there is not going to be one, so "no
- * picture" is the permanent state of nearly every row — which makes the fallback the
- * thing worth testing, not an afterthought. Two ingredients of two different categories
- * in one render, because a component that hard-coded a single drawing (the way the shared
+ * The thirty-nine seeded ingredients have real photographs now, but the drawing did not
+ * become dead code — it is what a fortieth ingredient gets, and what any row an admin
+ * clears the picture from falls back to. Two ingredients of two different categories in
+ * one render, because a component that hard-coded a single drawing (the way the shared
  * `EntityImage` leaf does) would pass a one-row version of this test perfectly.
  */
 test('an ingredient with no picture gets its own category’s drawing, not a broken image', async () => {
@@ -714,4 +740,64 @@ test('an ingredient with no picture gets its own category’s drawing, not a bro
   // No <img> at all: an <img> with no src is the broken-image icon we are avoiding.
   expect(screen.queryByTestId('ingredient-image-jasmine')).toBeNull()
   expect(flower.querySelector('svg')).not.toBeNull()
+})
+
+/* --------------------------------------------------------------- the photo credit */
+
+/**
+ * The obligation, asserted as a rendered thing.
+ *
+ * CC BY and CC BY-SA are satisfied only while the credit is *shown*. Storing
+ * `image_attribution` and never rendering it would pass every backend test in the suite
+ * and still be a licence breach, so the assertion has to be about the DOM — and about both
+ * hrefs, because the name and the licence point at different pages and swapping them (or
+ * dropping one) is the plausible mistake.
+ */
+test('a seeded photograph carries its photographer and its licence, each linked to its own page', async () => {
+  signedOutCatalog({
+    'GET /catalog/ingredients': () => json(pageOf([photographedJasmine])),
+  })
+  renderApp('/ingredients')
+
+  const credit = await screen.findByTestId('ingredient-credit-jasmine')
+  expect(credit).toHaveTextContent('Zhuwq')
+  expect(credit).toHaveTextContent('CC BY-SA 3.0')
+
+  // The name goes to the Commons file page, where the licence and the author record live.
+  expect(within(credit).getByRole('link', { name: 'Zhuwq' })).toHaveAttribute(
+    'href',
+    'https://commons.wikimedia.org/wiki/File:Arabian-Jasmine.JPG',
+  )
+  // The licence goes to the deed. CC asks for the notice to be linked, and a bare string
+  // is an assertion rather than a reference.
+  expect(within(credit).getByRole('link', { name: 'CC BY-SA 3.0' })).toHaveAttribute(
+    'href',
+    'http://creativecommons.org/licenses/by-sa/3.0/',
+  )
+})
+
+/**
+ * The other half, and the one that is easy to get wrong by rendering a label
+ * unconditionally: an admin's own upload has nobody to credit, so the card says nothing
+ * rather than "Photo:" followed by a gap. Same for a row with no picture at all.
+ */
+test('a picture with nobody to credit gets no credit line, and neither does a drawing', async () => {
+  signedOutCatalog({
+    'GET /catalog/ingredients': () =>
+      json(
+        pageOf([
+          // An admin's own photograph: a picture, and no attribution with it.
+          { ...jasmineFlower, image_url: '/media/an-admin-upload.jpg' },
+          // And the drawn fallback, which has no photograph to credit either.
+          greenLeaf,
+        ]),
+      ),
+  })
+  renderApp('/ingredients')
+
+  await screen.findByTestId('ingredient-image-jasmine')
+  expect(screen.queryByTestId('ingredient-credit-jasmine')).toBeNull()
+  expect(screen.queryByTestId('ingredient-credit-green-tea')).toBeNull()
+  // Nothing anywhere on the page, not merely nothing under those two test ids.
+  expect(screen.queryByText(/Photo/)).toBeNull()
 })

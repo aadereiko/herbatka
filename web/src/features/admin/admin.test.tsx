@@ -41,6 +41,12 @@ const jasmine: Ingredient = {
   is_caffeinated: false,
   description: null,
   image_url: null,
+  // No picture, so nobody to credit. The four travel together: an ingredient either has a
+  // seeded Commons photograph and all of them, or it has neither.
+  image_attribution: null,
+  image_license: null,
+  image_license_url: null,
+  image_source_url: null,
 }
 
 /** A `File` the upload field will accept. The rejection cases live in the shop suite,

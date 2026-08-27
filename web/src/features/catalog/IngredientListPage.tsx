@@ -23,6 +23,7 @@ import {
   readIngredientFilters,
   writeIngredientFilters,
 } from './filters'
+import { IngredientCredit } from './IngredientCredit'
 import { IngredientImage } from './IngredientImage'
 import { IngredientTasteControl } from './IngredientTasteControl'
 import { pluralise } from './format'
@@ -191,6 +192,14 @@ export function IngredientListPage() {
                   label="How much you like it"
                 />
               </div>
+
+              {/* Last line of the card, below the control rather than beside the picture.
+                  The slot is sixty-four pixels square — a caption under it would wrap to
+                  four lines — and the obligation is that the credit is on the page with
+                  the photograph, not that it is touching it. Nothing at all for an
+                  ingredient with no attribution, which is every admin upload and every
+                  drawn placeholder, so cards do not grow an empty row. */}
+              <IngredientCredit ingredient={ingredient} />
             </Panel>
           ))}
         </ul>
