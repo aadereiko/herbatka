@@ -8,14 +8,21 @@ convenience.
 
 import asyncio
 import sys
+import uuid
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
 from app.db.session import SessionLocal
-from app.models.catalog import Tea
+from app.models.catalog import Ingredient, Tea
 from app.models.friendship import Friendship
-from app.models.preference import FavouriteShop, FavouriteTea, ShopReview
+from app.models.preference import (
+    FavouriteShop,
+    FavouriteTea,
+    IngredientRating,
+    ShopReview,
+)
 from app.models.review import Review
 from app.models.shop import Shop
 from app.models.user import AuthIdentity, User
@@ -105,6 +112,35 @@ SHOP_OPINIONS: list[tuple[str, str, int, str | None]] = [
     ("piotr@example.com", "czajnik", 8, "Worth the trip from Gdańsk. Just about."),
 ]
 
+# (email, ingredient slug, score) — the tastes behind the tea scores above, so that a
+# blend's ingredient rows have something to say about why somebody rated it what they did.
+# Deliberately opinionated and deliberately contradictory: an average of 5.5 over two
+# people who said 2 and 9 is a more honest test of the UI than everyone agreeing.
+INGREDIENT_TASTES: list[tuple[str, str, int]] = [
+    ("ada@example.com", "green-tea-leaf", 10),
+    ("ada@example.com", "jasmine-flower", 10),
+    ("ada@example.com", "matcha", 8),
+    ("ada@example.com", "clove", 3),
+    ("tomek@example.com", "pu-erh-tea-leaf", 10),
+    ("tomek@example.com", "ginger", 9),
+    ("tomek@example.com", "clove", 6),
+    ("tomek@example.com", "hibiscus", 2),
+    ("ines@example.com", "oolong-tea-leaf", 10),
+    ("ines@example.com", "osmanthus", 9),
+    ("ines@example.com", "vanilla", 7),
+    ("jo@example.com", "white-tea-leaf", 9),
+    ("jo@example.com", "elderflower", 9),
+    ("jo@example.com", "liquorice-root", 2),
+    ("hana@example.com", "chamomile", 10),
+    ("hana@example.com", "peppermint", 9),
+    ("hana@example.com", "lavender", 8),
+    ("hana@example.com", "black-tea-leaf", 3),
+    ("piotr@example.com", "black-tea-leaf", 10),
+    ("piotr@example.com", "bergamot-oil", 4),
+    ("piotr@example.com", "hibiscus", 1),
+    ("piotr@example.com", "clove", 5),
+]
+
 FAVOURITE_TEAS = [
     ("ada@example.com", "jasmine-pearls"),
     ("ada@example.com", "sencha"),
@@ -121,13 +157,36 @@ FAVOURITE_SHOPS = [
 ]
 
 
-async def seed_people(befriend_email: str) -> dict[str, int]:
-    created = {"people": 0, "friendships": 0, "reviews": 0, "shop_reviews": 0, "favourites": 0}
+async def _find_you(session: AsyncSession, who: str) -> User:
+    """The account to befriend, named by email or by id.
+
+    Both, because both are what you actually have to hand. The email is what you typed
+    when you signed up; the id is what the address bar shows you while you are looking at
+    somebody's profile, which is exactly the moment you notice they have no friends.
+    """
+    try:
+        user_id = uuid.UUID(who)
+    except ValueError:
+        found = await session.scalar(select(User).where(User.email == who))
+    else:
+        found = await session.get(User, user_id)
+    if found is None:
+        raise SystemExit(f"No account matching {who!r} — sign up first.")
+    return found
+
+
+async def seed_people(befriend: str) -> dict[str, int]:
+    created = {
+        "people": 0,
+        "friendships": 0,
+        "reviews": 0,
+        "shop_reviews": 0,
+        "favourites": 0,
+        "tastes": 0,
+    }
 
     async with SessionLocal() as session:
-        you = await session.scalar(select(User).where(User.email == befriend_email))
-        if you is None:
-            raise SystemExit(f"No account with email {befriend_email!r} — sign up first.")
+        you = await _find_you(session, befriend)
 
         by_email: dict[str, User] = {}
         for email, name, pronouns, location, favourite, bio in PEOPLE:
@@ -201,6 +260,18 @@ async def seed_people(befriend_email: str) -> dict[str, int]:
             session.add(ShopReview(user_id=person.id, shop_id=shop.id, score=score, body=body))
             created["shop_reviews"] += 1
 
+        ingredients = {i.slug: i for i in await session.scalars(select(Ingredient))}
+        for email, slug, score in INGREDIENT_TASTES:
+            ingredient = ingredients.get(slug)
+            if ingredient is None:
+                continue
+            person = by_email[email]
+            if await session.get(IngredientRating, (person.id, ingredient.id)) is None:
+                session.add(
+                    IngredientRating(user_id=person.id, ingredient_id=ingredient.id, score=score)
+                )
+                created["tastes"] += 1
+
         for email, slug in FAVOURITE_TEAS:
             tea = teas.get(slug)
             if tea is None:
@@ -226,12 +297,12 @@ async def seed_people(befriend_email: str) -> dict[str, int]:
 
 def main() -> None:
     if len(sys.argv) != 2:
-        raise SystemExit("usage: python -m app.seed.people <your-email>")
+        raise SystemExit("usage: python -m app.seed.people <your-email-or-id>")
     created = asyncio.run(seed_people(sys.argv[1]))
     print(
         f"{created['people']} people, {created['friendships']} friendships, "
         f"{created['reviews']} tea reviews, {created['shop_reviews']} shop reviews, "
-        f"{created['favourites']} favourites."
+        f"{created['favourites']} favourites, {created['tastes']} ingredient tastes."
     )
 
 

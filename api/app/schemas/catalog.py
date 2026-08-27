@@ -24,6 +24,30 @@ class IngredientOut(BaseModel):
     description: str | None
 
 
+class IngredientTaste(IngredientOut):
+    """An ingredient plus what people think of it, and what *you* think of it.
+
+    A separate model from `IngredientOut` rather than three optional fields on it. The
+    admin endpoints that create and edit an ingredient return the plain one — nobody has
+    rated a thing that did not exist ten milliseconds ago — and the read endpoints return
+    this. Required fields, no defaults: if `attach_ingredient_ratings` is ever forgotten,
+    that is a 500 on the endpoint that forgot it, not a page quietly reporting that no
+    one has ever rated anything.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    #: Yours, or null — including when signed out. Distinct from a score of 1: "no
+    #: opinion on hibiscus" and "actively dislike hibiscus" are different facts.
+    my_score: int | None
+    average_score: float | None
+    rating_count: int
+
+
+class IngredientRatingInput(BaseModel):
+    score: int = Field(ge=1, le=10)
+
+
 class IngredientCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     category: IngredientCategory
@@ -70,7 +94,7 @@ class TeaIngredientIn(BaseModel):
 
 
 class TeaIngredientOut(BaseModel):
-    ingredient: IngredientOut
+    ingredient: IngredientTaste
     percentage: float | None
     is_primary: bool
 
@@ -195,7 +219,7 @@ def tea_detail(tea: Any, ratings: Any, my_review: Any = None, my_brewing: Any = 
         grams_per_100ml=float(tea.grams_per_100ml) if tea.grams_per_100ml is not None else None,
         ingredients=[
             TeaIngredientOut(
-                ingredient=IngredientOut.model_validate(link.ingredient),
+                ingredient=IngredientTaste.model_validate(link.ingredient),
                 percentage=float(link.percentage) if link.percentage is not None else None,
                 is_primary=link.is_primary,
             )

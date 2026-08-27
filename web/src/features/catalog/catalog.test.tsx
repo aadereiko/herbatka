@@ -6,28 +6,38 @@ import { afterEach, expect, test, vi } from 'vitest'
 
 import { AppRoutes } from '../../app/router'
 import type { Session, User } from '../../lib/api'
-import type { BrewingNote, Ingredient, Page, TeaDetail, TeaSummary } from '../../lib/catalog'
+import type { BrewingNote, IngredientTaste, Page, TeaDetail, TeaSummary } from '../../lib/catalog'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
 
 /* --------------------------------------------------------------------- fixtures */
 
-const jasmineFlower: Ingredient = {
+/** Rated by two people, one of them you — so the row on the tea page has something to
+ *  show in both halves of the control. */
+const jasmineFlower: IngredientTaste = {
   id: 'ing-1',
   slug: 'jasmine',
   name: 'Jasmine',
   category: 'flower',
   is_caffeinated: false,
   description: 'Picked at night, layered with the leaf until it takes the scent.',
+  my_score: 9,
+  average_score: 8.5,
+  rating_count: 2,
 }
 
-const greenLeaf: Ingredient = {
+/** Nobody has said anything about this one. Null rather than 0 throughout — see
+ *  `describeTaste`. */
+const greenLeaf: IngredientTaste = {
   id: 'ing-2',
   slug: 'green-tea',
   name: 'Green tea',
   category: 'leaf',
   is_caffeinated: true,
   description: null,
+  my_score: null,
+  average_score: null,
+  rating_count: 0,
 }
 
 const jasminePearls: TeaSummary = {
@@ -488,4 +498,130 @@ test('a signed-out reader gets the catalog’s figures and no way to overwrite t
   expect(screen.queryByTestId('brewing-form')).toBeNull()
   // Nothing to label when there is only one source, signed in or not.
   expect(screen.getByTestId('tea-brewing')).not.toHaveTextContent('the catalog’s')
+})
+
+/* ------------------------------------------------------ how much you like an ingredient */
+
+/** The reason the control lives on the tea page and not only on /ingredients: a blend
+ *  lists five things, and one of them being the clove you rated 2 is the explanation. */
+test('a tea page shows your score for each of its ingredients, and the crowd’s', async () => {
+  teaPage()
+  renderApp('/teas/jasmine-pearls')
+
+  const jasmine = await screen.findByTestId('ingredient-taste-jasmine')
+  expect(within(jasmine).getByLabelText('How much you like Jasmine')).toHaveValue('9')
+  expect(screen.getByTestId('ingredient-average-jasmine')).toHaveTextContent('8.5 from 2 people')
+
+  // Nobody has rated green tea, so there is an empty control and no average at all —
+  // "0.0" would read as universally hated rather than as never asked about.
+  expect(within(screen.getByTestId('ingredient-taste-green-tea')).getByLabelText(
+    'How much you like Green tea',
+  )).toHaveValue('')
+  expect(screen.queryByTestId('ingredient-average-green-tea')).toBeNull()
+})
+
+test('picking a score saves it and shows immediately, without waiting for the refetch', async () => {
+  let saved: string | null = null
+  // Held open on purpose: the assertion is about what the select shows while the PUT is
+  // still in flight, which is the whole reason the control keeps a draft.
+  let release = () => {}
+  const inFlight = new Promise<void>((resolve) => {
+    release = resolve
+  })
+
+  teaPage({
+    'PUT /catalog/ingredients/green-tea/rating': async ({ init }) => {
+      saved = init?.body as string
+      await inFlight
+      return json({ ...greenLeaf, my_score: 6, average_score: 6, rating_count: 1 })
+    },
+  })
+  renderApp('/teas/jasmine-pearls')
+
+  const select = await screen.findByLabelText('How much you like Green tea')
+  fireEvent.change(select, { target: { value: '6' } })
+
+  expect(select).toHaveValue('6')
+  await waitFor(() => expect(saved).toBe(JSON.stringify({ score: 6 })))
+  release()
+})
+
+test('clearing your score deletes the rating rather than storing a zero', async () => {
+  let deleted = 0
+  teaPage({
+    'DELETE /catalog/ingredients/jasmine/rating': () => {
+      deleted += 1
+      return new Response(null, { status: 204 })
+    },
+  })
+  renderApp('/teas/jasmine-pearls')
+
+  const select = await screen.findByLabelText('How much you like Jasmine')
+  fireEvent.change(select, { target: { value: '' } })
+
+  await waitFor(() => expect(deleted).toBe(1))
+  // Not a PUT with 0: "no opinion on jasmine" and "I dislike jasmine" are different facts.
+  expect(countOf('PUT', '/catalog/ingredients/jasmine/rating')).toBe(0)
+})
+
+test('clearing a score you never gave asks the server nothing', async () => {
+  teaPage()
+  renderApp('/teas/jasmine-pearls')
+
+  // Green tea starts unrated. A DELETE here would 404 and paint a red error over an idle
+  // change of mind.
+  const select = await screen.findByLabelText('How much you like Green tea')
+  fireEvent.change(select, { target: { value: '' } })
+
+  await waitFor(() => expect(select).toHaveValue(''))
+  expect(countOf('DELETE', '/catalog/ingredients/green-tea/rating')).toBe(0)
+})
+
+test('a failed save puts the row back to what it said before', async () => {
+  teaPage({
+    'PUT /catalog/ingredients/jasmine/rating': () => json({ detail: 'Nope' }, 500),
+  })
+  renderApp('/teas/jasmine-pearls')
+
+  const select = await screen.findByLabelText('How much you like Jasmine')
+  fireEvent.change(select, { target: { value: '3' } })
+
+  expect(await screen.findByTestId('ingredient-taste-error-jasmine')).toBeInTheDocument()
+  // Back to 9. Leaving 3 on screen would claim a save that never happened.
+  expect(select).toHaveValue('9')
+})
+
+test('signed out there is no control, only what other people think', async () => {
+  signedOutCatalog()
+  renderApp('/ingredients')
+
+  await screen.findByTestId('ingredient-list')
+  expect(screen.getByTestId('ingredient-average-jasmine')).toHaveTextContent('Liked 8.5 from 2 people')
+  // An input that bounces you to a login the moment you touch it is worse than one that
+  // was never offered.
+  expect(screen.queryByLabelText('How much you like Jasmine')).toBeNull()
+})
+
+/** The same cold-load race that bit the tea pages: /ingredients is public, so it fetches
+ *  before the silent refresh answers. Without the viewer in the query key, the anonymous
+ *  reply — "you have rated nothing" — is what gets cached and shown to a signed-in user. */
+test('the ingredient list waits for the session before caching who you are', async () => {
+  let release: (value: Response) => void = () => {}
+  const refresh = new Promise<Response>((resolve) => {
+    release = resolve
+  })
+
+  mockFetch({
+    'POST /auth/refresh': () => refresh,
+    'GET /friends/requests': () => json([]),
+    'GET /catalog/ingredients': () => json(pageOf([greenLeaf, jasmineFlower])),
+  })
+  renderApp('/ingredients')
+
+  // While the refresh is outstanding, nothing has been asked of the catalog.
+  await waitFor(() => expect(countOf('POST', '/auth/refresh')).toBe(1))
+  expect(countOf('GET', '/catalog/ingredients')).toBe(0)
+
+  release(json(session))
+  expect(await screen.findByLabelText('How much you like Jasmine')).toHaveValue('9')
 })

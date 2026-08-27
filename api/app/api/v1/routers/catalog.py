@@ -6,7 +6,8 @@ from app.api.deps import CurrentUser, DbSession, OptionalUser, PageParams
 from app.schemas.catalog import (
     BrandOut,
     IngredientCategory,
-    IngredientOut,
+    IngredientRatingInput,
+    IngredientTaste,
     TeaCreate,
     TeaDetail,
     TeaSummary,
@@ -65,6 +66,7 @@ async def get_tea(slug: str, db: DbSession, viewer: OptionalUser) -> TeaDetail:
 
     mine = await review_service.get_mine(db, tea.id, viewer.id) if viewer else None
     brewing = await preference_service.get_brewing(db, viewer.id, tea.id) if viewer else None
+    await preference_service.attach_tea_ingredient_ratings(db, tea, viewer)
     return tea_detail(
         tea,
         ratings,
@@ -82,20 +84,64 @@ async def submit_tea(payload: TeaCreate, user: CurrentUser, db: DbSession) -> Te
         )
     except NotFound as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await preference_service.attach_tea_ingredient_ratings(db, tea, user)
     return tea_detail(tea, ratings)
 
 
-@router.get("/ingredients", response_model=Page[IngredientOut])
+@router.get("/ingredients", response_model=Page[IngredientTaste])
 async def list_ingredients(
     db: DbSession,
     paging: PageParams,
+    viewer: OptionalUser,
     q: Annotated[str | None, Query(max_length=120)] = None,
     category: IngredientCategory | None = None,
-) -> Page[IngredientOut]:
+) -> Page[IngredientTaste]:
     items, total = await catalog_service.list_ingredients(db, q, category, paging.page, paging.size)
+    await preference_service.attach_ingredient_ratings(db, items, viewer)
     return Page.build(
-        [IngredientOut.model_validate(i) for i in items], total, paging.page, paging.size
+        [IngredientTaste.model_validate(i) for i in items], total, paging.page, paging.size
     )
+
+
+@router.put("/ingredients/{slug}/rating", response_model=IngredientTaste)
+async def rate_ingredient(
+    slug: str, payload: IngredientRatingInput, user: CurrentUser, db: DbSession
+) -> IngredientTaste:
+    """How much you like an ingredient, 1–10.
+
+    Returns the ingredient rather than the rating. A tea review is an object worth having
+    back — it has a body, subscores, an author, a date. A rating is one integer you
+    already know, and what the caller actually wants is the row it just changed, with the
+    average moved: that is this.
+    """
+    try:
+        ingredient = await catalog_service.get_ingredient_by_slug(db, slug)
+    except NotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found"
+        ) from exc
+    await preference_service.rate_ingredient(db, user.id, ingredient.id, payload.score)
+    await preference_service.attach_ingredient_ratings(db, [ingredient], user)
+    return IngredientTaste.model_validate(ingredient)
+
+
+@router.delete("/ingredients/{slug}/rating", status_code=status.HTTP_204_NO_CONTENT)
+async def unrate_ingredient(slug: str, user: CurrentUser, db: DbSession) -> None:
+    """Back to having no opinion, which is not the same as scoring it 1."""
+    # Two 404s, not one. A typo in the slug and a rating you never made are different
+    # mistakes, and folding them into one message sends you looking in the wrong place.
+    try:
+        ingredient = await catalog_service.get_ingredient_by_slug(db, slug)
+    except NotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found"
+        ) from exc
+    try:
+        await preference_service.clear_ingredient_rating(db, user.id, ingredient.id)
+    except NotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No rating to remove"
+        ) from exc
 
 
 @router.get("/brands", response_model=Page[BrandOut])

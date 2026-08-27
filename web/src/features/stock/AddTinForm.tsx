@@ -4,7 +4,8 @@ import type { FormEvent } from 'react'
 import { Button } from '../../components/ui/button'
 import { FormError, SubmitButton, TextAreaField, TextField } from '../../components/ui/form'
 import type { StockItemInput, TeaRef } from '../../lib/household'
-import type { ShopRef } from '../../lib/shop'
+import type { ListingWithShop, ShopRef } from '../../lib/shop'
+import { priceMajorInput } from '../shop/format'
 import { ShopPicker } from './ShopPicker'
 import { TeaPicker } from './TeaPicker'
 
@@ -33,19 +34,24 @@ function readOptionalGrams(raw: string): { value?: number; error?: string } {
 /**
  * Adding a tin to the shelf.
  *
- * The two fields that matter — which tea, and how much of it — are the only ones on
- * screen to begin with. Everything the contract also accepts (where it lives, what it
- * cost, when it should be drunk by) sits behind one disclosure, because the moment this
- * form is used is when the shopping is being unpacked, and a fourteen-field form gets
- * abandoned then.
+ * Three questions are on screen: which tea, where it came from, and how much of it there
+ * is. Everything else the contract accepts (where it lives, what it cost, when it should
+ * be drunk by) sits behind one disclosure, because the moment this form is used is when
+ * the shopping is being unpacked, and a fourteen-field form gets abandoned then.
  *
- * M8's "where did it come from?" obeys that rule rather than bending it. It is a genuinely
- * useful thing to record — the tin page already prints "Bought at X" for anything that
- * came through the buy flow, and a hand-typed tin had no way to say it — but it is not
- * one of the two questions that must be answered to put a tin on a shelf, so it goes
- * inside the disclosure with the price and the dates. It sits first in there because it
- * is the one optional field somebody actively goes looking for, and it is a search box
- * rather than a `<select>`: see `ShopPicker`.
+ * The shop used to be inside that disclosure, on the argument that only the tea and the
+ * grams are needed to put a tin on a shelf. That argument was answered by somebody saying
+ * the obvious thing out loud: *in a household, a tea comes from the shop, not from
+ * itself*. A tin on a real shelf was carried in from somewhere, and burying that under
+ * "More details" made it the field nobody ever filled in — which left the shelf unable to
+ * answer "where do we get this again?", which is the question people actually put to it
+ * when a tin runs out.
+ *
+ * Promoting it pays for itself twice over, because the catalog already knows which shops
+ * sell which tea. Once a tea is picked, `ShopPicker` puts that tea's shops up as a
+ * one-tap shortlist, and the listing behind the tap carries the pack size and the price.
+ * See `applyListing` for what that fills in, and — more to the point — what it refuses to
+ * touch.
  */
 export function AddTinForm({
   pending,
@@ -69,6 +75,49 @@ export function AddTinForm({
   const [notes, setNotes] = useState('')
   const [more, setMore] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
+
+  /**
+   * What a tapped listing knows, poured into the fields that are still empty.
+   *
+   * "Still empty" is the whole rule, and it is not politeness. The listing is what the
+   * shop advertises; the tin is what is actually in the cupboard, and the person typing
+   * is the only one of the two who has seen it. Replacing a typed 80 with the shop's 50 g
+   * pack is the app telling somebody they are wrong about their own tea, and it does it
+   * silently, three fields away from where they are looking.
+   *
+   * `price` and `currency` are the awkward half, because they live inside the disclosure:
+   * a prefill landing there is a number attached to the tin that nobody can see, review
+   * or correct — and it is a claim about *money*, taken from a shop's published listing
+   * rather than from the receipt in the bag. Two ways out of that, and this form opens
+   * the disclosure rather than skipping the hidden fields, because the pack size and the
+   * price are most of what a listing is worth and dropping two thirds of the help to
+   * avoid one scroll is a bad trade. Filling them in and saying nothing was never an
+   * option. The disclosure only springs open when there is genuinely something new in it
+   * to look at: tap a listing whose shop publishes no price and nothing hidden changed,
+   * so nothing opens.
+   */
+  function applyListing(listing: ListingWithShop) {
+    let filledHidden = false
+
+    if (quantity.trim() === '' && listing.pack_grams !== null) {
+      setQuantity(String(listing.pack_grams))
+    }
+    if (price.trim() === '' && listing.price_minor !== null) {
+      setPrice(priceMajorInput(listing.price_minor))
+      filledHidden = true
+    }
+    if (currency.trim() === '' && listing.currency) {
+      setCurrency(listing.currency)
+      filledHidden = true
+    }
+
+    if (filledHidden) setMore(true)
+  }
+
+  function handleShop(picked: ShopRef | null, listing?: ListingWithShop) {
+    setShop(picked)
+    if (listing) applyListing(listing)
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -120,6 +169,17 @@ export function AddTinForm({
     <form noValidate onSubmit={handleSubmit} data-testid="add-tin-form" className="space-y-4">
       <TeaPicker idPrefix="add-tin" selected={tea} onSelect={setTea} error={errors.tea} />
 
+      {/* `tea?.slug ?? null` rather than a guard around the whole control: the shop is a
+          question worth asking before the tea has been settled — plenty of people know
+          they were in Kruka before they can remember what the tin is called — and it is
+          only the shortlist that needs a tea to have something to say. */}
+      <ShopPicker
+        idPrefix="add-tin"
+        selected={shop}
+        onSelect={handleShop}
+        teaSlug={tea?.slug ?? null}
+      />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField
           id="add-tin-quantity"
@@ -156,9 +216,6 @@ export function AddTinForm({
 
       {more && (
         <div className="grid gap-4 sm:grid-cols-2" data-testid="add-tin-details">
-          <div className="sm:col-span-2">
-            <ShopPicker idPrefix="add-tin" selected={shop} onSelect={setShop} />
-          </div>
           <TextField
             id="add-tin-location"
             label="Where is it kept?"

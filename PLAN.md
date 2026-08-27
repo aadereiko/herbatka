@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6e done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6f done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -401,6 +401,38 @@ and appear in the nav, friend rows, review authors, feed actors and household me
 - The friends list never contains the person reading it, so a friend's empty friends panel
   means "their only friend is you" and says that, rather than claiming they have added
   nobody to somebody who knows they were added.
+
+### M6f — A tin comes from a shop; ingredients you can rate ✅
+- **The shelf form asks where the tin is from, up front.** It used to ask only "which
+  tea" and bury the shop under *More details*, which got the model backwards: a tin on a
+  real shelf came from somewhere. Once a tea is picked, `ShopPicker` shows the shops that
+  actually sell it — the same `GET /catalog/teas/{slug}/shops` behind the tea page's
+  "Where to buy" — as a one-tap shortlist carrying the pack size and the price.
+- Tapping a listing fills only the fields that are **still empty**. The listing is what
+  the shop advertises; the tin is what is in the cupboard, and the person typing is the
+  only one of the two who has seen it. And a prefill that lands behind the disclosure
+  springs it open: a *money* figure, copied off a shop's shelf edge rather than a receipt,
+  must not be attached to somebody's tin where they cannot see or correct it. Tap a
+  listing whose shop publishes no price and nothing hidden changes, so nothing opens.
+- Still optional, and the search box never goes away. Our catalog knowing which shops
+  sell a tea is not the same as knowing every shop that does — the tin came from wherever
+  it came from, including a gift.
+- **Ingredient ratings**, 1–10, the same scale as everything else. They earn their place
+  on the *tea* page rather than on `/ingredients`: a blend lists five things, and one of
+  them being the clove you rated 2 explains a tea you keep not reaching for better than
+  its own average does.
+- "—" *deletes* the rating rather than storing a zero. "No opinion on hibiscus" and
+  "I dislike hibiscus" are different facts about a blend, and a control that could only
+  say the second would make the first unsayable.
+- `IngredientTaste` is a separate schema from `IngredientOut` with **no defaults**, so a
+  forgotten `attach_ingredient_ratings` is a 500 on the endpoint that forgot it rather
+  than a page quietly reporting that nobody has ever rated anything. Five `tea_detail`
+  call sites pay one line each for that.
+- `/ingredients` is now viewer-keyed and gated on `authReady` — the same cold-load race
+  the tea pages hit in M4, and it applied the moment these rows started carrying
+  `my_score`.
+- `make people` takes an id as well as an email, because the id is what the address bar
+  shows you while you are looking at the profile of somebody with no friends.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

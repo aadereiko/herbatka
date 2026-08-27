@@ -2,7 +2,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.preference import FavouriteTea
+from app.models.preference import FavouriteTea, IngredientRating
 from tests.conftest import Account
 
 CATALOG = "/api/v1/catalog"
@@ -332,3 +332,188 @@ class TestBlankBrewingLeavesThingsAlone:
         assert refused.status_code == 422
         body = (await client.get(f"{CATALOG}/teas/{tea.slug}", headers=owner.headers)).json()
         assert body["my_brewing"]["brew_temp_c"] == 80
+
+
+class TestIngredientRatings:
+    """How much you like an ingredient, as opposed to how good a tea is.
+
+    The whole point of the feature is the join: a blend lists five things, and one of them
+    being the clove you rated 2 explains a tea you keep not reaching for. So most of these
+    are about the number arriving on the *tea* page, not just on the ingredient list.
+    """
+
+    async def test_rating_and_reading_it_back(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        response = await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 9}
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["my_score"] == 9
+        assert body["average_score"] == 9.0
+        assert body["rating_count"] == 1
+
+    async def test_rating_again_replaces_rather_than_duplicating(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict, db: AsyncSession
+    ) -> None:
+        """Changing your mind about clove is the normal case, not a 409."""
+        await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 9}
+        )
+        second = await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 4}
+        )
+        assert second.status_code == 200
+        assert second.json()["my_score"] == 4
+        assert second.json()["rating_count"] == 1
+
+        rows = await db.scalar(select(func.count()).select_from(IngredientRating))
+        assert rows == 1
+
+    async def test_the_average_and_your_own_score_are_separate(
+        self,
+        client: AsyncClient,
+        owner: Account,
+        flatmate: Account,
+        catalog_fixtures: dict,
+    ) -> None:
+        await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 10}
+        )
+        await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=flatmate.headers, json={"score": 4}
+        )
+
+        mine = await client.get(f"{CATALOG}/ingredients?q=Mint", headers=owner.headers)
+        row = mine.json()["items"][0]
+        assert row["my_score"] == 10
+        assert row["average_score"] == 7.0
+        assert row["rating_count"] == 2
+
+    async def test_an_unrated_ingredient_reports_null_not_zero(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        """0.0 reads as "everybody hates it" rather than "nobody has said"."""
+        row = (await client.get(f"{CATALOG}/ingredients?q=Mint", headers=owner.headers)).json()[
+            "items"
+        ][0]
+        assert row["average_score"] is None
+        assert row["my_score"] is None
+        assert row["rating_count"] == 0
+
+    async def test_signed_out_sees_the_average_but_no_my_score(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 8}
+        )
+        row = (await client.get(f"{CATALOG}/ingredients?q=Mint")).json()["items"][0]
+        assert row["average_score"] == 8.0
+        assert row["my_score"] is None
+
+    async def test_a_rating_is_yours_alone(
+        self, client: AsyncClient, owner: Account, flatmate: Account, catalog_fixtures: dict
+    ) -> None:
+        await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 2}
+        )
+        theirs = (
+            await client.get(f"{CATALOG}/ingredients?q=Mint", headers=flatmate.headers)
+        ).json()["items"][0]
+        assert theirs["my_score"] is None
+
+    async def test_your_score_reaches_the_tea_that_contains_it(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        """The reason the feature exists. Mint is 30% of Mint Green; rating mint 3 should
+        be visible while looking at the tea, without a second request."""
+        await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 3}
+        )
+        tea = (await client.get(f"{CATALOG}/teas/mint-green", headers=owner.headers)).json()
+        scores = {
+            row["ingredient"]["slug"]: row["ingredient"]["my_score"] for row in tea["ingredients"]
+        }
+        assert scores == {"mint": 3, "green-leaf": None}
+
+    async def test_the_tea_page_carries_ratings_when_signed_out(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        """Every ingredient on every TeaDetail path has to be attached — the schema has no
+        defaults, so a forgotten call is a 500 here rather than a silent zero."""
+        await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 6}
+        )
+        response = await client.get(f"{CATALOG}/teas/mint-green")
+        assert response.status_code == 200, response.text
+        rows = {r["ingredient"]["slug"]: r["ingredient"] for r in response.json()["ingredients"]}
+        assert rows["mint"]["average_score"] == 6.0
+        assert rows["mint"]["my_score"] is None
+        assert rows["green-leaf"]["rating_count"] == 0
+
+    async def test_a_submitted_tea_comes_back_with_its_ingredients_rated(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        """POST /catalog/teas builds a TeaDetail too, and it was the easiest one to forget."""
+        await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 7}
+        )
+        response = await client.post(
+            f"{CATALOG}/teas",
+            headers=owner.headers,
+            json={
+                "name": "Proposed Mint",
+                "tea_type": "herbal",
+                "ingredients": [{"ingredient_id": str(catalog_fixtures["mint"].id)}],
+            },
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["ingredients"][0]["ingredient"]["my_score"] == 7
+
+    async def test_removing_your_rating(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        """Unrated is a real state: "no opinion on hibiscus" is not "I dislike hibiscus"."""
+        await client.put(
+            f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": 5}
+        )
+        assert (
+            await client.delete(f"{CATALOG}/ingredients/mint/rating", headers=owner.headers)
+        ).status_code == 204
+
+        row = (await client.get(f"{CATALOG}/ingredients?q=Mint", headers=owner.headers)).json()[
+            "items"
+        ][0]
+        assert row["my_score"] is None
+        assert row["rating_count"] == 0
+
+    async def test_removing_one_you_never_made_is_404(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        response = await client.delete(f"{CATALOG}/ingredients/mint/rating", headers=owner.headers)
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No rating to remove"
+
+    async def test_a_typo_in_the_slug_says_so_rather_than_blaming_the_rating(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        """Two different mistakes, two different messages — one 404 for both sends you
+        looking in the wrong place."""
+        response = await client.delete(f"{CATALOG}/ingredients/mnit/rating", headers=owner.headers)
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Ingredient not found"
+
+    async def test_rejects_a_score_out_of_range(
+        self, client: AsyncClient, owner: Account, catalog_fixtures: dict
+    ) -> None:
+        for score in (0, 11, -3):
+            response = await client.put(
+                f"{CATALOG}/ingredients/mint/rating", headers=owner.headers, json={"score": score}
+            )
+            assert response.status_code == 422, score
+
+    async def test_requires_an_account(self, client: AsyncClient, catalog_fixtures: dict) -> None:
+        assert (
+            await client.put(f"{CATALOG}/ingredients/mint/rating", json={"score": 5})
+        ).status_code == 401

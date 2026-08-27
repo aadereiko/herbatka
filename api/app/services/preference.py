@@ -1,11 +1,19 @@
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.preference import BrewingNote, FavouriteShop, FavouriteTea, ShopReview
+from app.models.catalog import Ingredient
+from app.models.preference import (
+    BrewingNote,
+    FavouriteShop,
+    FavouriteTea,
+    IngredientRating,
+    ShopReview,
+)
 from app.models.user import User
 from app.schemas.preference import BrewingNoteInput, ShopReviewInput
 from app.services.errors import NotFound
@@ -124,6 +132,94 @@ async def delete_shop_review(db: AsyncSession, shop_id: uuid.UUID, user_id: uuid
         raise NotFound("review")
     await db.delete(review)
     await db.flush()
+
+
+# ------------------------------------------------------------------ ingredient ratings
+
+
+async def rate_ingredient(
+    db: AsyncSession, user_id: uuid.UUID, ingredient_id: uuid.UUID, score: int
+) -> None:
+    """Set, or change, how much you like an ingredient. PUT semantics: no 409 for a second
+    opinion, because changing your mind about clove is the normal case."""
+    existing = await db.get(IngredientRating, (user_id, ingredient_id))
+    if existing is None:
+        db.add(IngredientRating(user_id=user_id, ingredient_id=ingredient_id, score=score))
+    else:
+        existing.score = score
+    await db.flush()
+
+
+async def clear_ingredient_rating(
+    db: AsyncSession, user_id: uuid.UUID, ingredient_id: uuid.UUID
+) -> None:
+    """Unrated is a real state, distinct from a low score: "I have no opinion on hibiscus"
+    is not "I dislike hibiscus", and only the delete can say the first one."""
+    rating = await db.get(IngredientRating, (user_id, ingredient_id))
+    if rating is None:
+        raise NotFound("rating")
+    await db.delete(rating)
+    await db.flush()
+
+
+async def attach_ingredient_ratings(
+    db: AsyncSession, ingredients: Sequence[Ingredient], viewer: User | None
+) -> None:
+    """Hang `my_score`, `average_score` and `rating_count` on each ingredient in place.
+
+    Two queries for the whole page rather than three per row: the alternative is a
+    correlated AVG in the select list, which is one query per ingredient on a list of
+    twenty, and the same again for the ingredients nested inside a tea.
+
+    The attributes are set on every ingredient passed in, including the ones nobody has
+    rated — a missing attribute would make `IngredientTaste` raise, and the schema is
+    deliberately strict there so that a forgotten call is a 500 rather than a page that
+    quietly claims nothing has ever been rated.
+    """
+    if not ingredients:
+        return
+
+    ids = {ingredient.id for ingredient in ingredients}
+
+    rows = await db.execute(
+        select(
+            IngredientRating.ingredient_id,
+            func.avg(IngredientRating.score),
+            func.count(),
+        )
+        .where(IngredientRating.ingredient_id.in_(ids))
+        .group_by(IngredientRating.ingredient_id)
+    )
+    aggregates = {ingredient_id: (float(average), count) for ingredient_id, average, count in rows}
+
+    mine: dict[uuid.UUID, int] = {}
+    if viewer is not None:
+        mine = dict(
+            (
+                await db.execute(
+                    select(IngredientRating.ingredient_id, IngredientRating.score).where(
+                        IngredientRating.user_id == viewer.id,
+                        IngredientRating.ingredient_id.in_(ids),
+                    )
+                )
+            ).all()
+        )
+
+    for ingredient in ingredients:
+        average, count = aggregates.get(ingredient.id, (None, 0))
+        ingredient.average_score = average
+        ingredient.rating_count = count
+        ingredient.my_score = mine.get(ingredient.id)
+
+
+async def attach_tea_ingredient_ratings(db: AsyncSession, tea: Any, viewer: User | None) -> None:
+    """The same, for the ingredients hanging off one tea.
+
+    Every path that builds a `TeaDetail` has to call this, because `IngredientTaste` has
+    no defaults and will raise without it. That is on purpose and it is the cheap half of
+    the bargain: five one-line calls, against a schema that cannot silently under-report.
+    """
+    await attach_ingredient_ratings(db, [link.ingredient for link in tea.ingredient_links], viewer)
 
 
 # ----------------------------------------------------------------------- brewing notes

@@ -6,8 +6,8 @@ import type {
   BrandListParams,
   BrewingInput,
   BrewingNote,
-  Ingredient,
   IngredientListParams,
+  IngredientTaste,
   Page,
   TeaDetail,
   TeaInput,
@@ -51,7 +51,7 @@ export const fetchTea = (slug: string) =>
   api<TeaDetail>(`/catalog/teas/${encodeURIComponent(slug)}`)
 
 export const fetchIngredients = (params: IngredientListParams) =>
-  api<Page<Ingredient>>(`/catalog/ingredients${toQuery(params)}`)
+  api<Page<IngredientTaste>>(`/catalog/ingredients${toQuery(params)}`)
 
 export const fetchBrands = (params: BrandListParams) =>
   api<Page<Brand>>(`/catalog/brands${toQuery(params)}`)
@@ -81,11 +81,57 @@ export function useTeaDetail(slug: string) {
   })
 }
 
+/**
+ * Viewer-keyed and gated on `authReady`, for the same reason `useTeaList` is: the rows
+ * now carry `my_score`, so this is no longer a response that is the same for everybody.
+ * /ingredients is a public page, so on a cold load it fetches before AuthProvider's
+ * silent refresh has answered — without the viewer in the key, the anonymous answer
+ * ("you have rated nothing") gets cached and shown to a signed-in user.
+ */
 export function useIngredientList(params: IngredientListParams) {
+  const { viewer, authReady } = useViewer()
   return useQuery({
-    queryKey: catalogKeys.ingredientList(params),
+    queryKey: [...catalogKeys.ingredientList(params), viewer],
     queryFn: () => fetchIngredients(params),
     placeholderData: keepPreviousData,
+    enabled: authReady,
+  })
+}
+
+/**
+ * Rating an ingredient touches two things: the ingredient lists, and every tea that
+ * contains it — a `TeaDetail` carries `my_score` on each of its ingredients, which is
+ * the whole reason anybody would rate one. There is no cheap way to know *which* teas
+ * contain it from here, so this invalidates every tea detail. That is one refetch of the
+ * page you are looking at, against the alternative of a page that still says you rated
+ * clove 2 after you have just changed it to 7.
+ */
+function useInvalidateIngredientRatings() {
+  const client = useQueryClient()
+  return () => {
+    void client.invalidateQueries({ queryKey: catalogKeys.ingredientLists })
+    void client.invalidateQueries({ queryKey: catalogKeys.teaDetails })
+  }
+}
+
+export function useRateIngredient() {
+  const invalidate = useInvalidateIngredientRatings()
+  return useMutation({
+    mutationFn: ({ slug, score }: { slug: string; score: number }) =>
+      api<IngredientTaste>(`/catalog/ingredients/${encodeURIComponent(slug)}/rating`, {
+        method: 'PUT',
+        body: JSON.stringify({ score }),
+      }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useClearIngredientRating() {
+  const invalidate = useInvalidateIngredientRatings()
+  return useMutation({
+    mutationFn: (slug: string) =>
+      api<void>(`/catalog/ingredients/${encodeURIComponent(slug)}/rating`, { method: 'DELETE' }),
+    onSuccess: invalidate,
   })
 }
 

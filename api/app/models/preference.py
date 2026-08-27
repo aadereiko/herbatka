@@ -5,7 +5,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, Numeric, Tex
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
-from app.models.catalog import Tea
+from app.models.catalog import Ingredient, Tea
 from app.models.review import SCORE_MAX, SCORE_MIN
 from app.models.shop import Shop
 from app.models.user import User
@@ -77,6 +77,40 @@ class ShopReview(UUIDPrimaryKey, Timestamps, Base):
             f"score >= {SCORE_MIN} AND score <= {SCORE_MAX}", name="ck_shop_review_score_range"
         ),
         Index("ix_shop_review_shop_created", "shop_id", "created_at"),
+    )
+
+
+class IngredientRating(Timestamps, Base):
+    """How much you like an ingredient, on the same 1–10 as everything else.
+
+    A taste, not a review: there is no body, because "bergamot, 3" is the whole thought
+    and a prose field would only invite people to re-review the teas it appears in. That
+    is why this is a composite-key row like `favourite_tea` rather than an id-bearing row
+    like `review` — nothing else in the system needs to point at one.
+
+    It earns its place on the tea page rather than here. A blend lists five ingredients,
+    and knowing at a glance that one of them is the clove you rated 2 explains a tea you
+    keep not reaching for better than its own average score does.
+    """
+
+    __tablename__ = "ingredient_rating"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), primary_key=True
+    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ingredient.id", ondelete="CASCADE"), primary_key=True
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    ingredient: Mapped[Ingredient] = relationship()
+
+    __table_args__ = (
+        CheckConstraint(
+            f"score >= {SCORE_MIN} AND score <= {SCORE_MAX}",
+            name="ck_ingredient_rating_score_range",
+        ),
+        Index("ix_ingredient_rating_user", "user_id"),
     )
 
 

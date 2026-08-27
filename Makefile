@@ -38,7 +38,7 @@ downgrade: ## Roll back one migration
 admin: ## Promote a user to admin: make admin e=ada@example.com
 	cd api && uv run python -m app.cli promote-admin "$(e)"
 
-people: ## Dev only: create some friends for you. make people e=you@example.com
+people: ## Dev only: create some friends for you. make people e=you@example.com (an id works too)
 	cd api && uv run python -m app.seed.people "$(e)"
 
 seed: ## Load starter ingredients and teas

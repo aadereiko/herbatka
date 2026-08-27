@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -32,6 +32,7 @@ from app.schemas.shop import (
     shop_summary,
 )
 from app.services import catalog as catalog_service
+from app.services import preference as preference_service
 from app.services import shop as shop_service
 from app.services.errors import AlreadyExists, IngredientInUse, NotFound
 from app.services.geocoding import AddressNotFound, GeocodingUnavailable
@@ -76,21 +77,33 @@ async def create_tea(payload: TeaCreate, admin: AdminUser, db: DbSession) -> Tea
         )
     except NotFound as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await preference_service.attach_tea_ingredient_ratings(db, tea, admin)
+    return tea_detail(tea, ratings)
+
+
+# The admin is passed to `_detail` only so that the ingredients in the response carry
+# their own `my_score`. It is the same body every other reader of this tea gets, and an
+# admin editing a blend they have opinions about should see those opinions.
+async def _detail(db: DbSession, admin: AdminUser, loaded: tuple[Any, Any]) -> TeaDetail:
+    tea, ratings = loaded
+    await preference_service.attach_tea_ingredient_ratings(db, tea, admin)
     return tea_detail(tea, ratings)
 
 
 @router.patch("/teas/{tea_id}", response_model=TeaDetail)
-async def update_tea(tea_id: uuid.UUID, payload: TeaUpdate, db: DbSession) -> TeaDetail:
+async def update_tea(
+    tea_id: uuid.UUID, payload: TeaUpdate, admin: AdminUser, db: DbSession
+) -> TeaDetail:
     try:
-        return tea_detail(*await catalog_service.update_tea(db, tea_id, payload))
+        return await _detail(db, admin, await catalog_service.update_tea(db, tea_id, payload))
     except NotFound as exc:
         raise _not_found(exc) from exc
 
 
 @router.post("/teas/{tea_id}/approve", response_model=TeaDetail)
-async def approve_tea(tea_id: uuid.UUID, db: DbSession) -> TeaDetail:
+async def approve_tea(tea_id: uuid.UUID, admin: AdminUser, db: DbSession) -> TeaDetail:
     try:
-        return tea_detail(*await catalog_service.approve_tea(db, tea_id))
+        return await _detail(db, admin, await catalog_service.approve_tea(db, tea_id))
     except NotFound as exc:
         raise _not_found(exc) from exc
 

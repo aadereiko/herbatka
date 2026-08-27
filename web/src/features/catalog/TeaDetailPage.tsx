@@ -16,8 +16,15 @@ import { FavouriteStar } from '../favourite/FavouriteStar'
 import { TeaReviewsPanel } from '../review/TeaReviewsPanel'
 import { WhereToBuyPanel } from '../shop/WhereToBuyPanel'
 import { BrewingPanel } from './BrewingPanel'
+import { IngredientTasteControl } from './IngredientTasteControl'
 import { useTeaDetail } from './queries'
 
+/**
+ * The row where an ingredient rating actually earns its place. A blend lists five things,
+ * and knowing that one of them is the clove you rated 2 explains a tea you keep not
+ * reaching for better than its own average score does — so the control is here, at the
+ * moment you notice, rather than only over on /ingredients.
+ */
 function IngredientRow({ entry }: { entry: TeaIngredient }) {
   return (
     <li className="flex flex-wrap items-center gap-2 border-b border-brand-100 py-2 last:border-0 dark:border-neutral-800">
@@ -31,10 +38,13 @@ function IngredientRow({ entry }: { entry: TeaIngredient }) {
       {entry.is_primary && <Badge tone="brand">Primary</Badge>}
       {entry.ingredient.is_caffeinated && <Badge tone="amber">Caffeinated</Badge>}
       {entry.percentage !== null && (
-        <span className="ml-auto text-sm tabular-nums text-neutral-600 dark:text-neutral-400">
+        <span className="text-sm tabular-nums text-neutral-600 dark:text-neutral-400">
           {entry.percentage}%
         </span>
       )}
+      <span className="ml-auto">
+        <IngredientTasteControl ingredient={entry.ingredient} idPrefix="tea" />
+      </span>
     </li>
   )
 }

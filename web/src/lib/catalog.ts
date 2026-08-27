@@ -86,6 +86,18 @@ export type Page<T> = {
 // Nullability now matches the server exactly — the generated write schemas are
 // `T | null`, not `T?`, which is what makes clearing a field via PATCH expressible.
 export type Ingredient = components['schemas']['IngredientOut']
+
+/**
+ * An ingredient plus how much people like it, and how much *you* like it.
+ *
+ * Kept apart from `Ingredient` rather than folded into it, because the two really are
+ * different responses: every read path returns this, and the admin create/edit endpoints
+ * return the bare `IngredientOut` — nobody has rated a thing that did not exist a moment
+ * ago. Aliasing one to the other would put `my_score` in the type of a response that does
+ * not contain it, which is exactly the class of lie these aliases exist to prevent.
+ */
+export type IngredientTaste = components['schemas']['IngredientTaste']
+export type IngredientRatingInput = components['schemas']['IngredientRatingInput']
 export type BrandRef = components['schemas']['BrandRef']
 export type Brand = components['schemas']['BrandOut']
 export type TeaIngredient = components['schemas']['TeaIngredientOut']

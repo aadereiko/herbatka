@@ -13,7 +13,7 @@ import type {
   StockItem,
   StockItemDetail,
 } from '../../lib/household'
-import type { ShopSummary } from '../../lib/shop'
+import type { ListingWithShop, ShopSummary } from '../../lib/shop'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
 
@@ -141,6 +141,69 @@ const kruka: ShopSummary = {
   my_score: null,
 }
 
+/** A second shop, so "Sold at" is a list rather than a row that could be anything. */
+const postal: ShopSummary = {
+  ...kruka,
+  id: 'shop-2',
+  slug: 'postal-tea',
+  name: 'Postal Tea',
+  city: null,
+  country: 'United Kingdom',
+  listing_count: 1,
+}
+
+/**
+ * The tin form's shop shortlist is the catalog's own "where to buy" answer, so the suite
+ * needs listings and not only shops.
+ *
+ * These two are the two cases that matter, and they are different cases. Kruka publishes
+ * a pack size *and* a price, which is the whole prefill; Postal publishes a pack size and
+ * no price at all, which is common, is not an error, and is what stops the form's
+ * disclosure springing open on every tap.
+ */
+const krukaSencha: ListingWithShop = {
+  id: 'listing-1',
+  tea: sencha.tea,
+  pack_grams: 50,
+  price_minor: 450,
+  currency: 'PLN',
+  product_url: null,
+  is_available: true,
+  shop: kruka,
+}
+
+const postalSencha: ListingWithShop = {
+  id: 'listing-2',
+  tea: sencha.tea,
+  pack_grams: 100,
+  price_minor: null,
+  currency: null,
+  product_url: null,
+  is_available: true,
+  shop: postal,
+}
+
+/** A second tea and a listing for it, so "these are the shops for *this* tea" is a claim
+ *  that can be caught being wrong. */
+const danCongTea: TeaSummary = {
+  ...senchaTea,
+  id: 'tea-2',
+  slug: 'dan-cong',
+  name: 'Dan Cong',
+  tea_type: 'oolong',
+}
+
+const postalDanCong: ListingWithShop = {
+  id: 'listing-3',
+  tea: lastOolong.tea,
+  pack_grams: 25,
+  price_minor: 1800,
+  currency: 'PLN',
+  product_url: null,
+  is_available: true,
+  shop: postal,
+}
+
 function pageOf<T>(items: T[], extra: Partial<Page<T>> = {}): Page<T> {
   return { items, total: items.length, page: 1, size: 20, pages: 1, ...extra }
 }
@@ -219,6 +282,12 @@ function shelf(overrides: Record<string, Handler> = {}) {
     'GET /households/hh-1': () => json(household),
     'GET /households/hh-1/invites': () => json([]),
     'GET /households/hh-1/stock': () => json(pageOf([sencha, lastOolong])),
+    // The add-tin form asks two questions of the shop half of the API the moment it is
+    // opened — "which shops are there" and, once a tea is picked, "which of them sell
+    // this" — so both are answered here rather than in every test that happens to open
+    // it. Empty by default: a test that wants a shortlist says so.
+    'GET /shops': () => json(pageOf([kruka], { size: 8 })),
+    'GET /catalog/teas/sencha/shops': () => json(pageOf([], { size: 6 })),
     ...overrides,
   })
 }
@@ -643,14 +712,6 @@ test('the tin form sends the shop when one is picked, and no key at all when not
   fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
   fireEvent.change(screen.getByLabelText('How much is in it?'), { target: { value: '80' } })
 
-  // Not on screen until the optional half is opened. The two questions that must be
-  // answered to put a tin on a shelf are still the only two you are shown first, which is
-  // the rule this form was written around.
-  expect(screen.queryByLabelText('Where did it come from?')).toBeNull()
-  expect(calls.some((call) => call.path === '/shops')).toBe(false)
-
-  fireEvent.click(screen.getByTestId('toggle-tin-details'))
-
   // A search box and a short result list — never a <select> of every shop there is.
   await screen.findByTestId('shop-picker-results')
   expect(calls.find((call) => call.path === '/shops')?.search).toContain('size=8')
@@ -661,6 +722,8 @@ test('the tin form sends the shop when one is picked, and no key at all when not
   fireEvent.submit(screen.getByTestId('add-tin-form'))
 
   await screen.findByTestId('stock-notice')
+  // A search result is a shop and nothing more — no listing, so nothing was prefilled and
+  // the 80 g typed above is exactly what gets posted.
   expect(bodyOf('POST', '/households/hh-1/stock')).toEqual({
     tea_id: 'tea-1',
     quantity_grams: 80,
@@ -681,8 +744,8 @@ test('the tin form sends the shop when one is picked, and no key at all when not
   fireEvent.click(screen.getByTestId('toggle-add-tin'))
   fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
   fireEvent.change(screen.getByLabelText('How much is in it?'), { target: { value: '80' } })
-  // Opened and left alone, so this is "I did not say" rather than "I never looked".
-  fireEvent.click(screen.getByTestId('toggle-tin-details'))
+  // Looked at and left alone — the picker is on screen throughout — so this is "I did not
+  // say" rather than "I was never asked".
   await screen.findByTestId('shop-picker-results')
   fireEvent.submit(screen.getByTestId('add-tin-form'))
 
@@ -690,6 +753,230 @@ test('the tin form sends the shop when one is picked, and no key at all when not
   const body = bodyOf('POST', '/households/hh-1/stock') as Record<string, unknown>
   expect('shop_id' in body).toBe(false)
   expect(body).toEqual({ tea_id: 'tea-1', quantity_grams: 80 })
+})
+
+/* ------------------------------------------ where the tin came from, on the way in */
+
+test('the shop is a question the form asks, not one hidden behind “More details”', async () => {
+  shelf({ 'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })) })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+
+  // The complaint this answers: in a household a tea comes from the shop, so the form
+  // asks where it came from without anybody having to go looking for the question.
+  expect(screen.getByLabelText('Where did it come from?')).toBeInTheDocument()
+  expect(screen.queryByTestId('add-tin-details')).toBeNull()
+
+  // Expected, not demanded: the hint says what a blank means instead of nagging.
+  expect(screen.getByText(/Leave it blank for a gift/)).toBeInTheDocument()
+})
+
+test('picking a tea puts the shops that sell it one tap away, above the search box', async () => {
+  shelf({
+    'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })),
+    'GET /catalog/teas/sencha/shops': () =>
+      json(pageOf([krukaSencha, postalSencha], { size: 6 })),
+    'POST /households/hh-1/stock': () => json({ ...senchaDetail, shop: kruka }, 201),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+
+  // Nothing to be sold at until there is something to sell, and no request for it either.
+  expect(screen.queryByTestId('shop-picker-sold-at')).toBeNull()
+  expect(calls.some((call) => call.path === '/catalog/teas/sencha/shops')).toBe(false)
+
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+
+  const sold = await screen.findByTestId('shop-picker-sold-at')
+  expect(sold).toHaveTextContent('Sold at')
+  expect(sold).toHaveTextContent('Herbaciarnia u Kruka')
+  expect(sold).toHaveTextContent('Postal Tea')
+  // Each row says which pack and what it costs, so the shortlist answers "which one?"
+  // and not merely "who?".
+  expect(within(sold).getByTestId('shop-listing-listing-1')).toHaveTextContent('50 g')
+  expect(within(sold).getByTestId('shop-listing-listing-1')).toHaveTextContent('4.50')
+  expect(calls.find((call) => call.path === '/catalog/teas/sencha/shops')?.search).toContain(
+    'size=6',
+  )
+
+  // And the search box is still underneath it, now narrowed to "somewhere else". Our
+  // catalog knowing two shops that sell this is not the same as it knowing the one this
+  // particular tin came from.
+  expect(screen.getByLabelText('Somewhere else')).toBeInTheDocument()
+  // The question is asked once, above both answers to it, rather than by the field —
+  // otherwise "Sold at" announces itself before anything has asked where the tin is from.
+  const form = screen.getByTestId('add-tin-form')
+  expect(within(form).getByText('Where did it come from?')).toBeInTheDocument()
+  const order = within(form).getAllByText(/Where did it come from\?|Sold at|Somewhere else/)
+  expect(order.map((node) => node.textContent)).toEqual([
+    'Where did it come from?',
+    'Sold at',
+    'Somewhere else',
+  ])
+
+  fireEvent.click(screen.getByTestId('shop-listing-listing-1'))
+  expect(screen.getByTestId('shop-picked')).toHaveTextContent('Herbaciarnia u Kruka')
+
+  fireEvent.submit(screen.getByTestId('add-tin-form'))
+  await screen.findByTestId('stock-notice')
+  expect(bodyOf('POST', '/households/hh-1/stock')).toMatchObject({ shop_id: 'shop-1' })
+})
+
+test('a tapped listing fills the empty fields with what the shop published', async () => {
+  shelf({
+    'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })),
+    'GET /catalog/teas/sencha/shops': () => json(pageOf([krukaSencha], { size: 6 })),
+    'POST /households/hh-1/stock': () => json({ ...senchaDetail, shop: kruka }, 201),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+  fireEvent.click(await screen.findByTestId('shop-listing-listing-1'))
+
+  // The pack size is a field you are already looking at, so it simply fills in.
+  expect(screen.getByLabelText('How much is in it?')).toHaveValue(50)
+
+  // The price and the currency are not: they live behind "More details". A number
+  // attached to your tin that you cannot see is a number you cannot correct, and this one
+  // is a claim about money copied off a shelf edge rather than off your receipt — so the
+  // drawer it landed in opens itself rather than keeping the secret.
+  expect(screen.getByTestId('add-tin-details')).toBeInTheDocument()
+  expect(screen.getByLabelText('Price paid')).toHaveValue('4.50')
+  expect(screen.getByLabelText('Currency')).toHaveValue('PLN')
+
+  fireEvent.submit(screen.getByTestId('add-tin-form'))
+  await screen.findByTestId('stock-notice')
+  // 4.50 goes back over the wire as 450 minor units, the way every other price does.
+  expect(bodyOf('POST', '/households/hh-1/stock')).toEqual({
+    tea_id: 'tea-1',
+    quantity_grams: 50,
+    price_paid_minor: 450,
+    currency: 'PLN',
+    shop_id: 'shop-1',
+  })
+})
+
+test('a listing fills the blanks and overwrites nothing that was already answered', async () => {
+  shelf({
+    'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })),
+    'GET /catalog/teas/sencha/shops': () => json(pageOf([krukaSencha], { size: 6 })),
+    'POST /households/hh-1/stock': () => json({ ...senchaDetail, shop: kruka }, 201),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+
+  // Answered before the shop was tapped, and both answers disagree with the listing on
+  // purpose: 80 g because it was decanted into a jar, 9.99 because that is what the
+  // receipt says. The shop's 50 g at 4.50 is what it advertises, not what happened.
+  fireEvent.change(screen.getByLabelText('How much is in it?'), { target: { value: '80' } })
+  fireEvent.click(screen.getByTestId('toggle-tin-details'))
+  fireEvent.change(screen.getByLabelText('Price paid'), { target: { value: '9.99' } })
+
+  fireEvent.click(await screen.findByTestId('shop-listing-listing-1'))
+
+  expect(screen.getByLabelText('How much is in it?')).toHaveValue(80)
+  expect(screen.getByLabelText('Price paid')).toHaveValue('9.99')
+  // The one field nobody had answered is the one field that gets filled.
+  expect(screen.getByLabelText('Currency')).toHaveValue('PLN')
+
+  fireEvent.submit(screen.getByTestId('add-tin-form'))
+  await screen.findByTestId('stock-notice')
+  expect(bodyOf('POST', '/households/hh-1/stock')).toEqual({
+    tea_id: 'tea-1',
+    quantity_grams: 80,
+    price_paid_minor: 999,
+    currency: 'PLN',
+    shop_id: 'shop-1',
+  })
+})
+
+test('a listing with no published price leaves the disclosure shut', async () => {
+  shelf({
+    'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })),
+    'GET /catalog/teas/sencha/shops': () => json(pageOf([postalSencha], { size: 6 })),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+
+  const row = await screen.findByTestId('shop-listing-listing-2')
+  expect(row).toHaveTextContent('100 g')
+  // A shop that has not published a price says nothing, rather than "0.00" — which reads
+  // as free, which is a different and wrong claim.
+  expect(row).not.toHaveTextContent('0.00')
+
+  fireEvent.click(row)
+
+  expect(screen.getByLabelText('How much is in it?')).toHaveValue(100)
+  // The disclosure opens for a prefill nobody could otherwise see. This tap prefilled
+  // nothing hidden, so there is nothing hidden to show, so it stays where it was: the
+  // rule is "never fill in a field behind a door without opening the door", not "open the
+  // door on every tap".
+  expect(screen.queryByTestId('add-tin-details')).toBeNull()
+})
+
+test('with no tea picked there is no shortlist, and the search box still finds a shop', async () => {
+  shelf({
+    'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })),
+    'GET /shops': ({ url }) =>
+      json(pageOf(url.searchParams.get('q') === 'kru' ? [kruka] : [], { size: 8 })),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+
+  // No tea, so nothing is known to be sold anywhere — and an empty box headed "Sold at"
+  // would be asserting that nobody sells it, which is not what "we did not ask" means.
+  await screen.findByTestId('shop-picker-empty')
+  expect(screen.queryByTestId('shop-picker-sold-at')).toBeNull()
+  expect(calls.some((call) => call.path === '/catalog/teas/sencha/shops')).toBe(false)
+
+  // The search is the fallback that has to keep working, because it is the only way to
+  // name a shop our catalog has never heard sell this tea.
+  fireEvent.change(screen.getByLabelText('Where did it come from?'), { target: { value: 'kru' } })
+  fireEvent.click(await screen.findByTestId('shop-result-shop-1'))
+  expect(screen.getByTestId('shop-picked')).toHaveTextContent('Herbaciarnia u Kruka')
+})
+
+test('changing the tea drops the old tea’s shops instead of leaving them one tap away', async () => {
+  shelf({
+    'GET /catalog/teas': () => json(pageOf([senchaTea, danCongTea], { size: 8 })),
+    'GET /catalog/teas/sencha/shops': () => json(pageOf([krukaSencha], { size: 6 })),
+    'GET /catalog/teas/dan-cong/shops': () => json(pageOf([postalDanCong], { size: 6 })),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+  expect(await screen.findByTestId('shop-picker-sold-at')).toHaveTextContent('Herbaciarnia u Kruka')
+
+  // Wrong tin. Clearing the tea clears the claim about who sells it, immediately…
+  fireEvent.click(screen.getByTestId('tea-picker-clear'))
+  expect(screen.queryByTestId('shop-picker-sold-at')).toBeNull()
+
+  // …and picking a different tea does not put the old answer back while the new one is in
+  // flight. `useTeaShops` keeps previous data, which is right for the tea page it was
+  // written for and would be wrong here: Kruka would sit under "Sold at" for a tea Kruka
+  // does not stock, one tap from being recorded against it.
+  fireEvent.click(screen.getByTestId('tea-result-tea-2'))
+  expect(screen.queryByTestId('shop-picker-sold-at')).toBeNull()
+
+  const sold = await screen.findByTestId('shop-picker-sold-at')
+  expect(sold).toHaveTextContent('Postal Tea')
+  expect(sold).not.toHaveTextContent('Herbaciarnia u Kruka')
 })
 
 test('a tin that came from a shop says where, on the tin’s own page', async () => {

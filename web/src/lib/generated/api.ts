@@ -169,6 +169,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/ingredients/{slug}/rating": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rate Ingredient
+         * @description How much you like an ingredient, 1–10.
+         *
+         *     Returns the ingredient rather than the rating. A tea review is an object worth having
+         *     back — it has a body, subscores, an author, a date. A rating is one integer you
+         *     already know, and what the caller actually wants is the row it just changed, with the
+         *     average moved: that is this.
+         */
+        put: operations["rate_ingredient_api_v1_catalog_ingredients__slug__rating_put"];
+        post?: never;
+        /**
+         * Unrate Ingredient
+         * @description Back to having no opinion, which is not the same as scoring it 1.
+         */
+        delete: operations["unrate_ingredient_api_v1_catalog_ingredients__slug__rating_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalog/brands": {
         parameters: {
             query?: never;
@@ -1494,6 +1523,48 @@ export interface components {
             /** Description */
             description: string | null;
         };
+        /** IngredientRatingInput */
+        IngredientRatingInput: {
+            /** Score */
+            score: number;
+        };
+        /**
+         * IngredientTaste
+         * @description An ingredient plus what people think of it, and what *you* think of it.
+         *
+         *     A separate model from `IngredientOut` rather than three optional fields on it. The
+         *     admin endpoints that create and edit an ingredient return the plain one — nobody has
+         *     rated a thing that did not exist ten milliseconds ago — and the read endpoints return
+         *     this. Required fields, no defaults: if `attach_ingredient_ratings` is ever forgotten,
+         *     that is a 500 on the endpoint that forgot it, not a page quietly reporting that no
+         *     one has ever rated anything.
+         */
+        IngredientTaste: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "other";
+            /** Is Caffeinated */
+            is_caffeinated: boolean;
+            /** Description */
+            description: string | null;
+            /** My Score */
+            my_score: number | null;
+            /** Average Score */
+            average_score: number | null;
+            /** Rating Count */
+            rating_count: number;
+        };
         /** IngredientUpdate */
         IngredientUpdate: {
             /** Name */
@@ -1707,10 +1778,10 @@ export interface components {
             /** Pages */
             pages: number;
         };
-        /** Page[IngredientOut] */
-        Page_IngredientOut_: {
+        /** Page[IngredientTaste] */
+        Page_IngredientTaste_: {
             /** Items */
-            items: components["schemas"]["IngredientOut"][];
+            items: components["schemas"]["IngredientTaste"][];
             /** Total */
             total: number;
             /** Page */
@@ -2520,7 +2591,7 @@ export interface components {
         };
         /** TeaIngredientOut */
         TeaIngredientOut: {
-            ingredient: components["schemas"]["IngredientOut"];
+            ingredient: components["schemas"]["IngredientTaste"];
             /** Percentage */
             percentage: number | null;
             /** Is Primary */
@@ -3016,8 +3087,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_IngredientOut_"];
+                    "application/json": components["schemas"]["Page_IngredientTaste_"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rate_ingredient_api_v1_catalog_ingredients__slug__rating_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngredientRatingInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngredientTaste"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unrate_ingredient_api_v1_catalog_ingredients__slug__rating_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
