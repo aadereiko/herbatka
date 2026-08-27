@@ -70,6 +70,9 @@ export function AdminHomePage() {
         <AdminLink to="/admin/ingredients" title="Ingredients">
           Keep the shared vocabulary tidy: add, rename and retire ingredients.
         </AdminLink>
+        <AdminLink to="/admin/shops" title="Shops">
+          Approve suggested shops, and keep what each one stocks up to date.
+        </AdminLink>
         <AdminLink to="/teas" title="Browse the catalog">
           See what a signed-out visitor sees.
         </AdminLink>

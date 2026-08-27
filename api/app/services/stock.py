@@ -26,7 +26,9 @@ _GRAM_PRECISION = Decimal("0.01")
 
 _SIGN = {"purchase": 1, "brew": -1, "discard": -1}
 
-_LOADS = (selectinload(StockItem.tea),)
+# StockItem.shop is serialised on every tin, so it is eager-loaded alongside the tea.
+# Leaving it out makes reading item.shop lazy IO, which an async session cannot do.
+_LOADS = (selectinload(StockItem.tea), selectinload(StockItem.shop))
 
 
 def _grams(value: float | Decimal) -> Decimal:

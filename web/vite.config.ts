@@ -21,6 +21,10 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/api': { target: `http://localhost:${apiPort}`, changeOrigin: true },
+        // Uploaded images. Without this the request falls through to the SPA fallback
+        // and every <img> quietly gets index.html with a 200 — a broken picture and no
+        // error anywhere to explain it. In production the reverse proxy does this job.
+        '/media': { target: `http://localhost:${apiPort}`, changeOrigin: true },
       },
     },
     test: {

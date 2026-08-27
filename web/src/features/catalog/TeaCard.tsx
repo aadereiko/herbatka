@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 
+import { EntityImage } from '../../components/ui/image'
 import { Badge } from '../../components/ui/page'
 import type { TeaSummary } from '../../lib/catalog'
 import { CAFFEINE_LEVEL_LABELS, TEA_TYPE_LABELS } from '../../lib/catalog'
@@ -52,21 +53,11 @@ export function TeaCard({ tea }: { tea: TeaSummary }) {
         data-testid="tea-card"
         className="flex h-full flex-col overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm transition hover:border-brand-400 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-neutral-800 dark:bg-neutral-900"
       >
-        {tea.image_url ? (
-          <img
-            src={tea.image_url}
-            alt=""
-            className="h-32 w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div
-            aria-hidden="true"
-            className="grid h-32 w-full place-items-center bg-brand-100 text-4xl dark:bg-neutral-800"
-          >
-            🍃
-          </div>
-        )}
+        {/* The leaf placeholder this card introduced in M2 now lives in `EntityImage`,
+            because M6 gives shops and households pictures too and three copies of one
+            fallback is three chances to pick a different emoji. Empty alt: the whole
+            card is one link and the tea's name is its text. */}
+        <EntityImage src={tea.image_url} alt="" className="h-32 w-full" testId="tea-card-image" />
 
         <div className="flex flex-1 flex-col gap-2 p-4">
           <div>

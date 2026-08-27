@@ -302,3 +302,80 @@ TEAS: list[
         [("Yerba mate", 100.0, True)],
     ),
 ]
+
+# (name, website, address, city, country, description)
+SHOPS: list[tuple[str, str | None, str | None, str | None, str | None, str]] = [
+    (
+        "Czajnik",
+        "https://czajnik.example",
+        "ul. Floriańska 12",
+        "Kraków",
+        "Poland",
+        "A narrow shop off the main square with more oolong than shelf space.",
+    ),
+    (
+        "Herbaciarnia Pod Wierzbą",
+        None,
+        "ul. Piwna 4",
+        "Warsaw",
+        "Poland",
+        "Tea room first, shop second. They will let you taste before you buy.",
+    ),
+    (
+        "Leaf & Lore",
+        "https://leafandlore.example",
+        None,
+        None,
+        "United Kingdom",
+        "Online only. Small batches, honest harvest dates, sensible postage.",
+    ),
+    (
+        "Yunnan Direct",
+        "https://yunnandirect.example",
+        None,
+        None,
+        "China",
+        "Ships pu-erh and Yunnan blacks direct from the producer.",
+    ),
+    (
+        "Tørret Blad",
+        "https://torretblad.example",
+        "Jægersborggade 21",
+        "Copenhagen",
+        "Denmark",
+        "Nordic minimalism applied to tea. Excellent whites.",
+    ),
+    (
+        "Basar Herbat",
+        None,
+        "Rynek 7",
+        "Wrocław",
+        "Poland",
+        "Market stall. Cash only, but the masala chai is worth the trip.",
+    ),
+]
+
+# (shop, tea, pack_grams, price_minor, currency, product_path or None)
+LISTINGS: list[tuple[str, str, float | None, int | None, str | None, str | None]] = [
+    ("Czajnik", "Sencha", 50, 3200, "PLN", "/sencha-50g"),
+    ("Czajnik", "Sencha", 100, 5800, "PLN", "/sencha-100g"),
+    ("Czajnik", "Gunpowder Green", 100, 2900, "PLN", "/gunpowder"),
+    ("Czajnik", "Masala Chai", 100, 3400, "PLN", "/masala-chai"),
+    ("Czajnik", "Tie Guan Yin", 50, 6500, "PLN", "/tie-guan-yin"),
+    ("Herbaciarnia Pod Wierzbą", "Masala Chai", 100, 3100, "PLN", None),
+    ("Herbaciarnia Pod Wierzbą", "Chamomile Dream", 80, 2200, "PLN", None),
+    ("Herbaciarnia Pod Wierzbą", "Moroccan Mint", 100, 2600, "PLN", None),
+    ("Leaf & Lore", "Earl Grey", 125, 1150, "GBP", "/earl-grey"),
+    ("Leaf & Lore", "English Breakfast", 125, 950, "GBP", "/english-breakfast"),
+    ("Leaf & Lore", "Silver Needle", 25, 2400, "GBP", "/silver-needle"),
+    ("Leaf & Lore", "Jasmine Pearls", 50, 1600, "GBP", "/jasmine-pearls"),
+    ("Yunnan Direct", "Shou Pu-erh", 100, 2800, "CNY", "/shou-puerh"),
+    ("Yunnan Direct", "Tie Guan Yin", 100, 4200, "CNY", "/tie-guan-yin"),
+    ("Yunnan Direct", "Jasmine Pearls", 100, 3600, "CNY", "/jasmine-pearls"),
+    ("Tørret Blad", "Silver Needle", 25, 21000, "DKK", "/silver-needle"),
+    ("Tørret Blad", "Elderflower White", 50, 16500, "DKK", "/elderflower-white"),
+    ("Tørret Blad", "Milk Oolong", 50, 19000, "DKK", "/milk-oolong"),
+    ("Basar Herbat", "Masala Chai", None, 1800, "PLN", None),
+    ("Basar Herbat", "Rooibos Vanilla", None, 1500, "PLN", None),
+    ("Basar Herbat", "Hibiscus Cooler", None, 1400, "PLN", None),
+]

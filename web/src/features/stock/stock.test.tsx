@@ -37,6 +37,8 @@ const session: Session = {
 const household: HouseholdDetail = {
   id: 'hh-1',
   name: 'Home',
+  // M6 widened the household schemas with a picture.
+  image_url: null,
   role: 'owner',
   member_count: 1,
   stock_item_count: 2,
@@ -61,6 +63,8 @@ const sencha: StockItem = {
   opened_at: '2026-08-01',
   best_before: '2027-03-01',
   updated_at: '2026-08-20T07:00:00Z',
+  // M6: a tin bought through a shop's listing remembers which shop.
+  shop: { id: 'shop-1', slug: 'u-kruka', name: 'Herbaciarnia u Kruka' },
 }
 
 const lastOolong: StockItem = {
@@ -73,6 +77,8 @@ const lastOolong: StockItem = {
   opened_at: null,
   best_before: null,
   updated_at: '2026-08-24T07:00:00Z',
+  // And a tin typed in by hand does not. Null is the ordinary case, not a gap.
+  shop: null,
 }
 
 const brewEvent: StockEvent = {
@@ -213,6 +219,11 @@ test('the shelf shows what is left, where it lives, and flags what is running lo
   // Low stock is a badge and a colour, not a colour alone.
   expect(screen.getByTestId('tin-low-item-2')).toHaveTextContent('Running low')
   expect(screen.queryByTestId('tin-low-item-1')).toBeNull()
+
+  // M6: a tin bought through a shop's listing says where it came from, and one typed in
+  // by hand says nothing rather than an em dash.
+  expect(screen.getByTestId('tin-shop-item-1')).toHaveTextContent('from Herbaciarnia u Kruka')
+  expect(screen.queryByTestId('tin-shop-item-2')).toBeNull()
 })
 
 test('one tap brews 5 g: it posts a brew event and the number moves', async () => {

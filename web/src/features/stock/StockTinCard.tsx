@@ -70,6 +70,11 @@ export function StockTinCard({
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">
             <span>{TEA_TYPE_LABELS[item.tea.tea_type]}</span>
             {item.location && <span>· {item.location}</span>}
+            {/* Where it came from, when the tin was bought through a shop's listing
+                rather than typed in by hand. Absent, not "—", for the ordinary case. */}
+            {item.shop && (
+              <span data-testid={`tin-shop-${item.id}`}>· from {item.shop.name}</span>
+            )}
             {item.best_before && <span>· best before {formatDay(item.best_before)}</span>}
           </p>
         </div>

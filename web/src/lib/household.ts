@@ -32,6 +32,9 @@ export type MemberRole = keyof typeof MEMBER_ROLE_LABELS
 
 export type Member = components['schemas']['Member']
 
+/** M6 gave a household a picture, for the same reason a tea has one: a wall of
+ *  identically-shaped cards reading "Home", "Flat 3", "The Office" is a wall you read
+ *  rather than recognise. `image_url` is null on most of them, which is not an error. */
 export type HouseholdSummary = components['schemas']['HouseholdSummary']
 
 export type HouseholdDetail = components['schemas']['HouseholdDetail']
@@ -62,6 +65,12 @@ export type StockEventInputKind = (typeof STOCK_EVENT_INPUT_KINDS)[number]
 
 export type StockEvent = components['schemas']['StockEvent']
 
+/**
+ * M6 added `shop`: where the tin came from, when it came from a shop the catalog knows.
+ * A tin bought through `POST …/listings/{id}/buy` carries one; one typed in by hand
+ * carries null. That null is permanent rather than a migration artefact — most tins will
+ * always have been added by hand — so every render of it has to be guarded.
+ */
 export type StockItem = components['schemas']['StockItem']
 
 export type StockItemDetail = components['schemas']['StockItemDetail']
@@ -69,7 +78,18 @@ export type StockItemDetail = components['schemas']['StockItemDetail']
 /* ------------------------------------------------------------------ write payloads */
 
 export type HouseholdInput = components['schemas']['HouseholdCreate']
+
+/**
+ * M6 reopened `name` as optional and added `image_url`.
+ *
+ * `name` was required while renaming was the only thing this endpoint did. Setting a
+ * picture and leaving the name alone has to be expressible now, and re-sending the
+ * current name to do it is the round trip that races two owners editing at once.
+ * `image_url` is `T | null` rather than optional-only for the usual reason — removing
+ * the picture is not the same request as not mentioning it.
+ */
 export type HouseholdPatch = components['schemas']['HouseholdUpdate']
+
 export type JoinInput = components['schemas']['JoinRequest']
 
 export type InviteInput = Omit<components['schemas']['InviteCreate'], 'expires_in_days'> & {

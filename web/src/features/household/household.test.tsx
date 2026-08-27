@@ -50,6 +50,9 @@ const memberFor = (user: User, role: Member['role']): Member => ({
 const home: HouseholdSummary = {
   id: 'hh-1',
   name: 'Home',
+  // M6 widened both household schemas with a picture. Null here, as an untouched
+  // household actually comes back — the one test that cares sets it.
+  image_url: null,
   role: 'owner',
   member_count: 2,
   stock_item_count: 4,
@@ -75,6 +78,12 @@ const invite: Invite = {
   expires_at: '2026-09-01T08:00:00Z',
   created_at: '2026-08-01T08:00:00Z',
   accepted_at: null,
+}
+
+/** A `File` the upload field will accept: the right type, and comfortably under the
+ *  5 MB limit. The rejection cases live in the shop suite, which owns the field. */
+function imageFile(name: string): File {
+  return new File(['tea'], name, { type: 'image/png' })
 }
 
 function pageOf<T>(items: T[], extra: Partial<Page<T>> = {}): Page<T> {
@@ -376,6 +385,49 @@ test('renaming a household PATCHes the name and refreshes the page', async () =>
   expect(await screen.findByRole('heading', { level: 1, name: 'The Kitchen' })).toBeVisible()
   const patched = calls.find((call) => call.method === 'PATCH' && call.path === '/households/hh-1')
   expect(JSON.parse(patched?.body ?? '{}')).toEqual({ name: 'The Kitchen' })
+})
+
+test('an owner sets a household photo: it uploads, then PATCHes only what changed', async () => {
+  let stored: string | null = null
+  signedIn(ada, {
+    'GET /households/hh-1': () => json({ ...homeDetail, image_url: stored }),
+    'POST /uploads/image': () => json({ url: 'https://cdn.example/home.png' }, 201),
+    'PATCH /households/hh-1': ({ init }) => {
+      const patch = JSON.parse(String(init?.body)) as { image_url?: string | null }
+      stored = patch.image_url ?? null
+      return json({ ...homeDetail, image_url: stored })
+    },
+  })
+  renderApp('/households/hh-1')
+
+  // Nothing set yet, so the shared leaf placeholder stands in for the picture.
+  expect(await screen.findByTestId('household-detail-image-placeholder')).toBeInTheDocument()
+
+  fireEvent.click(screen.getByTestId('start-rename'))
+  fireEvent.change(screen.getByTestId('household-image-input'), {
+    target: { files: [imageFile('home.png')] },
+  })
+
+  // The upload is its own step: the URL comes back and sits in the form until saved.
+  expect(await screen.findByTestId('household-image-preview')).toHaveAttribute(
+    'src',
+    'https://cdn.example/home.png',
+  )
+  expect(calls.some((call) => call.path === '/households/hh-1' && call.method === 'PATCH')).toBe(
+    false,
+  )
+
+  fireEvent.submit(screen.getByTestId('rename-household-form'))
+
+  expect(await screen.findByTestId('household-detail-image')).toHaveAttribute(
+    'src',
+    'https://cdn.example/home.png',
+  )
+
+  // Only the field that moved. Sending an unchanged name back is the write that clobbers
+  // the rename another owner made thirty seconds ago.
+  const patched = calls.find((call) => call.method === 'PATCH' && call.path === '/households/hh-1')
+  expect(JSON.parse(patched?.body ?? '{}')).toEqual({ image_url: 'https://cdn.example/home.png' })
 })
 
 test('an owner removes another member in two taps; a member sees no remove button', async () => {

@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M5 done**. Next up: M6 — polish, then M7 — ship.
+Status: **M0–M6 done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -281,12 +281,50 @@ public. The feed carries friends' *reviews* plus tins added in households *you* 
 to — never a friend's shelf, which stays private to its members
 (`test_a_friends_household_stock_stays_private`).
 
-### M6 — Polish
+### M6 — Shops and buying ✅
+Where tea comes from, and getting it onto a shelf.
+
+`shop` (one model for both online and physical: an optional website, an optional
+address/city/country) and `shop_listing` — a tea a shop sells, with pack size, price and
+an outbound product link. Admin-managed with user submissions, the same approval queue
+teas use.
+
+**Buying records a purchase; it does not take payment.** You pick a listing, say how much
+you bought and what you paid, and it lands on a household's shelf as a tin tagged with
+the shop — which is what makes "a tea from a shop in a household" true. The outbound
+"Buy at …" link sends you to the shop's own page for the actual transaction. Real
+checkout was considered and rejected: payments, orders, fulfilment, refunds and tax are
+a different application, not a milestone.
+
+`stock_item` gains `shop_id`, and the purchase `stock_event` records the shop and price,
+so the ledger keeps answering "where did this come from and what did it cost" — the data
+a cost-per-cup or reorder feature would need later.
+
+Images arrive here rather than in polish, because households need them now: one upload
+endpoint writing to local disk in dev (S3-compatible later), used by households, shops
+and teas alike. Validated on type and size, stored under a hashed name — never the
+client's filename.
+
+**Done.** 6 shops and 21 listings seeded across four currencies. 219 backend + 109
+frontend tests. Verified in a browser: bought 50 g of Tie Guan Yin at Czajnik into Flat
+3B, and the tin shows "Bought at Czajnik" with the price and a ledger entry. Household
+pictures upload and render.
+
+Two things this milestone taught, both found in a browser and neither by a test:
+- **Vite proxies `/api` only.** Uploaded images live at `/media/…`, so every `<img>`
+  silently got `index.html` with a 200 — a broken picture and no error to explain it.
+  `/media` is proxied now; in production the reverse proxy does that job.
+- **Autogenerate wrote an unnamed foreign key for the third time.** `tests/test_migrations.py`
+  now greps every revision for `create_foreign_key(None` and `drop_constraint(None`,
+  because the failure is silent: `upgrade` succeeds, only `downgrade` breaks, and the
+  failed downgrade makes the next upgrade a no-op.
+
+### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across
 the app. Dark mode. Mobile layout pass — the stock screen is a phone-in-the-kitchen
 screen and should be designed as one. Basic a11y sweep.
 
-### M7 — Ship
+### M8 — Ship
 Dockerfiles for api and web. GitHub Actions: lint, typecheck, pytest, vitest, build.
 Deploy to Fly.io or Railway with a managed Postgres and a migrate-on-release step.
 **Done when:** pushing to `main` puts it online.

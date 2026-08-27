@@ -104,6 +104,7 @@ export function AdminTeasPage() {
             pendingLabel="Creating…"
             pending={create.isPending}
             error={create.isError ? describeApiError(create.error) : null}
+            withUpload
             onSubmit={(input) =>
               create.mutate(input, { onSuccess: () => setFormKey((key) => key + 1) })
             }

@@ -5,6 +5,7 @@ import type { Location } from 'react-router'
 import App from '../App'
 import { AdminHomePage } from '../features/admin/AdminHomePage'
 import { AdminIngredientsPage } from '../features/admin/AdminIngredientsPage'
+import { AdminShopsPage } from '../features/admin/AdminShopsPage'
 import { AdminTeasPage } from '../features/admin/AdminTeasPage'
 import { useAuth } from '../features/auth/auth-context'
 import { LoginPage } from '../features/auth/LoginPage'
@@ -18,6 +19,8 @@ import { HomePage } from '../features/home/HomePage'
 import { HouseholdDetailPage } from '../features/household/HouseholdDetailPage'
 import { HouseholdListPage } from '../features/household/HouseholdListPage'
 import { MyReviewsPage } from '../features/review/MyReviewsPage'
+import { ShopDetailPage } from '../features/shop/ShopDetailPage'
+import { ShopListPage } from '../features/shop/ShopListPage'
 import { StockItemPage } from '../features/stock/StockItemPage'
 import { ForbiddenPage } from './ForbiddenPage'
 
@@ -104,6 +107,13 @@ export function AppRoutes() {
       <Route path="/teas/:slug" element={<TeaDetailPage />} />
       <Route path="/ingredients" element={<IngredientListPage />} />
 
+      {/* Public for the same reason the catalog is, and more so: "where can I buy this"
+          is the question somebody arrives with, and putting it behind a sign-up is how
+          they leave again. Only the buy button needs an account, because only it needs a
+          shelf to put the tin on. */}
+      <Route path="/shops" element={<ShopListPage />} />
+      <Route path="/shops/:slug" element={<ShopDetailPage />} />
+
       {/* Reading reviews needs no account; the list of *yours* is the one page in this
           feature that does. `/reviews/mine` is the endpoint's own name, and a URL that
           matches the API is one less thing to remember. */}
@@ -185,6 +195,14 @@ export function AppRoutes() {
         element={
           <RequireAdmin>
             <AdminIngredientsPage />
+          </RequireAdmin>
+        }
+      />
+      <Route
+        path="/admin/shops"
+        element={
+          <RequireAdmin>
+            <AdminShopsPage />
           </RequireAdmin>
         }
       />

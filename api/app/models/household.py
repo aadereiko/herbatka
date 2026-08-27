@@ -18,6 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
 from app.models.catalog import Tea
+from app.models.shop import Shop
 from app.models.user import User
 
 MemberRoleEnum = Enum(
@@ -46,6 +47,7 @@ class Household(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "household"
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(500))
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("user_account.id", ondelete="SET NULL")
     )
@@ -120,6 +122,9 @@ class StockItem(UUIDPrimaryKey, Timestamps, Base):
         ForeignKey("tea.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    # Where this tin came from. SET NULL, because a shop closing does not empty anyone's
+    # cupboard.
+    shop_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("shop.id", ondelete="SET NULL"))
 
     # A cached sum of stock_event.delta_grams, recomputed in the same transaction as
     # every insert. The ledger is the truth; this is a materialised head so that
@@ -149,6 +154,7 @@ class StockItem(UUIDPrimaryKey, Timestamps, Base):
 
     household: Mapped[Household] = relationship(back_populates="stock_items")
     tea: Mapped[Tea] = relationship()
+    shop: Mapped["Shop | None"] = relationship()
     added_by: Mapped[User | None] = relationship(foreign_keys=[added_by_id])
     events: Mapped[list["StockEvent"]] = relationship(
         back_populates="stock_item",
@@ -189,6 +195,11 @@ class StockEvent(UUIDPrimaryKey, Timestamps, Base):
     delta_grams: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
     note: Mapped[str | None] = mapped_column(String(500))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Only meaningful on a `purchase`: which shop, and what it cost. Kept on the event
+    # rather than only on the tin so a top-up from a different shop is not lost.
+    shop_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("shop.id", ondelete="SET NULL"))
+    price_paid_minor: Mapped[int | None] = mapped_column(Integer)
+    currency: Mapped[str | None] = mapped_column(String(3))
 
     stock_item: Mapped[StockItem] = relationship(back_populates="events")
     user: Mapped[User | None] = relationship()

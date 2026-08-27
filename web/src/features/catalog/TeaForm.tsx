@@ -10,6 +10,7 @@ import {
   TextAreaField,
   TextField,
 } from '../../components/ui/form'
+import { IMAGE_UPLOAD_HINT, ImageUploadField } from '../../components/ui/image-upload'
 import { Badge, Skeleton } from '../../components/ui/page'
 import { useDebouncedValue } from '../../lib/debounce'
 import type { CaffeineLevel, Ingredient, TeaInput, TeaType } from '../../lib/catalog'
@@ -60,6 +61,7 @@ export function TeaForm({
   pendingLabel,
   pending,
   error,
+  withUpload = false,
   onSubmit,
 }: {
   idPrefix: string
@@ -67,6 +69,11 @@ export function TeaForm({
   pendingLabel: string
   pending: boolean
   error?: string | null
+  /** M6: the admin form uploads a picture; the public suggestion form still takes a URL.
+   *  Not a snub — a suggestion is a stranger's tip-off, and handing every visitor a file
+   *  endpoint to store bytes through is a different decision from letting them type a
+   *  link. An admin adds the real photo when they approve it. */
+  withUpload?: boolean
   onSubmit: (input: TeaInput) => void
 }) {
   const [name, setName] = useState('')
@@ -75,6 +82,9 @@ export function TeaForm({
   const [brandId, setBrandId] = useState('')
   const [origin, setOrigin] = useState('')
   const [description, setDescription] = useState('')
+  // One piece of state for two controls: the uploader hands back the URL the server
+  // stored, and the text box takes one typed in. Whichever the caller offers, the value
+  // submitted is the same field.
   const [imageUrl, setImageUrl] = useState('')
   const [brewTemp, setBrewTemp] = useState('')
   const [brewSeconds, setBrewSeconds] = useState('')
@@ -187,14 +197,27 @@ export function TeaForm({
           onChange={setOrigin}
           placeholder="China"
         />
-        <TextField
-          id={`${idPrefix}-image`}
-          label="Image URL"
-          type="url"
-          value={imageUrl}
-          onChange={setImageUrl}
-        />
+        {!withUpload && (
+          <TextField
+            id={`${idPrefix}-image`}
+            label="Image URL"
+            type="url"
+            value={imageUrl}
+            onChange={setImageUrl}
+          />
+        )}
       </div>
+
+      {withUpload && (
+        <ImageUploadField
+          id={`${idPrefix}-image`}
+          label="Photo"
+          value={imageUrl || null}
+          onChange={(url) => setImageUrl(url ?? '')}
+          hint={IMAGE_UPLOAD_HINT}
+          previewAlt={name ? `Photo of ${name}` : 'The photo you chose'}
+        />
+      )}
 
       <TextAreaField
         id={`${idPrefix}-description`}

@@ -89,6 +89,11 @@ function SiteNav() {
         <NavLink to="/ingredients" className={navClass}>
           Ingredients
         </NavLink>
+        {/* Public, and next to the catalog it belongs beside: a shop is the other half
+            of "what is this tea" — the half that answers where to get it. */}
+        <NavLink to="/shops" className={navClass} data-testid="nav-shops">
+          Shops
+        </NavLink>
         {/* After the catalog it belongs to, and signed-in only: /reviews/mine is behind
             RequireAuth, and an entry that only ever leads to a login screen is worse
             than no entry. */}
@@ -125,18 +130,26 @@ export function PageHeading({
   title,
   subtitle,
   actions,
+  leading,
 }: {
   title: string
   subtitle?: string
   actions?: ReactNode
+  /** A picture, in practice — the household's or the shop's, beside its name rather than
+   *  floating above it. A slot here rather than a second heading component: the margins,
+   *  the wrapping and the actions row are the parts nobody wants two versions of. */
+  leading?: ReactNode
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="text-2xl font-semibold text-brand-900 dark:text-brand-100">{title}</h1>
-        {subtitle && (
-          <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{subtitle}</p>
-        )}
+      <div className="flex items-center gap-3">
+        {leading}
+        <div>
+          <h1 className="text-2xl font-semibold text-brand-900 dark:text-brand-100">{title}</h1>
+          {subtitle && (
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{subtitle}</p>
+          )}
+        </div>
       </div>
       {actions}
     </div>

@@ -19,8 +19,21 @@ from app.schemas.catalog import (
     tea_summary,
 )
 from app.schemas.common import Page
+from app.schemas.shop import (
+    Listing,
+    ListingCreate,
+    ListingUpdate,
+    ShopCreate,
+    ShopDetail,
+    ShopSummary,
+    ShopUpdate,
+    listing_out,
+    shop_detail,
+    shop_summary,
+)
 from app.services import catalog as catalog_service
-from app.services.errors import IngredientInUse, NotFound
+from app.services import shop as shop_service
+from app.services.errors import AlreadyExists, IngredientInUse, NotFound
 
 # AdminUser is declared as a router-wide dependency rather than per route: a new
 # endpoint added here is protected by default, instead of being public until somebody
@@ -146,5 +159,99 @@ async def update_brand(brand_id: uuid.UUID, payload: BrandUpdate, db: DbSession)
 async def delete_brand(brand_id: uuid.UUID, db: DbSession) -> None:
     try:
         await catalog_service.delete_brand(db, brand_id)
+    except NotFound as exc:
+        raise _not_found(exc) from exc
+
+
+# ---------------------------------------------------------------------------- shops
+
+
+@router.get("/shops", response_model=Page[ShopSummary])
+async def list_shops(
+    db: DbSession, paging: PageParams, approved: Annotated[bool | None, Query()] = None
+) -> Page[ShopSummary]:
+    """Unlike the public list, this can show unapproved shops — the moderation queue."""
+    rows, total = await shop_service.list_shops(
+        db, approved=approved, page=paging.page, size=paging.size
+    )
+    return Page.build([shop_summary(s, n) for s, n in rows], total, paging.page, paging.size)
+
+
+@router.get("/shops/{shop_id}", response_model=ShopDetail)
+async def get_shop(shop_id: uuid.UUID, db: DbSession) -> ShopDetail:
+    """The full record regardless of approval.
+
+    The public GET /shops/{slug} deliberately hides unapproved shops, which left the
+    moderation queue unable to show `address` or `description` — so an edit form built
+    from the queue's summary would have PATCHed both to null. An admin needs to read
+    what they are approving.
+    """
+    try:
+        return shop_detail(*await shop_service.get_shop(db, shop_id))
+    except NotFound as exc:
+        raise _not_found(exc) from exc
+
+
+@router.post("/shops", response_model=ShopDetail, status_code=status.HTTP_201_CREATED)
+async def create_shop(payload: ShopCreate, admin: AdminUser, db: DbSession) -> ShopDetail:
+    shop, count = await shop_service.create_shop(db, payload, created_by=admin, approved=True)
+    return shop_detail(shop, count)
+
+
+@router.patch("/shops/{shop_id}", response_model=ShopDetail)
+async def update_shop(shop_id: uuid.UUID, payload: ShopUpdate, db: DbSession) -> ShopDetail:
+    try:
+        return shop_detail(*await shop_service.update_shop(db, shop_id, payload))
+    except NotFound as exc:
+        raise _not_found(exc) from exc
+
+
+@router.post("/shops/{shop_id}/approve", response_model=ShopDetail)
+async def approve_shop(shop_id: uuid.UUID, db: DbSession) -> ShopDetail:
+    try:
+        return shop_detail(*await shop_service.approve_shop(db, shop_id))
+    except NotFound as exc:
+        raise _not_found(exc) from exc
+
+
+@router.delete("/shops/{shop_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_shop(shop_id: uuid.UUID, db: DbSession) -> None:
+    try:
+        await shop_service.delete_shop(db, shop_id)
+    except NotFound as exc:
+        raise _not_found(exc) from exc
+
+
+@router.post(
+    "/shops/{shop_id}/listings", response_model=Listing, status_code=status.HTTP_201_CREATED
+)
+async def create_listing(shop_id: uuid.UUID, payload: ListingCreate, db: DbSession) -> Listing:
+    try:
+        return listing_out(await shop_service.create_listing(db, shop_id, payload))
+    except NotFound as exc:
+        raise _not_found(exc) from exc
+    except AlreadyExists as exc:
+        # Checked in the service, so this is a 409 naming the clash rather than a 500
+        # from uq_listing_shop_tea_pack. The constraint stays as the net.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This shop already lists that tea at that pack size",
+        ) from exc
+
+
+@router.patch("/shops/{shop_id}/listings/{listing_id}", response_model=Listing)
+async def update_listing(
+    shop_id: uuid.UUID, listing_id: uuid.UUID, payload: ListingUpdate, db: DbSession
+) -> Listing:
+    try:
+        return listing_out(await shop_service.update_listing(db, shop_id, listing_id, payload))
+    except NotFound as exc:
+        raise _not_found(exc) from exc
+
+
+@router.delete("/shops/{shop_id}/listings/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_listing(shop_id: uuid.UUID, listing_id: uuid.UUID, db: DbSession) -> None:
+    try:
+        await shop_service.delete_listing(db, shop_id, listing_id)
     except NotFound as exc:
         raise _not_found(exc) from exc

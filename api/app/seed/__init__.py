@@ -6,17 +6,19 @@ without creating duplicates or clobbering edits an admin has made.
 """
 
 import asyncio
+from decimal import Decimal
 
 from sqlalchemy import select
 
 from app.core.slug import slugify
 from app.db.session import SessionLocal
 from app.models.catalog import Brand, Ingredient, Tea, TeaIngredient
-from app.seed.data import BRANDS, BREWING, INGREDIENTS, TEAS
+from app.models.shop import Shop, ShopListing
+from app.seed.data import BRANDS, BREWING, INGREDIENTS, LISTINGS, SHOPS, TEAS
 
 
 async def seed() -> dict[str, int]:
-    created = {"ingredients": 0, "brands": 0, "teas": 0}
+    created = {"ingredients": 0, "brands": 0, "teas": 0, "shops": 0, "listings": 0}
 
     async with SessionLocal() as session:
         existing_ingredients = {i.slug: i for i in await session.scalars(select(Ingredient))}
@@ -79,6 +81,53 @@ async def seed() -> dict[str, int]:
             session.add(tea)
             created["teas"] += 1
 
+        # Shops, and what they sell. Flushed first so the listings can reference them.
+        existing_shops = {s.slug: s for s in await session.scalars(select(Shop))}
+        for name, website, address, city, country, description in SHOPS:
+            slug = slugify(name)
+            if slug in existing_shops:
+                continue
+            shop = Shop(
+                slug=slug,
+                name=name,
+                website=website,
+                address=address,
+                city=city,
+                country=country,
+                description=description,
+                is_approved=True,
+            )
+            session.add(shop)
+            existing_shops[slug] = shop
+            created["shops"] += 1
+        await session.flush()
+
+        teas_by_slug = {t.slug: t for t in await session.scalars(select(Tea))}
+        existing_listings = {
+            (row.shop_id, row.tea_id, row.pack_grams)
+            for row in await session.scalars(select(ShopListing))
+        }
+        for shop_name, tea_name, pack, price, currency, path in LISTINGS:
+            shop = existing_shops[slugify(shop_name)]
+            tea = teas_by_slug.get(slugify(tea_name))
+            if tea is None:
+                continue
+            pack_value = Decimal(str(pack)) if pack is not None else None
+            if (shop.id, tea.id, pack_value) in existing_listings:
+                continue
+            session.add(
+                ShopListing(
+                    shop_id=shop.id,
+                    tea_id=tea.id,
+                    pack_grams=pack_value,
+                    price_minor=price,
+                    currency=currency,
+                    product_url=f"{shop.website}{path}" if shop.website and path else None,
+                )
+            )
+            existing_listings.add((shop.id, tea.id, pack_value))
+            created["listings"] += 1
+
         await session.commit()
 
     return created
@@ -91,6 +140,7 @@ def main() -> None:
         print("Catalog already seeded; nothing to do.")
     else:
         print(
-            f"Seeded {created['ingredients']} ingredients, "
-            f"{created['brands']} brands, {created['teas']} teas."
+            f"Seeded {created['ingredients']} ingredients, {created['brands']} brands, "
+            f"{created['teas']} teas, {created['shops']} shops, "
+            f"{created['listings']} listings."
         )

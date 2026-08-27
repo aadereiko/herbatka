@@ -84,6 +84,10 @@ function toSummary(detail: StockItemDetail): StockItem {
     opened_at: detail.opened_at,
     best_before: detail.best_before,
     updated_at: detail.updated_at,
+    // M6. Easy to forget, and forgetting it means a tin bought at a shop loses its shop
+    // the moment a PATCH writes the detail response back into the list cache — until the
+    // next refetch puts it back, which looks exactly like a flicker nobody can reproduce.
+    shop: detail.shop,
   }
 }
 

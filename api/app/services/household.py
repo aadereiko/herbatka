@@ -130,7 +130,10 @@ async def update(db: AsyncSession, household_id: uuid.UUID, payload: HouseholdUp
     household = await db.get(Household, household_id)
     if household is None:
         raise NotFound("household")
-    household.name = payload.name
+    # exclude_unset, so PATCHing only the picture does not blank the name — and passing
+    # image_url: null explicitly still clears it.
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(household, key, value)
     await db.flush()
     return household
 

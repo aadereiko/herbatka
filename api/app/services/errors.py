@@ -61,3 +61,8 @@ class AlreadyConnected(ServiceError):
 
 class Blocked(ServiceError):
     """Surfaced as 404, never as "you are blocked" — see the router."""
+
+
+class AlreadyExists(ServiceError):
+    """A uniqueness rule the caller can fix, reported as 409 rather than left to the
+    constraint to raise as a 500."""

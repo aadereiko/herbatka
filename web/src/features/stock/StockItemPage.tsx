@@ -313,6 +313,25 @@ export function StockItemPage() {
               <DetailRow label="Bought" value={formatDay(item.purchased_at)} />
               <DetailRow label="Price paid" value={price ?? '—'} />
               <DetailRow label="Last change" value={formatMoment(item.updated_at)} />
+              {/* Only when the tin came from a shop the catalog knows — most tins are
+                  typed in by hand and have no answer, and a row of em dashes down the
+                  grid is a row nobody reads. A link, because "buy another one" is the
+                  reason anybody looks at where a tin came from. */}
+              {item.shop && (
+                <div data-testid="tin-shop">
+                  <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                    Bought at
+                  </dt>
+                  <dd className="text-sm">
+                    <Link
+                      to={`/shops/${item.shop.slug}`}
+                      className="font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-300"
+                    >
+                      {item.shop.name}
+                    </Link>
+                  </dd>
+                </div>
+              )}
             </dl>
 
             {item.notes && (

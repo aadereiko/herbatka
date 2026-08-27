@@ -270,6 +270,9 @@ test('the detail page lists ingredients and the brewing spec', async () => {
     // now makes is a request the harness knows about — an unhandled one rejects loudly,
     // which is the point of the router.
     'GET /catalog/teas/jasmine-pearls/reviews': () => json(pageOf([])),
+    // M6 hangs a "where to buy" panel off the same page. Registered for the same
+    // reason: an unhandled request rejects loudly, which is the point of the router.
+    'GET /catalog/teas/jasmine-pearls/shops': () => json(pageOf([])),
   })
   renderApp('/teas/jasmine-pearls')
 

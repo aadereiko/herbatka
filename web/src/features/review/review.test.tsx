@@ -174,6 +174,9 @@ function teaPage(overrides: Record<string, Handler> = {}) {
     'POST /auth/refresh': () => json(session),
     'GET /catalog/teas/jasmine-pearls': () => json(jasminePearlsDetail),
     'GET /catalog/teas/jasmine-pearls/reviews': () => json(pageOf([grace])),
+    // M6 hangs a "where to buy" panel off the same page. Registered for the same
+    // reason: an unhandled request rejects loudly, which is the point of the router.
+    'GET /catalog/teas/jasmine-pearls/shops': () => json(pageOf([])),
     ...overrides,
   })
 }

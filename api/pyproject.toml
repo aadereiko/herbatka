@@ -13,6 +13,7 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "pyjwt>=2.13.0",
     "pydantic[email]>=2.13.4",
+    "python-multipart>=0.0.32",
 ]
 
 [dependency-groups]

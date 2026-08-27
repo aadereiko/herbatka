@@ -289,3 +289,38 @@ async def tin(client: AsyncClient, owner: Account, household: dict, tea: "Tea") 
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+@pytest.fixture
+async def shop(client: AsyncClient, admin_headers: dict[str, str]) -> dict:
+    response = await client.post(
+        "/api/v1/admin/shops",
+        headers=admin_headers,
+        json={
+            "name": "Czajnik",
+            "city": "Kraków",
+            "country": "Poland",
+            "website": "https://czajnik.example",
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.fixture
+async def listing(
+    client: AsyncClient, admin_headers: dict[str, str], shop: dict, tea: "Tea"
+) -> dict:
+    response = await client.post(
+        f"/api/v1/admin/shops/{shop['id']}/listings",
+        headers=admin_headers,
+        json={
+            "tea_id": str(tea.id),
+            "pack_grams": 50,
+            "price_minor": 2400,
+            "currency": "PLN",
+            "product_url": "https://czajnik.example/sencha",
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()

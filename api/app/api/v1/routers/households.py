@@ -32,6 +32,7 @@ def _summary(
     return HouseholdSummary(
         id=household.id,
         name=household.name,
+        image_url=household.image_url,
         role=role,  # type: ignore[arg-type]
         member_count=members,
         stock_item_count=tins,

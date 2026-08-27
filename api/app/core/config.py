@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     refresh_cookie_name: str = "herbatka_refresh"
 
+    # Uploaded images live on local disk in dev. Swapping this for an S3-compatible
+    # store later is a change to app/services/images.py alone, because everything else
+    # only ever sees the returned URL.
+    media_root: str = str(REPO_ROOT / "api" / "media")
+    media_url_prefix: str = "/media"
+
     jwt_secret: str = "change-me-in-any-non-local-environment"
     access_token_ttl_seconds: int = 900
     refresh_token_ttl_days: int = 30

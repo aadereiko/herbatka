@@ -1,10 +1,13 @@
 import uuid
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.catalog import TeaType
+
+if TYPE_CHECKING:
+    from app.schemas.shop import ShopRef
 
 MemberRole = Literal["owner", "member"]
 StockEventKind = Literal["purchase", "brew", "adjust", "discard"]
@@ -31,6 +34,7 @@ class Member(BaseModel):
 class HouseholdSummary(BaseModel):
     id: uuid.UUID
     name: str
+    image_url: str | None
     role: MemberRole
     member_count: int
     stock_item_count: int
@@ -47,7 +51,8 @@ class HouseholdCreate(BaseModel):
 
 
 class HouseholdUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    image_url: str | None = Field(default=None, max_length=500)
 
 
 class InviteCreate(BaseModel):
@@ -106,6 +111,9 @@ class StockItem(BaseModel):
     opened_at: date | None
     best_before: date | None
     updated_at: datetime
+    # Forward-referenced: schemas.shop imports TeaRef from here, so importing it back at
+    # runtime would be a cycle. schemas.shop calls the model_rebuild below.
+    shop: "ShopRef | None"
 
 
 class StockItemDetail(StockItem):
@@ -178,6 +186,8 @@ def stock_event(event: Any) -> StockEvent:
 
 
 def _stock_fields(item: Any) -> dict[str, Any]:
+    from app.schemas.shop import ShopRef
+
     quantity = float(item.quantity_grams)
     threshold = float(item.low_stock_grams)
     return {
@@ -192,6 +202,7 @@ def _stock_fields(item: Any) -> dict[str, Any]:
         "opened_at": item.opened_at,
         "best_before": item.best_before,
         "updated_at": item.updated_at,
+        "shop": ShopRef.model_validate(item.shop) if item.shop else None,
     }
 
 

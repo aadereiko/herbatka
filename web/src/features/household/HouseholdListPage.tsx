@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 
 import { FormError, SubmitButton, TextField } from '../../components/ui/form'
+import { EntityImage } from '../../components/ui/image'
 import {
   Badge,
   EmptyState,
@@ -26,8 +27,16 @@ function HouseholdCard({ household }: { household: HouseholdSummary }) {
         data-testid="household-card"
         className="flex h-full flex-col gap-3 rounded-2xl border border-brand-200 bg-white p-4 shadow-sm transition hover:border-brand-400 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-neutral-800 dark:bg-neutral-900"
       >
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="text-base font-semibold text-brand-900 dark:text-brand-100">
+        <div className="flex items-start gap-3">
+          {/* Empty alt: the whole card is one link whose text is the household's name,
+              and hearing it twice is repetition rather than information. */}
+          <EntityImage
+            src={household.image_url}
+            alt=""
+            className="size-12 shrink-0 rounded-xl"
+            testId="household-card-image"
+          />
+          <h2 className="mr-auto text-base font-semibold text-brand-900 dark:text-brand-100">
             {household.name}
           </h2>
           <Badge tone={household.role === 'owner' ? 'brand' : 'neutral'}>
