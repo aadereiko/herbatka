@@ -18,6 +18,7 @@ import { pluralise } from '../catalog/format'
 import { formatAverage, formatScore } from '../review/format'
 import { ReviewDetails } from '../review/ReviewList'
 import { FriendAction } from './FriendAction'
+import { ProfileConnections } from './ProfileConnections'
 import { useProfile } from './queries'
 
 /** One number and what it counts. Three of them, and the average is the one that is
@@ -157,11 +158,11 @@ function ProfileBody({ profile }: { profile: PublicProfile }) {
           }
           testId="profile-average"
         />
-        <Fact
-          label="Households"
-          value={String(profile.household_count)}
-          testId="profile-household-count"
-        />
+        {/* No household tile. household_count now means "how many you may see", so on a
+            stranger's profile it would read "Households 0" about somebody who has three
+            — a fact about the reader wearing the label of a fact about the person. The
+            panel below shows the ones you may see, and shows nothing when there are
+            none, which is the honest version of the same information. */}
       </dl>
 
       <Panel ariaLabel="Recent reviews" testId="profile-reviews">
@@ -193,6 +194,9 @@ function ProfileBody({ profile }: { profile: PublicProfile }) {
           </>
         )}
       </Panel>
+
+      {/* Below the reviews, and often not there at all — see `ProfileConnections`. */}
+      <ProfileConnections profile={profile} />
     </>
   )
 }

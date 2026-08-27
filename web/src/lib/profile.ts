@@ -22,6 +22,42 @@ import type { components } from './generated/api'
 
 export type ProfileReview = components['schemas']['ProfileReview']
 
+/* --------------------------------------------------------- who they are connected to */
+
+/**
+ * Somebody named on a profile — one of their friends.
+ *
+ * A face and a name and nothing else, and in particular no email, where the `UserRef` a
+ * friends list or a members list carries does have one. Same reason the profile itself
+ * has none: those lists only ever describe people you are already connected to, and this
+ * one can name a friend-of-a-friend you have never met.
+ */
+export type ProfilePerson = components['schemas']['ProfilePerson']
+
+/**
+ * One of their households, as much of it as you are allowed to know about.
+ *
+ * `shared` is the load-bearing field, and it is about *you*, not about the household:
+ * true means you are a member of it too. False means it is theirs and not yours — you
+ * may see that it exists and what it is called, and `GET /households/{id}` will answer
+ * you 404 by design. Anything that turns one of those into a link is offering a link to
+ * a "not found" page.
+ */
+export type ProfileHousehold = components['schemas']['ProfileHousehold']
+
+/**
+ * **`households` and `friends` arrive already filtered, and the client must not try to
+ * filter them again.** The server decides what this viewer may see — everything on your
+ * own profile and on a friend's, only the households you are both in and the friends you
+ * have in common for anybody else signed in, and nothing at all for a signed-out
+ * visitor. What you are not allowed to see never reaches the browser, so there is
+ * nothing here to re-derive and no way to re-derive it correctly if you tried.
+ *
+ * That is also what `household_count` and `friend_count` now mean: the size of what *you*
+ * were shown, not the person's real totals. The API deliberately does not send the
+ * totals, because "showing 2 of 5" would publish the very number the rule exists to
+ * withhold — so never render one of these against a total, and never invent one.
+ */
 export type PublicProfile = components['schemas']['PublicProfile']
 
 /**

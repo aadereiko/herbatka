@@ -129,10 +129,16 @@ class TestProfileStats:
         assert review["score"] == 8
         assert review["body"] == "Grassy."
 
-    async def test_counts_the_households_they_belong_to(
+    async def test_the_household_count_is_what_you_may_see_not_their_total(
         self, client: AsyncClient, owner: Account, household: dict
     ) -> None:
-        assert (await client.get(profile_url(owner.id))).json()["household_count"] == 1
+        """A true total beside a filtered list would leak the number the rule hides:
+        "1 of 5" tells a stranger there are four more."""
+        signed_out = (await client.get(profile_url(owner.id))).json()
+        their_own = (await client.get(profile_url(owner.id), headers=owner.headers)).json()
+
+        assert signed_out["household_count"] == 0
+        assert their_own["household_count"] == 1
 
 
 class TestEditingYourOwn:
@@ -210,3 +216,157 @@ class TestEditingYourOwn:
 
     async def test_requires_an_account(self, client: AsyncClient) -> None:
         assert (await client.patch(ME, json={"bio": "hello"})).status_code == 401
+
+
+async def _befriend(client: AsyncClient, a: Account, b: Account) -> None:
+    request = await client.post(
+        "/api/v1/friends/requests", headers=a.headers, json={"user_id": b.id}
+    )
+    accepted = await client.post(
+        f"/api/v1/friends/requests/{request.json()['id']}/accept", headers=b.headers
+    )
+    assert accepted.status_code == 200, accepted.text
+
+
+class TestWhoSeesWhichHouseholds:
+    async def test_signed_out_sees_none(
+        self, client: AsyncClient, owner: Account, household: dict
+    ) -> None:
+        assert (await client.get(profile_url(owner.id))).json()["households"] == []
+
+    async def test_you_see_all_of_your_own(
+        self, client: AsyncClient, owner: Account, household: dict
+    ) -> None:
+        body = (await client.get(profile_url(owner.id), headers=owner.headers)).json()
+
+        assert [h["name"] for h in body["households"]] == ["Flat 3B"]
+        assert body["households"][0]["shared"] is True
+
+    async def test_a_friend_sees_them_even_without_sharing_one(
+        self, client: AsyncClient, owner: Account, outsider: Account, household: dict
+    ) -> None:
+        """A deliberate loosening of the rule that membership is invisible to
+        non-members: a friend learns the household's *name*, and nothing else."""
+        await _befriend(client, owner, outsider)
+
+        body = (await client.get(profile_url(owner.id), headers=outsider.headers)).json()
+
+        assert [h["name"] for h in body["households"]] == ["Flat 3B"]
+        assert body["households"][0]["shared"] is False
+
+    async def test_a_name_a_friend_can_see_still_does_not_open(
+        self, client: AsyncClient, owner: Account, outsider: Account, household: dict
+    ) -> None:
+        """shared=false is load-bearing: the household page still 404s, so the client
+        must not offer the name as a link."""
+        await _befriend(client, owner, outsider)
+
+        assert (
+            await client.get(f"/api/v1/households/{household['id']}", headers=outsider.headers)
+        ).status_code == 404
+
+    async def test_a_stranger_sees_only_the_ones_you_are_both_in(
+        self, client: AsyncClient, owner: Account, flatmate: Account, shared_household: dict
+    ) -> None:
+        """No friendship here — the flatmate sees it only because they are in it, which
+        they could already tell from the household page itself."""
+        body = (await client.get(profile_url(owner.id), headers=flatmate.headers)).json()
+
+        assert [h["name"] for h in body["households"]] == ["Flat 3B"]
+        assert body["households"][0]["shared"] is True
+
+    async def test_a_stranger_with_nothing_in_common_sees_none(
+        self, client: AsyncClient, owner: Account, outsider: Account, household: dict
+    ) -> None:
+        body = (await client.get(profile_url(owner.id), headers=outsider.headers)).json()
+
+        assert body["households"] == []
+        assert body["household_count"] == 0
+
+    async def test_blocking_closes_it_again(
+        self, client: AsyncClient, owner: Account, outsider: Account, household: dict
+    ) -> None:
+        """Whoever did the blocking, neither should be showing the other their
+        households."""
+        await _befriend(client, owner, outsider)
+        await client.post(f"/api/v1/friends/{outsider.id}/block", headers=owner.headers)
+
+        body = (await client.get(profile_url(owner.id), headers=outsider.headers)).json()
+
+        assert body["households"] == []
+
+
+class TestWhoSeesWhichFriends:
+    async def test_signed_out_sees_none(
+        self, client: AsyncClient, owner: Account, flatmate: Account
+    ) -> None:
+        await _befriend(client, owner, flatmate)
+
+        assert (await client.get(profile_url(owner.id))).json()["friends"] == []
+
+    async def test_you_see_all_of_your_own(
+        self, client: AsyncClient, owner: Account, flatmate: Account
+    ) -> None:
+        await _befriend(client, owner, flatmate)
+
+        body = (await client.get(profile_url(owner.id), headers=owner.headers)).json()
+
+        assert [f["display_name"] for f in body["friends"]] == ["Flatmate"]
+        assert body["friend_count"] == 1
+
+    async def test_a_friend_sees_all_of_theirs(
+        self, client: AsyncClient, owner: Account, flatmate: Account, outsider: Account
+    ) -> None:
+        """Everyone except the reader — the flatmate already knows they are a friend."""
+        await _befriend(client, owner, flatmate)
+        await _befriend(client, owner, outsider)
+
+        body = (await client.get(profile_url(owner.id), headers=flatmate.headers)).json()
+
+        assert [f["display_name"] for f in body["friends"]] == ["Outsider"]
+
+    async def test_a_stranger_sees_only_the_ones_in_common(
+        self, client: AsyncClient, owner: Account, flatmate: Account, outsider: Account
+    ) -> None:
+        """The flatmate is the overlap; the outsider is not a friend of the owner's
+        viewer and must not be listed."""
+        await _befriend(client, owner, flatmate)
+        await _befriend(client, outsider, flatmate)
+
+        body = (await client.get(profile_url(owner.id), headers=outsider.headers)).json()
+
+        assert [f["display_name"] for f in body["friends"]] == ["Flatmate"]
+
+    async def test_a_stranger_with_nobody_in_common_sees_none(
+        self, client: AsyncClient, owner: Account, flatmate: Account, outsider: Account
+    ) -> None:
+        await _befriend(client, owner, flatmate)
+
+        body = (await client.get(profile_url(owner.id), headers=outsider.headers)).json()
+
+        assert body["friends"] == []
+        assert body["friend_count"] == 0
+
+    async def test_the_list_never_contains_the_person_reading_it(
+        self, client: AsyncClient, owner: Account, flatmate: Account, outsider: Account
+    ) -> None:
+        """On a friend's profile you would otherwise find yourself among their friends,
+        which the friend badge has already said."""
+        await _befriend(client, owner, flatmate)
+        await _befriend(client, owner, outsider)
+        await _befriend(client, flatmate, outsider)
+
+        body = (await client.get(profile_url(owner.id), headers=outsider.headers)).json()
+
+        assert outsider.id not in [f["id"] for f in body["friends"]]
+
+    async def test_carries_the_avatar_for_the_list(
+        self, client: AsyncClient, owner: Account, flatmate: Account
+    ) -> None:
+        await _befriend(client, owner, flatmate)
+
+        friend = (await client.get(profile_url(owner.id), headers=owner.headers)).json()["friends"][
+            0
+        ]
+
+        assert set(friend) == {"id", "display_name", "avatar_url"}

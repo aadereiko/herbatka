@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6d done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6e done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -380,6 +380,27 @@ and appear in the nav, friend rows, review authors, feed actors and household me
 - `make people e=you@example.com` seeds six friends with profiles, opinions and
   favourites. Its own module, never run by the catalog seed: creating accounts with a
   known password anywhere but a laptop is a security bug, not a convenience.
+
+### M6e — Households and friends on a profile ✅
+- A profile now says who somebody lives with and who they know, under one rule applied
+  in one place (`services/profile.py`): **yourself or a friend sees everything; anyone
+  else sees only the overlap** — households you are both in, friends you have in common;
+  signed out sees neither panel. Blocked counts as a stranger.
+- `household_count` and `friend_count` changed meaning to "how many you may see", so the
+  Households fact tile came off the page. On a stranger's profile it would have read
+  "Households 0" about somebody who has three — a fact about the reader wearing the label
+  of a fact about the person.
+- **Empty and absent are different answers.** A stranger's empty panel is not rendered at
+  all: an empty box announces that something is being withheld, which is one bit more than
+  the rule means to give away. Your own and a friend's empty panel is the real answer and
+  says so.
+- A shared household is a link; one of theirs you are not in is plain text. The detail
+  endpoint 404s at non-members on purpose, so linking it would offer a link to the app's
+  own "no such household" page. The test asserts the *absence* of the link — checking the
+  name is on the page passes either way.
+- The friends list never contains the person reading it, so a friend's empty friends panel
+  means "their only friend is you" and says that, rather than claiming they have added
+  nobody to somebody who knows they were added.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

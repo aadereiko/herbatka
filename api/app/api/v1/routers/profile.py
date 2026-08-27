@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.api.deps import CurrentUser, DbSession, OptionalUser
 from app.schemas.auth import ProfileUpdate, UserOut
 from app.schemas.household import TeaRef
-from app.schemas.profile import ProfileReview, PublicProfile
+from app.schemas.profile import ProfileHousehold, ProfilePerson, ProfileReview, PublicProfile
 from app.services import friend as friend_service
 from app.services import profile as profile_service
 from app.services.errors import NotFound
@@ -30,6 +30,16 @@ async def get_profile(user_id: uuid.UUID, db: DbSession, viewer: OptionalUser) -
             await friend_service.get_pair(db, viewer.id, person.id), viewer.id
         )
 
+    # Blocked counts as a stranger here: whoever did the blocking, neither should be
+    # showing the other their households or their friends. The overlap still shows,
+    # because it is already visible elsewhere.
+    are_friends = state == "friends"
+    households = await profile_service.visible_households(
+        db, viewer, person, are_friends=are_friends
+    )
+    friends = await profile_service.visible_friends(db, viewer, person, are_friends=are_friends)
+    stats = await profile_service.stats(db, person.id)
+
     return PublicProfile(
         id=person.id,
         display_name=person.display_name,
@@ -39,8 +49,19 @@ async def get_profile(user_id: uuid.UUID, db: DbSession, viewer: OptionalUser) -
         location=person.location,
         favourite_tea_type=person.favourite_tea_type,  # type: ignore[arg-type]
         member_since=person.created_at,
-        **await profile_service.stats(db, person.id),  # type: ignore[arg-type]
+        review_count=stats["review_count"],  # type: ignore[arg-type]
+        average_score_given=stats["average_score_given"],  # type: ignore[arg-type]
+        # Both counts describe the filtered lists, never the person's true totals.
+        household_count=len(households),
+        friend_count=len(friends),
         friend_state=state,  # type: ignore[arg-type]
+        households=[
+            ProfileHousehold(
+                id=household.id, name=household.name, image_url=household.image_url, shared=shared
+            )
+            for household, shared in households
+        ],
+        friends=[ProfilePerson.model_validate(friend) for friend in friends],
         recent_reviews=[
             ProfileReview(
                 id=review.id,

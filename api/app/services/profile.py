@@ -4,11 +4,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.household import HouseholdMember
+from app.models.household import Household, HouseholdMember
 from app.models.review import Review
 from app.models.user import User
 from app.schemas.auth import ProfileUpdate
 from app.services.errors import NotFound
+from app.services.friend import friend_ids_subquery
 
 RECENT_REVIEW_LIMIT = 6
 
@@ -61,3 +62,83 @@ async def update_own(db: AsyncSession, user: User, payload: ProfileUpdate) -> Us
     fresh = await db.get(User, user.id)
     assert fresh is not None
     return fresh
+
+
+# --------------------------------------------------- what one person may see of another
+#
+# One rule, in one place, applied to both lists:
+#
+#   yourself   → everything
+#   a friend   → everything
+#   anyone else→ only the overlap: households you are both in, friends you have in common
+#   signed out → nothing
+#
+# The overlap is always visible because it is already visible elsewhere: you can see a
+# shared household on its own page, and a mutual friend on your own friends list. Hiding
+# it here would not protect anything, it would just make the profile lie.
+#
+# Friendship widening this is a deliberate loosening of M3's rule that household
+# membership is invisible to non-members. A friend learns the *name* of a household you
+# are in — not its members, not its stock, and the household page still 404s for them.
+
+
+async def _household_ids_of(db: AsyncSession, user_id: uuid.UUID) -> set[uuid.UUID]:
+    rows = await db.scalars(
+        select(HouseholdMember.household_id).where(HouseholdMember.user_id == user_id)
+    )
+    return set(rows)
+
+
+async def visible_households(
+    db: AsyncSession, viewer: User | None, person: User, *, are_friends: bool
+) -> list[tuple[Household, bool]]:
+    """Their households, paired with whether the viewer is in each one."""
+    if viewer is None:
+        return []
+
+    theirs = await _household_ids_of(db, person.id)
+    if not theirs:
+        return []
+
+    mine = await _household_ids_of(db, viewer.id)
+    shared = theirs & mine
+    visible = theirs if (are_friends or viewer.id == person.id) else shared
+    if not visible:
+        return []
+
+    rows = await db.scalars(
+        select(Household).where(Household.id.in_(visible)).order_by(Household.name)
+    )
+    return [(household, household.id in mine) for household in rows]
+
+
+async def visible_friends(
+    db: AsyncSession, viewer: User | None, person: User, *, are_friends: bool
+) -> list[User]:
+    """Their friends — all of them to a friend or to themselves, otherwise only the
+    people you both know."""
+    if viewer is None:
+        return []
+
+    theirs = set(await db.scalars(select(friend_ids_subquery(person.id).c.friend_id)))
+    if not theirs:
+        return []
+
+    if not (are_friends or viewer.id == person.id):
+        mine = set(await db.scalars(select(friend_ids_subquery(viewer.id).c.friend_id)))
+        theirs &= mine
+
+    # The list never contains the person reading it. On a friend's profile you would
+    # otherwise find yourself among their friends, which the page has already told you
+    # in the friend badge — it is noise, and on a mutuals list it is nonsense.
+    theirs.discard(viewer.id)
+
+    if not theirs:
+        return []
+
+    rows = await db.scalars(
+        select(User)
+        .where(User.id.in_(theirs), User.is_active.is_(True))
+        .order_by(User.display_name)
+    )
+    return list(rows)

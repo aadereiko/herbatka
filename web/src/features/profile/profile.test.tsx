@@ -5,7 +5,12 @@ import { afterEach, expect, test, vi } from 'vitest'
 
 import { AppRoutes } from '../../app/router'
 import type { Session, User } from '../../lib/api'
-import type { ProfileReview, PublicProfile } from '../../lib/profile'
+import type {
+  ProfileHousehold,
+  ProfilePerson,
+  ProfileReview,
+  PublicProfile,
+} from '../../lib/profile'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
 
@@ -45,6 +50,25 @@ const jasmineReview: ProfileReview = {
   created_at: '2026-08-20T10:00:00Z',
 }
 
+/** One you are in too, so it is somewhere you can actually go. */
+const sharedHousehold: ProfileHousehold = {
+  id: 'house-1',
+  name: 'Bletchley Kitchen',
+  image_url: null,
+  shared: true,
+}
+
+/** One of hers that you are not in. You may know the name; the detail endpoint will 404
+ *  at you, which is why nothing may render this as a link. */
+const theirHousehold: ProfileHousehold = {
+  id: 'house-2',
+  name: 'Flat 3',
+  image_url: null,
+  shared: false,
+}
+
+const alan: ProfilePerson = { id: 'user-3', display_name: 'Alan Turing', avatar_url: null }
+
 /** Somebody else, seen by a signed-in stranger. */
 const grace: PublicProfile = {
   id: 'user-2',
@@ -57,9 +81,14 @@ const grace: PublicProfile = {
   member_since: '2026-02-01T09:00:00Z',
   review_count: 12,
   average_score_given: 8.25,
+  // Both counts are the size of what this viewer was shown, not her real totals — the
+  // server has already dropped whatever the rule hides, and never says how much.
   household_count: 2,
   friend_state: 'none',
   recent_reviews: [jasmineReview],
+  households: [sharedHousehold, theirHousehold],
+  friends: [alan],
+  friend_count: 1,
 }
 
 /** Ada's own, which is where an email would leak from if one were ever going to. */
@@ -71,7 +100,16 @@ const mine: PublicProfile = {
   location: null,
   bio: 'Counting steps, mostly.',
   friend_state: 'self',
+  // Your own profile shows all of yours, and every one of them is one you are in.
+  households: [sharedHousehold],
+  household_count: 1,
+  friends: [{ id: grace.id, display_name: grace.display_name, avatar_url: null }],
+  friend_count: 1,
 }
+
+/** Nothing the viewer may see. Not the same document as "they have none" — from the
+ *  browser the two are indistinguishable, which is exactly the point of the rule. */
+const nothingVisible = { households: [], household_count: 0, friends: [], friend_count: 0 }
 
 /* ------------------------------------------------------------------ test harness */
 
@@ -155,7 +193,6 @@ test('a profile shows who they are, what they drink, and what they have rated', 
   expect(screen.getByTestId('profile-review-count')).toHaveTextContent('12')
   // One decimal, always: 8.25 is a mean of something and "8" would read as a verdict.
   expect(screen.getByTestId('profile-average')).toHaveTextContent('8.3')
-  expect(screen.getByTestId('profile-household-count')).toHaveTextContent('2')
 
   // The reviews are the reason to be on the page, and each one is a way back to the tea.
   const review = screen.getByTestId('profile-review')
@@ -212,6 +249,165 @@ test('the avatar falls back to their initials when there is no picture', async (
   expect(picture).toHaveAttribute('src', '/media/grace.png')
 })
 
+/* ------------------------------------------------ their households and their friends */
+
+/**
+ * The one that would go wrong quietly. A household with `shared: false` is one of theirs
+ * that you are not in: the name is all you get, and `GET /households/{id}` answers you 404
+ * by design. Wrapping every row in a `<Link>` looks identical on the page and sends
+ * somebody to a "no such household" screen from a link the app offered them.
+ *
+ * So the assertion is an absence, not a presence — `queryByRole('link')` inside the row.
+ * Checking only that "Flat 3" is on the page would pass in both worlds.
+ */
+test('a household you share is a link; one of theirs that you are not in is not', async () => {
+  signedIn({ 'GET /users/user-2/profile': () => json(grace) })
+  renderApp('/users/user-2')
+
+  const shared = await screen.findByTestId('profile-household-house-1')
+  expect(within(shared).getByRole('link', { name: 'Bletchley Kitchen' })).toHaveAttribute(
+    'href',
+    '/households/house-1',
+  )
+  expect(shared).toHaveTextContent('Shared with you')
+
+  const theirs = screen.getByTestId('profile-household-house-2')
+  expect(theirs).toHaveTextContent('Flat 3')
+  expect(within(theirs).queryByRole('link')).toBeNull()
+  expect(screen.queryByRole('link', { name: /Flat 3/ })).toBeNull()
+  // The marker is about you being in it, so the one you are not in must not carry it.
+  expect(theirs).not.toHaveTextContent('Shared with you')
+
+  // No "2 of 5" anywhere: the API does not send the total, precisely so the page cannot
+  // publish the number the rule is hiding.
+  expect(screen.getByTestId('profile-households')).not.toHaveTextContent(' of ')
+})
+
+test('the friends panel lists people and each one is a way to their profile', async () => {
+  signedIn({ 'GET /users/user-2/profile': () => json(grace) })
+  renderApp('/users/user-2')
+
+  const friend = await screen.findByTestId('profile-friend-user-3')
+  expect(within(friend).getByRole('link', { name: 'Alan Turing' })).toHaveAttribute(
+    'href',
+    '/users/user-3',
+  )
+})
+
+/**
+ * Signed out both lists come back empty, and empty must render as *nothing* rather than as
+ * an empty box. A box saying "Households" with nothing under it announces that something
+ * is being withheld, which is one bit more than the rule means to give away — and to a
+ * visitor with no account it reads as a person with no life rather than as a boundary.
+ */
+test('a signed-out visitor gets neither panel, not two empty ones', async () => {
+  signedOut({
+    'GET /users/user-2/profile': () => json({ ...grace, ...nothingVisible, friend_state: null }),
+  })
+  renderApp('/users/user-2')
+
+  expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Grace Hopper')
+  expect(screen.queryByTestId('profile-households')).toBeNull()
+  expect(screen.queryByTestId('profile-friends')).toBeNull()
+  // Signed out the nav carries no Households entry either, so these headings can only
+  // come from the panels.
+  expect(screen.queryByRole('heading', { name: 'Households' })).toBeNull()
+  expect(screen.queryByRole('heading', { name: 'Friends' })).toBeNull()
+})
+
+test('a stranger with nothing in common gets neither panel', async () => {
+  signedIn({
+    'GET /users/user-2/profile': () => json({ ...grace, ...nothingVisible, friend_state: 'none' }),
+  })
+  renderApp('/users/user-2')
+
+  // The friend action proves the page finished rendering, so the two nulls below are
+  // about the panels rather than about a page that is still pending.
+  expect(await screen.findByTestId('profile-add-friend')).toBeInTheDocument()
+  expect(screen.queryByTestId('profile-households')).toBeNull()
+  expect(screen.queryByTestId('profile-friends')).toBeNull()
+})
+
+/** Your own is the one profile where empty is worth a box, because you are the one person
+ *  who can do something about it. */
+test('your own empty profile invites you to start a household and to find people', async () => {
+  signedIn({
+    'GET /users/user-1/profile': () => json({ ...mine, ...nothingVisible }),
+  })
+  renderApp('/users/user-1')
+
+  const households = await screen.findByTestId('profile-households-empty')
+  expect(households).toHaveTextContent('You are not in a household yet')
+  expect(within(households).getByRole('link', { name: /Start or join one/ })).toHaveAttribute(
+    'href',
+    '/households',
+  )
+
+  const friends = screen.getByTestId('profile-friends-empty')
+  expect(friends).toHaveTextContent('You have not added anyone yet.')
+  expect(within(friends).getByRole('link', { name: /Find somebody you know/ })).toHaveAttribute(
+    'href',
+    '/friends',
+  )
+})
+
+/** A friend's empty list is the genuine article — you are shown all of theirs — so it is a
+ *  fact to state, not an invitation, and not a blank panel either. */
+test('a friend with no households says so rather than showing an empty box', async () => {
+  signedIn({
+    'GET /users/user-2/profile': () =>
+      json({ ...grace, friend_state: 'friends', households: [], household_count: 0 }),
+  })
+  renderApp('/users/user-2')
+
+  expect(await screen.findByTestId('profile-households-empty')).toHaveTextContent(
+    'Grace Hopper is not in a household.',
+  )
+  // Not the invitation — /households is somewhere you go about your own shelf.
+  expect(screen.queryByRole('link', { name: /Start or join one/ })).toBeNull()
+  // Her friends are all visible to a friend, so that panel is a list rather than a note.
+  expect(screen.getByTestId('profile-friend-user-3')).toHaveTextContent('Alan Turing')
+})
+
+/**
+ * The one empty state that is not simply "they have none". The server never puts the
+ * reader in the list it sends them, and a stranger's empty panel is dropped before it
+ * renders, so an empty friends panel is always a friend's, and always means their only
+ * friend is you. Claiming they have added nobody would be contradicted by the fact that
+ * they added the person reading it.
+ */
+test("a friend whose only friend is you says so, rather than claiming they have none", async () => {
+  signedIn({
+    'GET /users/user-2/profile': () =>
+      json({ ...grace, friend_state: 'friends', friends: [], friend_count: 0 }),
+  })
+  renderApp('/users/user-2')
+
+  expect(await screen.findByTestId('profile-friends-empty')).toHaveTextContent(
+    'You are the only person Grace Hopper has added.',
+  )
+  expect(screen.queryByTestId('profile-friends-empty')).not.toHaveTextContent('has not added')
+})
+
+/**
+ * The two panels fall back differently on purpose. A person with no photo gets their
+ * initials; a household gets the same leaf the rest of the app gives it. Initials
+ * belong to people — "BK" is not what a kitchen looks like.
+ */
+test('a person with no picture falls back to initials, a household to the leaf', async () => {
+  signedIn({ 'GET /users/user-2/profile': () => json(grace) })
+  renderApp('/users/user-2')
+
+  const friend = await screen.findByTestId('profile-friend-avatar-user-3')
+  expect(friend).toHaveTextContent('AT')
+  expect(friend.tagName).toBe('SPAN')
+
+  // EntityImage renders its placeholder under a `-placeholder` testid, the same one
+  // /households and the catalog use.
+  expect(screen.getByTestId('profile-household-avatar-house-1-placeholder')).toBeInTheDocument()
+  expect(screen.queryByTestId('profile-household-avatar-house-1')).toBeNull()
+})
+
 /* ------------------------------------------------------------- who may do what */
 
 test('your own profile offers editing and no friend action', async () => {
@@ -237,7 +433,7 @@ test('your own profile offers editing and no friend action', async () => {
  */
 test('a profile read by a stranger offers no friend actions and asks nothing authenticated', async () => {
   signedOut({
-    'GET /users/user-2/profile': () => json({ ...grace, friend_state: null }),
+    'GET /users/user-2/profile': () => json({ ...grace, ...nothingVisible, friend_state: null }),
   })
   renderApp('/users/user-2')
 

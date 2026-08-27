@@ -1824,6 +1824,32 @@ export interface components {
             /** Pages */
             pages: number;
         };
+        /** ProfileHousehold */
+        ProfileHousehold: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Image Url */
+            image_url: string | null;
+            /** Shared */
+            shared: boolean;
+        };
+        /** ProfilePerson */
+        ProfilePerson: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Url */
+            avatar_url: string | null;
+        };
         /** ProfileReview */
         ProfileReview: {
             /**
@@ -1900,10 +1926,16 @@ export interface components {
             average_score_given: number | null;
             /** Household Count */
             household_count: number;
+            /** Friend Count */
+            friend_count: number;
             /** Friend State */
             friend_state: ("none" | "incoming" | "outgoing" | "friends" | "blocked" | "self") | null;
             /** Recent Reviews */
             recent_reviews: components["schemas"]["ProfileReview"][];
+            /** Households */
+            households: components["schemas"]["ProfileHousehold"][];
+            /** Friends */
+            friends: components["schemas"]["ProfilePerson"][];
         };
         /**
          * PublicSummary
