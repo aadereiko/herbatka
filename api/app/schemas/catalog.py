@@ -22,6 +22,9 @@ class IngredientOut(BaseModel):
     category: IngredientCategory
     is_caffeinated: bool
     description: str | None
+    #: Almost always null. The client draws a category illustration in its place rather
+    #: than a broken-image box, so this being absent is a normal state, not a gap.
+    image_url: str | None
 
 
 class IngredientTaste(IngredientOut):
@@ -53,6 +56,7 @@ class IngredientCreate(BaseModel):
     category: IngredientCategory
     is_caffeinated: bool = False
     description: str | None = None
+    image_url: str | None = Field(default=None, max_length=500)
 
 
 class IngredientUpdate(BaseModel):
@@ -60,6 +64,9 @@ class IngredientUpdate(BaseModel):
     category: IngredientCategory | None = None
     is_caffeinated: bool | None = None
     description: str | None = None
+    # Explicitly nullable, and `exclude_unset` in the service is what makes that mean
+    # something: an omitted key leaves the picture alone, a literal null removes it.
+    image_url: str | None = Field(default=None, max_length=500)
 
 
 class BrandRef(BaseModel):

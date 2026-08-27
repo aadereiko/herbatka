@@ -173,6 +173,65 @@ class TestAdminIngredients:
 
         assert response.json()["slug"] == "mieta"
 
+    async def test_creates_with_a_picture_and_a_description(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        """Both halves of what a card is built from, on the way in and on the way out.
+
+        Asserted on the *values*, not on the keys being present: both fields are
+        nullable, so a schema that dropped them would still answer 201 with nulls.
+        """
+        response = await client.post(
+            f"{ADMIN}/ingredients",
+            headers=admin_headers,
+            json={
+                "name": "Osmanthus",
+                "category": "flower",
+                "description": "Apricot and ripe peach, in tiny golden flowers.",
+                "image_url": "/media/osmanthus.jpg",
+            },
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["description"] == "Apricot and ripe peach, in tiny golden flowers."
+        assert body["image_url"] == "/media/osmanthus.jpg"
+
+    async def test_a_picture_survives_an_edit_that_does_not_mention_it(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        """`exclude_unset` is the whole mechanism, and it has to work in both directions.
+
+        Renaming an ingredient must not quietly discard the photo somebody uploaded, and
+        an explicit null must genuinely remove it — otherwise the form's Remove button is
+        a lie. An optional-only field could express the first but not the second.
+        """
+        created = (
+            await client.post(
+                f"{ADMIN}/ingredients",
+                headers=admin_headers,
+                json={
+                    "name": "Osmanthus",
+                    "category": "flower",
+                    "image_url": "/media/osmanthus.jpg",
+                },
+            )
+        ).json()
+
+        renamed = await client.patch(
+            f"{ADMIN}/ingredients/{created['id']}",
+            headers=admin_headers,
+            json={"name": "Sweet osmanthus"},
+        )
+        assert renamed.json()["image_url"] == "/media/osmanthus.jpg"
+
+        cleared = await client.patch(
+            f"{ADMIN}/ingredients/{created['id']}",
+            headers=admin_headers,
+            json={"image_url": None},
+        )
+        assert cleared.json()["image_url"] is None
+
     async def test_refuses_to_delete_an_ingredient_in_use(
         self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
     ) -> None:

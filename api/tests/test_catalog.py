@@ -190,6 +190,29 @@ class TestIngredientsAndBrands:
     ) -> None:
         assert (await client.get(f"{CATALOG}/ingredients?category=herb")).json()["total"] == 1
 
+    async def test_a_read_carries_the_picture_and_the_description(
+        self, client: AsyncClient, db: AsyncSession, catalog_fixtures: dict[str, Any]
+    ) -> None:
+        """Both read shapes, because there are two of them and they are separate models.
+
+        `/ingredients` serialises through `IngredientTaste` and a tea's recipe rows
+        through the same class nested inside `TeaIngredientOut`; a field added to
+        `IngredientOut` and forgotten on one of the two paths is exactly the kind of gap
+        that only shows up as a missing picture on one page.
+        """
+        mint = catalog_fixtures["mint"]
+        mint.description = "Sharp menthol that cools the whole mouth."
+        mint.image_url = "/media/mint.jpg"
+        await db.flush()
+
+        listed = (await client.get(f"{CATALOG}/ingredients?q=Mint")).json()["items"][0]
+        assert listed["description"] == "Sharp menthol that cools the whole mouth."
+        assert listed["image_url"] == "/media/mint.jpg"
+
+        detail = (await client.get(f"{CATALOG}/teas/mint-green")).json()
+        row = next(i for i in detail["ingredients"] if i["ingredient"]["slug"] == "mint")
+        assert row["ingredient"]["image_url"] == "/media/mint.jpg"
+
     async def test_lists_brands(
         self, client: AsyncClient, catalog_fixtures: dict[str, Any]
     ) -> None:

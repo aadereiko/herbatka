@@ -21,13 +21,17 @@ const jasmineFlower: IngredientTaste = {
   category: 'flower',
   is_caffeinated: false,
   description: 'Picked at night, layered with the leaf until it takes the scent.',
+  // Null, like every seeded ingredient: there are no photographs of the vocabulary, so
+  // the drawn fallback is the *normal* case and the fixtures say so. A test that wants a
+  // photo spreads one on.
+  image_url: null,
   my_score: 9,
   average_score: 8.5,
   rating_count: 2,
 }
 
-/** Nobody has said anything about this one. Null rather than 0 throughout — see
- *  `describeTaste`. */
+/** Nobody has said anything about this one, and nobody has written it up either. Null
+ *  rather than 0 throughout — see `describeTaste`. */
 const greenLeaf: IngredientTaste = {
   id: 'ing-2',
   slug: 'green-tea',
@@ -35,6 +39,7 @@ const greenLeaf: IngredientTaste = {
   category: 'leaf',
   is_caffeinated: true,
   description: null,
+  image_url: null,
   my_score: null,
   average_score: null,
   rating_count: 0,
@@ -648,4 +653,65 @@ test('on a card the caption is part of the control, not a sibling competing for 
   // not fit.
   const caption = within(control).getByText('How much you like it')
   expect(caption.parentElement).not.toContainElement(screen.getByTestId('ingredient-average-jasmine'))
+})
+
+/* ------------------------------------------- what an ingredient looks like and reads as */
+
+/**
+ * The card's job, and until now the thing it usually failed at.
+ *
+ * All thirty-nine seeded ingredients had `description = NULL`, and the card rendered the
+ * paragraph only when there was one — so /ingredients was a grid of bare names and nobody
+ * could tell whether the text was missing or had never been meant to be there. It is
+ * unconditional now, which is why this asserts *both* rows: the one with something to say
+ * says it, and the one without says that.
+ */
+test('a card leads with what the ingredient tastes like, and says so when nobody has written it', async () => {
+  signedOutCatalog()
+  renderApp('/ingredients')
+
+  await screen.findByTestId('ingredient-list')
+  expect(screen.getByTestId('ingredient-description-jasmine')).toHaveTextContent(
+    'Picked at night, layered with the leaf until it takes the scent.',
+  )
+  expect(screen.getByTestId('ingredient-description-green-tea')).toHaveTextContent(
+    'No description yet.',
+  )
+})
+
+test('an ingredient with an uploaded picture shows the picture', async () => {
+  signedOutCatalog({
+    'GET /catalog/ingredients': () =>
+      json(pageOf([{ ...jasmineFlower, image_url: 'https://cdn.example/jasmine.png' }])),
+  })
+  renderApp('/ingredients')
+
+  const picture = await screen.findByTestId('ingredient-image-jasmine')
+  expect(picture).toHaveAttribute('src', 'https://cdn.example/jasmine.png')
+  // And the drawing steps aside rather than sitting behind it.
+  expect(screen.queryByTestId('ingredient-image-jasmine-placeholder')).toBeNull()
+})
+
+/**
+ * The placeholder decision, pinned.
+ *
+ * There is no photograph of clove to seed and there is not going to be one, so "no
+ * picture" is the permanent state of nearly every row — which makes the fallback the
+ * thing worth testing, not an afterthought. Two ingredients of two different categories
+ * in one render, because a component that hard-coded a single drawing (the way the shared
+ * `EntityImage` leaf does) would pass a one-row version of this test perfectly.
+ */
+test('an ingredient with no picture gets its own category’s drawing, not a broken image', async () => {
+  signedOutCatalog()
+  renderApp('/ingredients')
+
+  await screen.findByTestId('ingredient-list')
+
+  const flower = screen.getByTestId('ingredient-image-jasmine-placeholder')
+  const leaf = screen.getByTestId('ingredient-image-green-tea-placeholder')
+  expect(flower).toHaveAttribute('data-category', 'flower')
+  expect(leaf).toHaveAttribute('data-category', 'leaf')
+  // No <img> at all: an <img> with no src is the broken-image icon we are avoiding.
+  expect(screen.queryByTestId('ingredient-image-jasmine')).toBeNull()
+  expect(flower.querySelector('svg')).not.toBeNull()
 })

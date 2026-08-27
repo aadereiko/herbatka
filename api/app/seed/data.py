@@ -1,52 +1,291 @@
 """Starter catalog. Real teas and real ingredients, so the app is never empty."""
 
-# (name, category, is_caffeinated)
-INGREDIENTS: list[tuple[str, str, bool]] = [
+# (name, category, is_caffeinated, description)
+#
+# The descriptions are *tasting notes*, not encyclopaedia entries. Somebody reading
+# /ingredients is deciding whether they would like a blend that contains the thing, and
+# "Matricaria chamomilla, family Asteraceae" does not help them do that — "apple, straw
+# and honey" does. Two sentences at most, because these are read a card at a time in a
+# grid of thirty-nine and a paragraph would turn the page into a wall again.
+#
+# No `image_url` here. Seeding one would mean inventing a URL for a file that does not
+# exist, and a catalog of broken images is worse than a catalog of honest illustrations —
+# see the per-category drawings in web/src/features/catalog/IngredientImage.tsx.
+INGREDIENTS: list[tuple[str, str, bool, str]] = [
     # leaves
-    ("Green tea leaf", "leaf", True),
-    ("Black tea leaf", "leaf", True),
-    ("Oolong tea leaf", "leaf", True),
-    ("White tea leaf", "leaf", True),
-    ("Pu-erh tea leaf", "leaf", True),
-    ("Matcha", "leaf", True),
-    ("Yerba mate", "leaf", True),
-    ("Rooibos", "leaf", False),
-    ("Honeybush", "leaf", False),
+    (
+        "Green tea leaf",
+        "leaf",
+        True,
+        "Fresh-cut grass and steamed greens with a clean edge. Turns bitter and "
+        "spinach-like if the water is anywhere near boiling.",
+    ),
+    (
+        "Black tea leaf",
+        "leaf",
+        True,
+        "Malty, brisk and tannic — the one that stands up to milk without sulking.",
+    ),
+    (
+        "Oolong tea leaf",
+        "leaf",
+        True,
+        "Somewhere between green and black: peachy and floral when light, roasted and "
+        "nutty when dark. Re-steeps all afternoon.",
+    ),
+    (
+        "White tea leaf",
+        "leaf",
+        True,
+        "Barely processed and very quiet: hay, melon and honey. Easy to miss, easier to over-brew.",
+    ),
+    (
+        "Pu-erh tea leaf",
+        "leaf",
+        True,
+        "Fermented and frankly earthy — damp forest floor, in the way people mean as a "
+        "compliment. Mellows with age.",
+    ),
+    (
+        "Matcha",
+        "leaf",
+        True,
+        "Shade-grown leaf ground to powder and whisked rather than steeped. Thick, "
+        "savoury and intensely green, with a sweet finish.",
+    ),
+    (
+        "Yerba mate",
+        "leaf",
+        True,
+        "Vegetal and bracingly bitter, closer to a hard green tea than to coffee. The "
+        "most caffeine in the cupboard.",
+    ),
+    (
+        "Rooibos",
+        "leaf",
+        False,
+        "Red bush from South Africa: sweet, woody, a little vanilla. Caffeine-free, and "
+        "it will not turn bitter however long you forget it.",
+    ),
+    (
+        "Honeybush",
+        "leaf",
+        False,
+        "Rooibos's gentler cousin — rounder, honeyed, faintly apricot. Good last thing at night.",
+    ),
     # herbs
-    ("Peppermint", "herb", False),
-    ("Spearmint", "herb", False),
-    ("Lemongrass", "herb", False),
-    ("Lemon balm", "herb", False),
-    ("Chamomile", "herb", False),
-    ("Nettle", "herb", False),
-    ("Lemon verbena", "herb", False),
+    (
+        "Peppermint",
+        "herb",
+        False,
+        "Sharp menthol that cools the whole mouth. Assertive enough to take over any "
+        "blend it is put in.",
+    ),
+    (
+        "Spearmint",
+        "herb",
+        False,
+        "Sweeter and softer than peppermint — more garden than toothpaste. What makes "
+        "Moroccan mint drinkable by the litre.",
+    ),
+    (
+        "Lemongrass",
+        "herb",
+        False,
+        "A bright citrus lift with none of the sourness of an actual lemon. Wakes up a "
+        "dull herbal blend on its own.",
+    ),
+    (
+        "Lemon balm",
+        "herb",
+        False,
+        "Gentle lemon and cut grass with a calming, faintly minty finish. Quieter than "
+        "lemongrass and easier to live with.",
+    ),
+    (
+        "Chamomile",
+        "herb",
+        False,
+        "Apple skin, straw and honey, with a soft bitter edge if you leave it too long. "
+        "The classic bedtime cup, and it earns it.",
+    ),
+    (
+        "Nettle",
+        "herb",
+        False,
+        "Deeply green and mineral, like spinach water in the best possible way. "
+        "Savoury rather than sweet, and it does not sting once dried.",
+    ),
+    (
+        "Lemon verbena",
+        "herb",
+        False,
+        "The most lemon-scented thing here that is not a lemon: perfumed, sherbet-bright "
+        "and almost entirely without acidity.",
+    ),
     # flowers
-    ("Jasmine flower", "flower", False),
-    ("Lavender", "flower", False),
-    ("Hibiscus", "flower", False),
-    ("Rose petal", "flower", False),
-    ("Elderflower", "flower", False),
-    ("Osmanthus", "flower", False),
-    ("Blue cornflower", "flower", False),
+    (
+        "Jasmine flower",
+        "flower",
+        False,
+        "Heady white-flower perfume, layered over the leaf overnight so the tea takes the "
+        "scent. A little goes a very long way.",
+    ),
+    (
+        "Lavender",
+        "flower",
+        False,
+        "Floral and resinous, and soapy the moment there is too much of it. In small "
+        "amounts it makes chamomile taste expensive.",
+    ),
+    (
+        "Hibiscus",
+        "flower",
+        False,
+        "Fiercely tart and ruby-red — cranberry without the sugar. Dyes everything it "
+        "touches, including the blend it is in.",
+    ),
+    (
+        "Rose petal",
+        "flower",
+        False,
+        "Turkish delight in a cup: sweet, perfumed, a little powdery. Divides a room.",
+    ),
+    (
+        "Elderflower",
+        "flower",
+        False,
+        "Muscat grapes and a hedge in June. Delicate and honeyed, and lost entirely if "
+        "the rest of the blend is loud.",
+    ),
+    (
+        "Osmanthus",
+        "flower",
+        False,
+        "Tiny golden flowers that taste of apricot and ripe peach. Traditionally married "
+        "to oolong, and it is hard to argue with.",
+    ),
+    (
+        "Blue cornflower",
+        "flower",
+        False,
+        "There for the look, mostly: bright blue flecks through the dry leaf and barely a "
+        "whisper of flavour in the cup.",
+    ),
     # spices
-    ("Cinnamon", "spice", False),
-    ("Cardamom", "spice", False),
-    ("Ginger", "spice", False),
-    ("Clove", "spice", False),
-    ("Star anise", "spice", False),
-    ("Black pepper", "spice", False),
-    ("Vanilla", "spice", False),
-    ("Fennel seed", "spice", False),
-    ("Liquorice root", "spice", False),
+    (
+        "Cinnamon",
+        "spice",
+        False,
+        "Warm, sweet and drying, with a woody heat at the back of the throat. Carries a "
+        "chai and bullies anything delicate.",
+    ),
+    (
+        "Cardamom",
+        "spice",
+        False,
+        "Camphorous and citrusy, cooling and warming at the same time. The flavour that "
+        "makes chai taste like chai.",
+    ),
+    (
+        "Ginger",
+        "spice",
+        False,
+        "A clean burn that builds slowly at the back of the throat. Sweet and rounded "
+        "when dried, much fiercer when fresh.",
+    ),
+    (
+        "Clove",
+        "spice",
+        False,
+        "Numbing, medicinal and enormously strong. One too many and the cup tastes like "
+        "a dentist's waiting room.",
+    ),
+    (
+        "Star anise",
+        "spice",
+        False,
+        "Sweet liquorice and warm spice, rounder and softer than aniseed. Two pods "
+        "flavour an entire pot.",
+    ),
+    (
+        "Black pepper",
+        "spice",
+        False,
+        "A dry, slow heat rather than a flavour of its own, waking up whatever sits next "
+        "to it. Traditional in chai and easy to overdo.",
+    ),
+    (
+        "Vanilla",
+        "spice",
+        False,
+        "Creamy and rounding — it makes a rough tea taste smoother without adding a "
+        "grain of sugar.",
+    ),
+    (
+        "Fennel seed",
+        "spice",
+        False,
+        "Sweet aniseed with a cooling finish. Drunk after dinner across half of Europe, "
+        "and for good reason.",
+    ),
+    (
+        "Liquorice root",
+        "spice",
+        False,
+        "Startlingly sweet with no sugar in it at all, and a dark, faintly salty finish. "
+        "You will either love it or pick it out.",
+    ),
     # fruit
-    ("Orange peel", "fruit", False),
-    ("Lemon peel", "fruit", False),
-    ("Apple piece", "fruit", False),
-    ("Rosehip", "fruit", False),
-    ("Bergamot oil", "fruit", False),
-    ("Mango piece", "fruit", False),
+    (
+        "Orange peel",
+        "fruit",
+        False,
+        "Sweet-bitter citrus oil, closer to marmalade than to juice. Warms up a black "
+        "blend and steadies a tart one.",
+    ),
+    (
+        "Lemon peel",
+        "fruit",
+        False,
+        "Sharp zest and a little bitter pith: the smell of a lemon without the sourness of one.",
+    ),
+    (
+        "Apple piece",
+        "fruit",
+        False,
+        "Mild sweetness and body, mostly there to round the sharp edges off a fruit "
+        "blend. Chewy in the tin, gentle in the cup.",
+    ),
+    (
+        "Rosehip",
+        "fruit",
+        False,
+        "Tangy and slightly floral, with a jammy thickness to it. Almost always found "
+        "holding hands with hibiscus.",
+    ),
+    (
+        "Bergamot oil",
+        "fruit",
+        False,
+        "The perfume that makes Earl Grey Earl Grey: sour orange, lemon and cologne. "
+        "Wonderful, right up until there is too much of it.",
+    ),
+    (
+        "Mango piece",
+        "fruit",
+        False,
+        "Sweet tropical fruit that arrives as scent more than as taste. At its best iced, "
+        "over a green base.",
+    ),
     # other
-    ("Toasted rice", "other", False),
+    (
+        "Toasted rice",
+        "other",
+        False,
+        "Popped and toasted grain — nutty, savoury, not far off popcorn. Rounds the "
+        "sharpness off a green tea.",
+    ),
 ]
 
 # (name, country, website)

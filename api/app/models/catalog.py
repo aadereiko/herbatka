@@ -76,6 +76,11 @@ class Ingredient(UUIDPrimaryKey, Timestamps, Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     description: Mapped[str | None] = mapped_column(Text)
+    # Same String(500) as Tea, Shop and Household: an uploaded path from POST /uploads/image,
+    # never a blob. Nullable and expected to stay null for most rows — there is no stock
+    # photography to seed a vocabulary with, so the UI draws a per-category illustration
+    # rather than treating "no picture" as a broken card.
+    image_url: Mapped[str | None] = mapped_column(String(500))
 
     tea_links: Mapped[list["TeaIngredient"]] = relationship(back_populates="ingredient")
 

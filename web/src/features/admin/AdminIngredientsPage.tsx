@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
 
 import { Button } from '../../components/ui/button'
+import { IMAGE_UPLOAD_HINT, ImageUploadField } from '../../components/ui/image-upload'
 import {
   CheckboxField,
   FormError,
@@ -33,6 +34,7 @@ import {
   readIngredientFilters,
   writeIngredientFilters,
 } from '../catalog/filters'
+import { IngredientImage } from '../catalog/IngredientImage'
 import { useIngredientList } from '../catalog/queries'
 import { useCreateIngredient, useDeleteIngredient, useUpdateIngredient } from './queries'
 
@@ -65,6 +67,8 @@ function IngredientForm({
   const [category, setCategory] = useState<IngredientCategory>(initial?.category ?? 'herb')
   const [caffeinated, setCaffeinated] = useState(initial?.is_caffeinated ?? false)
   const [description, setDescription] = useState(initial?.description ?? '')
+  /** `string | null`, not `''`, and sent as-is — see the note on the submit below. */
+  const [imageUrl, setImageUrl] = useState<string | null>(initial?.image_url ?? null)
   const [nameError, setNameError] = useState<string | undefined>(undefined)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -79,6 +83,12 @@ function IngredientForm({
       category,
       is_caffeinated: caffeinated,
       description: description.trim() || undefined,
+      // Always sent, including as a literal `null`, which is the difference between
+      // Remove working and Remove appearing to work. `IngredientUpdate` reads an omitted
+      // key as "leave the picture alone", so an `undefined` here — the way the empty
+      // description above is handled — would make a cleared picture come back on reload.
+      // On create the two are the same thing, so one rule serves both.
+      image_url: imageUrl,
     })
   }
 
@@ -117,6 +127,18 @@ function IngredientForm({
         value={description}
         onChange={setDescription}
         rows={2}
+        hint="What it tastes and smells like, in a sentence or two. This is what the card is for."
+      />
+      {/* The hint names the fallback on purpose: an admin who does not know the card
+          draws a category illustration will read an empty picture field as a broken
+          catalog and go hunting for thirty-nine photographs. */}
+      <ImageUploadField
+        id="ingredient-image"
+        label="Picture"
+        value={imageUrl}
+        onChange={setImageUrl}
+        hint={`${IMAGE_UPLOAD_HINT} Without one, cards draw the category illustration.`}
+        previewAlt={name ? `Picture of ${name}` : 'The picture you chose'}
       />
       {error && <FormError testId="ingredient-form-error">{error}</FormError>}
       <div className="flex items-center gap-3">
@@ -302,14 +324,22 @@ export function AdminIngredientsPage() {
                   className="border-b border-brand-100 last:border-0 dark:border-neutral-800"
                 >
                   <td className="px-4 py-2 align-top">
-                    <span className="font-medium text-brand-900 dark:text-brand-100">
-                      {ingredient.name}
-                    </span>
-                    {ingredient.is_caffeinated && (
-                      <span className="ml-2">
-                        <Badge tone="amber">Caffeinated</Badge>
+                    {/* A thumbnail here rather than only in the form's preview: after a
+                        save, this row is the only place that says what the catalog
+                        actually stored. */}
+                    <div className="flex items-center gap-2">
+                      <IngredientImage
+                        src={ingredient.image_url}
+                        alt=""
+                        category={ingredient.category}
+                        className="h-8 w-8 shrink-0 rounded-lg"
+                        testId={`admin-ingredient-image-${ingredient.slug}`}
+                      />
+                      <span className="font-medium text-brand-900 dark:text-brand-100">
+                        {ingredient.name}
                       </span>
-                    )}
+                      {ingredient.is_caffeinated && <Badge tone="amber">Caffeinated</Badge>}
+                    </div>
                     {rowError?.id === ingredient.id && (
                       <p
                         role="alert"

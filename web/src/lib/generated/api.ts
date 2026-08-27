@@ -1501,6 +1501,8 @@ export interface components {
             is_caffeinated: boolean;
             /** Description */
             description?: string | null;
+            /** Image Url */
+            image_url?: string | null;
         };
         /** IngredientOut */
         IngredientOut: {
@@ -1522,6 +1524,8 @@ export interface components {
             is_caffeinated: boolean;
             /** Description */
             description: string | null;
+            /** Image Url */
+            image_url: string | null;
         };
         /** IngredientRatingInput */
         IngredientRatingInput: {
@@ -1558,6 +1562,8 @@ export interface components {
             is_caffeinated: boolean;
             /** Description */
             description: string | null;
+            /** Image Url */
+            image_url: string | null;
             /** My Score */
             my_score: number | null;
             /** Average Score */
@@ -1575,6 +1581,8 @@ export interface components {
             is_caffeinated?: boolean | null;
             /** Description */
             description?: string | null;
+            /** Image Url */
+            image_url?: string | null;
         };
         /** Invite */
         Invite: {

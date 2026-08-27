@@ -40,6 +40,13 @@ const jasmine: Ingredient = {
   category: 'flower',
   is_caffeinated: false,
   description: null,
+  image_url: null,
+}
+
+/** A `File` the upload field will accept. The rejection cases live in the shop suite,
+ *  which owns the field. */
+function imageFile(name: string): File {
+  return new File(['petal'], name, { type: 'image/png' })
 }
 
 const pendingTea: TeaSummary = {
@@ -255,7 +262,50 @@ test('the create form posts what the contract asks for', async () => {
     name: 'Rooibos',
     category: 'leaf',
     is_caffeinated: true,
+    // An explicit null rather than an omitted key, so the same submit handler can also
+    // *remove* a picture on edit. See the note on `handleSubmit`.
+    image_url: null,
   })
+})
+
+/**
+ * The picture, end to end through the form: upload, preview, then into the body.
+ *
+ * The two halves are separate on purpose, and the assertion between them is the point —
+ * `ImageUploadField` uploads immediately and hands back a URL, but nothing is *saved*
+ * until submit. An implementation that posted the ingredient on file-pick, or that never
+ * threaded the returned URL into the payload, would fail one half each.
+ */
+test('a picture chosen for an ingredient is uploaded, previewed, then saved with it', async () => {
+  mockFetch({
+    'POST /auth/refresh': () => json(sessionFor(grace)),
+    'GET /catalog/ingredients': () => json(pageOf([jasmine])),
+    'POST /uploads/image': () => json({ url: 'https://cdn.example/jasmine.png' }, 201),
+    'POST /admin/ingredients': () =>
+      json({ ...jasmine, id: 'ing-2', slug: 'osmanthus', name: 'Osmanthus' }, 201),
+  })
+
+  renderApp('/admin/ingredients')
+
+  await screen.findByTestId('ingredient-form')
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Osmanthus' } })
+  fireEvent.change(screen.getByTestId('ingredient-image-input'), {
+    target: { files: [imageFile('osmanthus.png')] },
+  })
+
+  expect(await screen.findByTestId('ingredient-image-preview')).toHaveAttribute(
+    'src',
+    'https://cdn.example/jasmine.png',
+  )
+  expect(calls.some((call) => call.path === '/admin/ingredients')).toBe(false)
+
+  fireEvent.submit(screen.getByTestId('ingredient-form'))
+
+  await waitFor(() =>
+    expect(screen.getByTestId('ingredient-notice')).toHaveTextContent('Osmanthus'),
+  )
+  const posted = calls.find((call) => call.method === 'POST' && call.path === '/admin/ingredients')
+  expect(JSON.parse(posted?.body ?? '{}').image_url).toBe('https://cdn.example/jasmine.png')
 })
 
 test('the form refuses a nameless ingredient before it reaches the API', async () => {

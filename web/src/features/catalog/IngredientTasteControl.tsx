@@ -157,6 +157,19 @@ export function IngredientTasteControl({
   if (label) {
     return (
       <div data-testid={`ingredient-taste-${ingredient.slug}`}>
+        {/* The crowd figure goes *above* the control rather than below it, which is not
+            where it reads most naturally but is where it stops the grid looking broken.
+            These cards are bottom-aligned in their row, and a line that appears under the
+            select on some cards and not others lifts those selects by exactly one line —
+            so a row of six cards ends up with the controls at two different heights for a
+            reason nobody can see. Above the row, the variable-height part absorbs into
+            the description's slack and every card ends on the same line. */}
+        {(average || failure) && (
+          <p className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {average}
+            {failure}
+          </p>
+        )}
         <div className="flex items-center justify-between gap-2">
           {/* `min-w-0 truncate` so a long caption gives way rather than shouldering the
               select out through the side of the card. */}
@@ -165,12 +178,6 @@ export function IngredientTasteControl({
           </span>
           {select}
         </div>
-        {(average || failure) && (
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-            {average}
-            {failure}
-          </p>
-        )}
       </div>
     )
   }

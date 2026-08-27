@@ -3,7 +3,7 @@
 A tea tracker: rate teas, know what's in them, know how much is left in the house,
 and see what your friends are drinking.
 
-Status: **M0–M6f done**. Next up: M7 — polish, then M8 — ship.
+Status: **M0–M6g done**. Next up: M7 — polish, then M8 — ship.
 
 ---
 
@@ -433,6 +433,24 @@ and appear in the nav, friend rows, review authors, feed actors and household me
   `my_score`.
 - `make people` takes an id as well as an email, because the id is what the address bar
   shows you while you are looking at the profile of somebody with no friends.
+
+### M6g — Ingredients that say something ✅
+- All 39 seeded ingredients now carry a **tasting** description — what it smells and
+  tastes like, what it does in a cup — rather than an encyclopaedia entry. The page was a
+  wall of bare names because the column existed and every row was NULL.
+- The seed **backfills** onto rows that already exist with no description, and never
+  overwrites one somebody typed. A seed that only helps a fresh install helps nobody with
+  a database already running.
+- `Ingredient.image_url` plus admin upload, the same shape as `Shop` and `Household`.
+- **The placeholder is the normal state, not a defect.** There is no source for
+  thirty-nine photographs, so `IngredientImage` draws one of six flat SVGs by category —
+  leaf, herb, flower, spice (a pointed star, so it can never read as the flower), fruit,
+  other. `currentColor` and brand tokens only, which is why the wooden restyle retinted
+  all six without a redraw. Not `EntityImage`: a leaf standing in for "leaf" is a
+  tautology and for "clove" it is a lie.
+- The crowd average sits *above* the rating control on a card. Below, it lifted the
+  select by one line on exactly the cards that had one, so a row of six ended up with its
+  controls at two heights for a reason nobody could see.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

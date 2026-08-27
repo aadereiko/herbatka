@@ -23,6 +23,7 @@ import {
   readIngredientFilters,
   writeIngredientFilters,
 } from './filters'
+import { IngredientImage } from './IngredientImage'
 import { IngredientTasteControl } from './IngredientTasteControl'
 import { pluralise } from './format'
 import { useIngredientList } from './queries'
@@ -133,21 +134,51 @@ export function IngredientListPage() {
           }`}
         >
           {items.map((ingredient) => (
-            <Panel as="li" key={ingredient.id} className="list-none">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="mr-auto text-base font-semibold text-brand-900 dark:text-brand-100">
-                  {ingredient.name}
-                </h2>
-                <Badge tone="neutral">
-                  {INGREDIENT_CATEGORY_LABELS[ingredient.category]}
-                </Badge>
-                {ingredient.is_caffeinated && <Badge tone="amber">Caffeinated</Badge>}
+            // `flex-col` so the description can take the slack: cards in a row are the
+            // height of the tallest, and without it a two-word description leaves the
+            // rating control floating in the middle of an otherwise empty card.
+            <Panel as="li" key={ingredient.id} className="flex list-none flex-col">
+              <div className="flex items-start gap-3">
+                {/* Square and small. A picture of dried lavender is not the point of the
+                    card — the sentence underneath is — and a banner-width image would
+                    push that sentence below the fold on a phone. */}
+                <IngredientImage
+                  src={ingredient.image_url}
+                  alt=""
+                  category={ingredient.category}
+                  className="h-16 w-16 shrink-0 rounded-xl"
+                  testId={`ingredient-image-${ingredient.slug}`}
+                />
+                {/* `min-w-0` so a long name wraps instead of shouldering the badges out
+                    of the card — the same failure the taste control had. */}
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base font-semibold text-brand-900 dark:text-brand-100">
+                    {ingredient.name}
+                  </h2>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    <Badge tone="neutral">{INGREDIENT_CATEGORY_LABELS[ingredient.category]}</Badge>
+                    {ingredient.is_caffeinated && <Badge tone="amber">Caffeinated</Badge>}
+                  </div>
+                </div>
               </div>
-              {ingredient.description && (
-                <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                  {ingredient.description}
-                </p>
-              )}
+
+              {/* Always rendered, and in near-body colour rather than the muted grey it
+                  used to wear. This is the answer to "would I like a tea with this in
+                  it?", which is the question the page exists to answer; hiding it when
+                  absent made the page look like a list of labels and hid the fact that
+                  anything was missing at all. An ingredient nobody has written up says so
+                  — quietly, but it says so. */}
+              <p
+                data-testid={`ingredient-description-${ingredient.slug}`}
+                className={`mt-3 flex-1 text-sm ${
+                  ingredient.description
+                    ? 'text-neutral-700 dark:text-neutral-300'
+                    : 'italic text-neutral-400 dark:text-neutral-500'
+                }`}
+              >
+                {ingredient.description ?? 'No description yet.'}
+              </p>
+
               {/* Below the description rather than up in the badge row: the badges say
                   what the ingredient *is*, which is the same for everybody, and this says
                   what you think of it, which is not. The caption goes *into* the control
