@@ -1,7 +1,6 @@
 import csv
 import hashlib
 import html
-import json
 import re
 import ssl
 import sys
@@ -84,11 +83,13 @@ def bird_and_blend(body: str) -> str:
     m = BB_BLOCK.search(body)
     if not m:
         return ""
-    text = strip_tags(body[m.start(): m.start() + 3000])
+    text = strip_tags(body[m.start() : m.start() + 3000])
     text = re.sub(r"^>?\s*Ingredients\s*", "", text)
     # The accordion continues into the next panel; cut at the first heading-like word that
     # cannot be part of an ingredient list.
-    text = re.split(r"(?i)\b(?:allergen|nutrition|brewing|how to|caffeine level|share|delivery)\b", text)[0]
+    text = re.split(
+        r"(?i)\b(?:allergen|nutrition|brewing|how to|caffeine level|share|delivery)\b", text
+    )[0]
     return text.strip(" .;")
 
 
@@ -101,7 +102,8 @@ PL_CUT = re.compile(
     r"(?i)instrukcja|jedna z |temperatura|czas parzenia|opakowanie|ilo[sś][cć] herbaty"
     r"|herbata\s+\w+\s+nie |zala[cć]|aby |dzi[eę]ki |zapewniaj|kawa[lł]ki jab|sk[lł]adanie"
     r"|kosztu dostawy|skontaktuj|zam[oó]wieni"
-    r"|pozwalaj|pe[lł]na witamin|s[lł]yn[aą]c|reguluje|ekologicznych|saszetk|min\.|[0-9]+\s*g ka[zż]d"
+    r"|pozwalaj|pe[lł]na witamin|s[lł]yn[aą]c|reguluje|ekologicznych|saszetk|min\."
+    r"|[0-9]+\s*g ka[zż]d"
 )
 
 
@@ -160,16 +162,28 @@ def simon_levelt(body: str) -> str:
 
 SHOPS = {
     "ronnefeldt": {
-        "shop": "Ronnefeldt", "country": "DE", "urls": "de_urls.txt",
-        "cache": "de_cache", "parse": ronnefeldt, "out": "raw_de.csv",
+        "shop": "Ronnefeldt",
+        "country": "DE",
+        "urls": "de_urls.txt",
+        "cache": "de_cache",
+        "parse": ronnefeldt,
+        "out": "raw_de.csv",
     },
     "oxalis": {
-        "shop": "Oxalis", "country": "CZ", "urls": "cz_urls.txt",
-        "cache": "cz_cache", "parse": oxalis, "out": "raw_cz.csv",
+        "shop": "Oxalis",
+        "country": "CZ",
+        "urls": "cz_urls.txt",
+        "cache": "cz_cache",
+        "parse": oxalis,
+        "out": "raw_cz.csv",
     },
     "simonlevelt": {
-        "shop": "Simon Levelt", "country": "NL", "urls": "nl_urls.txt",
-        "cache": "nl_cache", "parse": simon_levelt, "out": "raw_nl.csv",
+        "shop": "Simon Levelt",
+        "country": "NL",
+        "urls": "nl_urls.txt",
+        "cache": "nl_cache",
+        "parse": simon_levelt,
+        "out": "raw_nl.csv",
     },
     "birdandblend": {
         "shop": "Bird & Blend",
@@ -199,7 +213,9 @@ def main(key: str) -> None:
     for i, url in enumerate(urls, 1):
         body = fetch(url, S / cfg["cache"])
         if i % 25 == 0:
-            print(f"  {i}/{len(urls)}, {len(rows)} with ingredients, {failed} unreachable", flush=True)
+            print(
+                f"  {i}/{len(urls)}, {len(rows)} with ingredients, {failed} unreachable", flush=True
+            )
         if not body:
             failed += 1
             continue

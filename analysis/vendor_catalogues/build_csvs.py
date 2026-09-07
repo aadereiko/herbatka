@@ -16,7 +16,10 @@ TYPE_RULES = [
     ("white", r"th[ée] blanc|white tea|herbata biala|biala herbata"),
     ("green", r"th[ée] vert|green tea|matcha|sencha|gyokuro|zielona|hojicha"),
     ("black", r"th[ée] noir|black tea|czarna"),
-    ("herbal", r"infusion|verveine|camomille|menthe|tilleul|hibiscus|rumianek|owocowa|zioowa|ziolowa"),
+    (
+        "herbal",
+        r"infusion|verveine|camomille|menthe|tilleul|hibiscus|rumianek|owocowa|zioowa|ziolowa",
+    ),
 ]
 
 
@@ -58,11 +61,17 @@ def clean_name(raw: str) -> str:
 # How the tea is sold, which no shop states in a field — it is in the product name, the URL
 # or the pack size, in whichever language the shop trades in.
 FORMAT_RULES = [
-    ("bags", r"sachet|teebeutel|beutel|builen|theezakje|zakje|saszetk|torebk|porcovan"
-             r"|s[aá][cč]k|tea ?bags?|teabag|pyramid|bustine|infusettes?|filtro|piramidk"),
+    (
+        "bags",
+        r"sachet|teebeutel|beutel|builen|theezakje|zakje|saszetk|torebk|porcovan"
+        r"|s[aá][cč]k|tea ?bags?|teabag|pyramid|bustine|infusettes?|filtro|piramidk",
+    ),
     ("powder", r"\bmatcha\b|poudre|pulver|poeder|pr[aá][sš]ek|proszek|powder|instant"),
-    ("loose", r"\bvrac\b|\blose[rn]?\b|losse thee|sypan|li[sś]ciast|loose ?-?leaf|volumine"
-              r"|sypk|na wag[eę]|lo[sš]e"),
+    (
+        "loose",
+        r"\bvrac\b|\blose[rn]?\b|losse thee|sypan|li[sś]ciast|loose ?-?leaf|volumine"
+        r"|sypk|na wag[eę]|lo[sš]e",
+    ),
 ]
 
 
@@ -90,9 +99,13 @@ def load_palais() -> list[dict]:
             continue
         rows.append(
             {
-                "shop": "Palais des Thes", "country": "France", "name": clean_name(r["name"]),
-                "ingredients_source": ing, "source_quality": "composition list",
-                "url": r["url"], "format": tea_format(f"{r['name']} {r['url']}"),
+                "shop": "Palais des Thes",
+                "country": "France",
+                "name": clean_name(r["name"]),
+                "ingredients_source": ing,
+                "source_quality": "composition list",
+                "url": r["url"],
+                "format": tea_format(f"{r['name']} {r['url']}"),
             }
         )
     return rows
@@ -124,7 +137,9 @@ def load_shopify_prose(filename: str, shop: str, country: str, host: str) -> lis
         title = p.get("title") or ""
         if NOT_A_TEA_PRODUCT.search(title):
             continue
-        prose = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", p.get("body_html") or "")))
+        prose = re.sub(
+            r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", p.get("body_html") or ""))
+        )
         if not prose:
             continue
         folded = lexicon.fold(prose)
@@ -138,8 +153,11 @@ def load_shopify_prose(filename: str, shop: str, country: str, host: str) -> lis
             continue
         rows.append(
             {
-                "shop": shop, "country": country, "name": clean_name(title),
-                "ingredients_source": ", ".join(found), "source_quality": "named in prose",
+                "shop": shop,
+                "country": country,
+                "name": clean_name(title),
+                "ingredients_source": ", ".join(found),
+                "source_quality": "named in prose",
                 "url": f"https://{host}/products/{p['handle']}",
                 # Variant titles are where a Shopify shop actually states the format
                 # ("50 Tea Bags", "Loose Leaf Pouch"); the product title rarely does.
@@ -185,9 +203,12 @@ def load_raw(path: Path, country: str) -> list[dict]:
             continue
         rows.append(
             {
-                "shop": r["shop"], "country": country,
+                "shop": r["shop"],
+                "country": country,
                 "name": clean_name(r["name"]),
-                "ingredients_source": ing, "source_quality": "composition list", "url": r["url"],
+                "ingredients_source": ing,
+                "source_quality": "composition list",
+                "url": r["url"],
                 "format": tea_format(f"{r['name']} {r['url']}"),
             }
         )
@@ -208,8 +229,18 @@ def keep_in_summary(term: str, mapped: str, noise: bool) -> bool:
 
 
 def write_teas(rows: list[dict], dest: Path) -> None:
-    fields = ["shop", "country", "name", "tea_type", "format", "ingredients_english",
-              "ingredients_source", "n_ingredients", "source_quality", "url"]
+    fields = [
+        "shop",
+        "country",
+        "name",
+        "tea_type",
+        "format",
+        "ingredients_english",
+        "ingredients_source",
+        "n_ingredients",
+        "source_quality",
+        "url",
+    ]
     with dest.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
@@ -230,11 +261,14 @@ def main() -> None:
             + load_shopify_prose("shopify_artoftea.json", "Art of Tea", "USA", "www.artoftea.com")
         ),
         "teas_canada.csv": load_shopify_prose(
-            "shopify_davidstea.json", "DAVIDsTEA", "Canada", "www.davidstea.com"),
+            "shopify_davidstea.json", "DAVIDsTEA", "Canada", "www.davidstea.com"
+        ),
         "teas_india.csv": load_shopify_prose(
-            "shopify_vahdam.json", "Vahdam Teas", "India", "www.vahdamteas.com"),
+            "shopify_vahdam.json", "Vahdam Teas", "India", "www.vahdamteas.com"
+        ),
         "teas_australia.csv": load_shopify_prose(
-            "shopify_t2.json", "T2 Tea", "Australia", "t2tea.com"),
+            "shopify_t2.json", "T2 Tea", "Australia", "t2tea.com"
+        ),
     }
 
     # Stripping the pack size off a name collapses "Masala Chai 60 g" and "Masala Chai 1 kg"
@@ -242,7 +276,9 @@ def main() -> None:
     # the one with the fuller ingredient text more often than not.
     for rows in groups.values():
         seen: set[str] = set()
-        deduped = [r for r in rows if not (r["name"].casefold() in seen or seen.add(r["name"].casefold()))]
+        deduped = [
+            r for r in rows if not (r["name"].casefold() in seen or seen.add(r["name"].casefold()))
+        ]
         rows[:] = deduped
 
     ingredient_rows = []
@@ -258,9 +294,14 @@ def main() -> None:
                     english.append(mapped)
                 ingredient_rows.append(
                     {
-                        "country": r["country"], "shop": r["shop"], "tea_name": r["name"],
-                        "format": r.get("format", ""), "position": position, "ingredient_source": term,
-                        "ingredient_english": mapped, "percentage": pct,
+                        "country": r["country"],
+                        "shop": r["shop"],
+                        "tea_name": r["name"],
+                        "format": r.get("format", ""),
+                        "position": position,
+                        "ingredient_source": term,
+                        "ingredient_english": mapped,
+                        "percentage": pct,
                         "is_flavouring": "yes" if noise else "",
                         "in_herbatka_vocabulary": "yes" if mapped else "",
                         "url": r["url"],
@@ -274,9 +315,19 @@ def main() -> None:
         summary.append((filename, len(rows)))
 
     dest = S / "tea_ingredients_all.csv"
-    fields = ["country", "shop", "tea_name", "format", "position", "ingredient_source",
-              "ingredient_english", "percentage", "is_flavouring",
-              "in_herbatka_vocabulary", "url"]
+    fields = [
+        "country",
+        "shop",
+        "tea_name",
+        "format",
+        "position",
+        "ingredient_source",
+        "ingredient_english",
+        "percentage",
+        "is_flavouring",
+        "in_herbatka_vocabulary",
+        "url",
+    ]
     with dest.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
