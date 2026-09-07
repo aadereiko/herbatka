@@ -45,6 +45,13 @@ import { ForbiddenPage } from './ForbiddenPage'
  */
 const OcrBenchPage = import.meta.env.DEV ? lazy(() => import('../dev/ocr/OcrBenchPage')) : null
 
+/**
+ * The data-science bench, gated the same way and for one extra reason: it imports
+ * `vendor-dataset.json`, the shops' own catalogue copy gathered to develop the similarity
+ * work. The `import.meta.env.DEV` fold is what guarantees it never reaches a public
+ * bundle — see the note on `OcrBenchPage` for why the ternary shape matters.
+ */
+const LabsPage = import.meta.env.DEV ? lazy(() => import('../dev/labs/LabsPage')) : null
 
 /** What the guards stash in router state so the login page can send you back. */
 type FromState = { from?: Location } | null
@@ -275,6 +282,16 @@ export function AppRoutes() {
           element={
             <Suspense fallback={null}>
               <OcrBenchPage />
+            </Suspense>
+          }
+        />
+      )}
+      {LabsPage && (
+        <Route
+          path="/dev/labs"
+          element={
+            <Suspense fallback={null}>
+              <LabsPage />
             </Suspense>
           }
         />
