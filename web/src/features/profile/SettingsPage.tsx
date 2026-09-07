@@ -18,13 +18,14 @@ import { TEA_TYPES, TEA_TYPE_LABELS, isTeaType } from '../../lib/catalog'
 import type { TeaType } from '../../lib/catalog'
 import {
   BIO_MAX_LENGTH,
+  CITY_MAX_LENGTH,
   DISPLAY_NAME_MAX_LENGTH,
-  LOCATION_MAX_LENGTH,
   PRONOUNS_MAX_LENGTH,
+  STATUS_MAX_LENGTH,
 } from '../../lib/profile'
 import type { ProfileUpdate } from '../../lib/profile'
 import { useAuth } from '../auth/auth-context'
-import { useUpdateProfile } from './queries'
+import { useCountries, useUpdateProfile } from './queries'
 
 /** '' is a real option, not a placeholder: "no favourite" is a thing to be, and the only
  *  way to say it again once you have said something else. */
@@ -40,7 +41,51 @@ function trimmedOrNull(value: string): string | null {
   return trimmed === '' ? null : trimmed
 }
 
-type Errors = Partial<Record<'display_name' | 'pronouns' | 'location' | 'bio', string>>
+type Errors = Partial<Record<'display_name' | 'pronouns' | 'status' | 'city' | 'bio', string>>
+
+/**
+ * The country picker, and the one thing worth knowing about it.
+ *
+ * The list is fetched, never bundled, so the options and the server's validator cannot
+ * disagree — a country in this dropdown that `PATCH /auth/me` rejects is a form nobody
+ * can submit. While it is in flight the select still renders, with the person's *current*
+ * country as its only option: the alternative is a control that appears empty for a beat
+ * and looks like it has forgotten what you told it.
+ *
+ * '' is a real choice rather than a placeholder — "not saying" is a thing to be, and
+ * without it there would be no way to take a country back off once set.
+ */
+function CountryField({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (code: string) => void
+}) {
+  const countries = useCountries()
+  const { user } = useAuth()
+
+  const options = [
+    { value: '', label: 'Not saying' },
+    ...(countries.data
+      ? countries.data.map((country) => ({ value: country.code, label: country.name }))
+      : user?.country
+        ? [{ value: user.country.code, label: user.country.name }]
+        : []),
+  ]
+
+  return (
+    <SelectField
+      id="country"
+      label="Country"
+      value={value}
+      onChange={onChange}
+      options={options}
+      disabled={countries.isPending}
+      hint={countries.isError ? 'The country list could not be loaded.' : undefined}
+    />
+  )
+}
 
 function SettingsForm({ user }: { user: User }) {
   const save = useUpdateProfile()
@@ -50,7 +95,9 @@ function SettingsForm({ user }: { user: User }) {
   // the response would fight anything typed since.
   const [displayName, setDisplayName] = useState(user.display_name)
   const [pronouns, setPronouns] = useState(user.pronouns ?? '')
-  const [location, setLocation] = useState(user.location ?? '')
+  const [status, setStatus] = useState(user.status ?? '')
+  const [city, setCity] = useState(user.city ?? '')
+  const [countryCode, setCountryCode] = useState(user.country?.code ?? '')
   const [bio, setBio] = useState(user.bio ?? '')
   const [favourite, setFavourite] = useState<TeaType | ''>(user.favourite_tea_type ?? '')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatar_url)
@@ -70,8 +117,12 @@ function SettingsForm({ user }: { user: User }) {
     if (pronouns.trim().length > PRONOUNS_MAX_LENGTH) {
       found.pronouns = `${PRONOUNS_MAX_LENGTH} characters at most.`
     }
-    if (location.trim().length > LOCATION_MAX_LENGTH) {
-      found.location = `${LOCATION_MAX_LENGTH} characters at most.`
+    if (status.trim().length > STATUS_MAX_LENGTH) {
+      found.status = `${STATUS_MAX_LENGTH} characters at most.`
+    }
+
+    if (city.trim().length > CITY_MAX_LENGTH) {
+      found.city = `${CITY_MAX_LENGTH} characters at most.`
     }
     if (bio.trim().length > BIO_MAX_LENGTH) {
       found.bio = `${BIO_MAX_LENGTH} characters at most.`
@@ -89,8 +140,17 @@ function SettingsForm({ user }: { user: User }) {
     const nextPronouns = trimmedOrNull(pronouns)
     if (nextPronouns !== user.pronouns) patch.pronouns = nextPronouns
 
-    const nextLocation = trimmedOrNull(location)
-    if (nextLocation !== user.location) patch.location = nextLocation
+    const nextStatus = trimmedOrNull(status)
+    if (nextStatus !== user.status) patch.status = nextStatus
+
+    const nextCity = trimmedOrNull(city)
+    if (nextCity !== user.city) patch.city = nextCity
+
+    // '' is "no country", which the API spells null — the same distinction the text
+    // fields make. Compared against the *code*, never the name: the name is presentation
+    // and can change without the person having touched this form.
+    const nextCountry = countryCode === '' ? null : countryCode
+    if (nextCountry !== (user.country?.code ?? null)) patch.country_code = nextCountry
 
     const nextBio = trimmedOrNull(bio)
     if (nextBio !== user.bio) patch.bio = nextBio
@@ -143,13 +203,30 @@ function SettingsForm({ user }: { user: User }) {
       />
 
       <TextField
-        id="location"
-        label="Location"
-        value={location}
-        onChange={setLocation}
-        placeholder="Kraków"
-        error={errors.location}
+        id="status"
+        label="Status"
+        value={status}
+        onChange={setStatus}
+        placeholder="Working through a kilo of dan cong"
+        hint="One line about what you are drinking lately. Shown under your name."
+        error={errors.status}
       />
+
+      {/* City free, country from a list. A city is a place as you describe it and there
+          is no canonical list of those worth arguing with; a country typed freehand gives
+          you "UK", "U.K.", "United Kingdom" and "England" in one column, and then no
+          filter can ever group them. */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          id="city"
+          label="City"
+          value={city}
+          onChange={setCity}
+          placeholder="Kraków"
+          error={errors.city}
+        />
+        <CountryField value={countryCode} onChange={setCountryCode} />
+      </div>
 
       <TextAreaField
         id="bio"

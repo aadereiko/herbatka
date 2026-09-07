@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '../../lib/api'
 import type { User } from '../../lib/api'
-import type { ProfileUpdate, PublicProfile } from '../../lib/profile'
+import type { Country, ProfileUpdate, PublicProfile } from '../../lib/profile'
 import { useAuth } from '../auth/auth-context'
 import { useViewer } from '../auth/viewer'
 
@@ -67,5 +67,22 @@ export function useUpdateProfile() {
       updateUser(next)
       if (id) void client.invalidateQueries({ queryKey: profileKeys.detail(id) })
     },
+  })
+}
+
+/**
+ * Every country the API will accept, sorted by name.
+ *
+ * Fetched rather than bundled so the picker and the server's validator cannot disagree:
+ * a country in the dropdown the API rejects is a form nobody can submit. It is 249 rows
+ * of two short strings — about 6 kB — and it changes roughly once a decade, so it is
+ * cached indefinitely rather than refetched with everything else.
+ */
+export function useCountries() {
+  return useQuery({
+    queryKey: ['countries'],
+    queryFn: () => api<Country[]>('/countries'),
+    staleTime: Infinity,
+    gcTime: Infinity,
   })
 }

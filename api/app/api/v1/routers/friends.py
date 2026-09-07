@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from app.api.deps import CurrentUser, DbSession, PageParams
 from app.schemas.common import Page
 from app.schemas.friend import (
+    BrewedFeedItem,
     FeedActor,
     FeedItem,
     Friend,
@@ -164,7 +165,7 @@ def _feed_items(entries: list[dict]) -> list[FeedItem]:
                     body=row.body,
                 )
             )
-        else:
+        elif entry["kind"] == "stocked":
             items.append(
                 StockedFeedItem(
                     at=row.created_at,
@@ -172,6 +173,19 @@ def _feed_items(entries: list[dict]) -> list[FeedItem]:
                     tea=TeaRef.model_validate(row.tea),
                     household=HouseholdRef.model_validate(row.household),
                     grams=float(row.quantity_grams),
+                )
+            )
+        else:
+            items.append(
+                BrewedFeedItem(
+                    at=row.occurred_at,
+                    actor=FeedActor.model_validate(row.user) if row.user else None,
+                    tea=TeaRef.model_validate(row.stock_item.tea),
+                    household=HouseholdRef.model_validate(row.stock_item.household),
+                    # Stored negative — it left the tin — and shown positive, because
+                    # "brewed -5 g" is not a sentence anybody says.
+                    grams=abs(float(row.delta_grams)),
+                    note=row.note,
                 )
             )
     return items

@@ -9,6 +9,7 @@ import type { Page, TeaDetail, TeaSummary } from '../../lib/catalog'
 import type { ShopSummary } from '../../lib/shop'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
+import { ThemeProvider } from '../../components/ui/theme'
 
 /* --------------------------------------------------------------------- fixtures */
 
@@ -20,7 +21,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
@@ -143,13 +146,15 @@ function renderApp(path: string, { staleTime = 0 } = {}) {
     defaultOptions: { queries: { retry: false, staleTime }, mutations: { retry: false } },
   })
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 

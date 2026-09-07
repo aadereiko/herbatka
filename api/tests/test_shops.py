@@ -31,15 +31,22 @@ class TestBrowsing:
         assert (await client.get(f"{SHOPS}?city=krakow")).json()["total"] == 0
         assert (await client.get(f"{SHOPS}?city=Kraków")).json()["total"] == 1
 
-    async def test_an_unapproved_shop_is_hidden(
+    async def test_a_suggested_shop_is_listed_and_marked_rather_than_hidden(
         self, client: AsyncClient, user_headers: dict[str, str]
     ) -> None:
+        """It used to be invisible until approved, which meant the person who suggested it
+        submitted a form and then could not find the shop they had just added."""
         await client.post(
             SHOPS, headers=user_headers, json={"name": "Secret Shop", "city": "Nowhere"}
         )
 
-        assert (await client.get(SHOPS)).json()["total"] == 0
-        assert (await client.get(f"{SHOPS}/secret-shop")).status_code == 404
+        listing = (await client.get(SHOPS)).json()
+        assert listing["total"] == 1
+        assert listing["items"][0]["is_approved"] is False
+
+        detail = await client.get(f"{SHOPS}/secret-shop")
+        assert detail.status_code == 200
+        assert detail.json()["is_approved"] is False
 
     async def test_a_shop_needs_some_way_to_be_found(
         self, client: AsyncClient, user_headers: dict[str, str]
@@ -104,14 +111,19 @@ class TestListings:
         assert body["items"][0]["shop"]["name"] == "Czajnik"
         assert body["items"][0]["product_url"] == "https://czajnik.example/sencha"
 
-    async def test_unapproved_shops_do_not_appear_in_where_to_buy(
+    async def test_an_unapproved_shop_does_appear_in_where_to_buy_marked(
         self,
         client: AsyncClient,
         admin_headers: dict[str, str],
         user_headers: dict[str, str],
         tea,
     ) -> None:
-        """Pointing people at an unreviewed shop would sidestep the approval queue."""
+        """A suggested shop is part of the catalog now, so its listings are too.
+
+        This used to assert the opposite, on the argument that pointing people at an
+        unreviewed shop sidesteps the queue. That went with the change: a listing that
+        exists but is invisible on the one page it answers a question for is worse than a
+        marked one, and "where can I buy this" is the question."""
         pending = (
             await client.post(
                 SHOPS, headers=user_headers, json={"name": "Unreviewed", "city": "Gdańsk"}
@@ -123,7 +135,9 @@ class TestListings:
             json={"tea_id": str(tea.id)},
         )
 
-        assert (await client.get(f"/api/v1/catalog/teas/{tea.slug}/shops")).json()["total"] == 0
+        where = (await client.get(f"/api/v1/catalog/teas/{tea.slug}/shops")).json()
+        assert where["total"] == 1
+        assert where["items"][0]["shop"]["is_approved"] is False
 
 
 class TestBuying:
@@ -420,14 +434,17 @@ class TestApproval:
                 SHOPS, headers=user_headers, json={"name": "Pod Herbatą", "city": "Wrocław"}
             )
         ).json()
-        assert (await client.get(f"{SHOPS}/{suggested['slug']}")).status_code == 404
+        before = await client.get(f"{SHOPS}/{suggested['slug']}")
+        assert before.status_code == 200
+        assert before.json()["is_approved"] is False
 
         approved = await client.post(
             f"{ADMIN_SHOPS}/{suggested['id']}/approve", headers=admin_headers
         )
 
         assert approved.status_code == 200
-        assert (await client.get(f"{SHOPS}/{suggested['slug']}")).status_code == 200
+        # Approving is what clears the mark, not what makes it visible.
+        assert (await client.get(f"{SHOPS}/{suggested['slug']}")).json()["is_approved"] is True
 
     async def test_a_plain_user_cannot_reach_the_queue(
         self, client: AsyncClient, user_headers: dict[str, str]
@@ -441,9 +458,10 @@ class TestAdminShopDetail:
     async def test_an_admin_can_read_an_unapproved_shop(
         self, client: AsyncClient, user_headers: dict[str, str], admin_headers: dict[str, str]
     ) -> None:
-        """The public route hides it, which would leave the moderation queue unable to
-        show what it is approving — and an edit form built from a summary would PATCH
-        address and description to null."""
+        """The admin detail route exists because the moderation queue needs every field to
+        build an edit form from — a form built off a summary would PATCH address and
+        description to null. It outlived the reason it was added (the public route used to
+        hide unapproved shops) and is still the right endpoint for the queue."""
         suggested = (
             await client.post(
                 SHOPS,
@@ -457,7 +475,7 @@ class TestAdminShopDetail:
             )
         ).json()
 
-        assert (await client.get(f"{SHOPS}/{suggested['slug']}")).status_code == 404
+        assert (await client.get(f"{SHOPS}/{suggested['slug']}")).status_code == 200
 
         response = await client.get(f"{ADMIN_SHOPS}/{suggested['id']}", headers=admin_headers)
 

@@ -203,7 +203,7 @@ INGREDIENTS: list[tuple[str, str, bool, str]] = [
     ),
     (
         "Star anise",
-        "spice",
+        "seed",
         False,
         "Sweet liquorice and warm spice, rounder and softer than aniseed. Two pods "
         "flavour an entire pot.",
@@ -217,21 +217,21 @@ INGREDIENTS: list[tuple[str, str, bool, str]] = [
     ),
     (
         "Vanilla",
-        "spice",
+        "extract",
         False,
         "Creamy and rounding — it makes a rough tea taste smoother without adding a "
         "grain of sugar.",
     ),
     (
         "Fennel seed",
-        "spice",
+        "seed",
         False,
         "Sweet aniseed with a cooling finish. Drunk after dinner across half of Europe, "
         "and for good reason.",
     ),
     (
         "Liquorice root",
-        "spice",
+        "root",
         False,
         "Startlingly sweet with no sugar in it at all, and a dark, faintly salty finish. "
         "You will either love it or pick it out.",
@@ -239,14 +239,14 @@ INGREDIENTS: list[tuple[str, str, bool, str]] = [
     # fruit
     (
         "Orange peel",
-        "fruit",
+        "peel",
         False,
         "Sweet-bitter citrus oil, closer to marmalade than to juice. Warms up a black "
         "blend and steadies a tart one.",
     ),
     (
         "Lemon peel",
-        "fruit",
+        "peel",
         False,
         "Sharp zest and a little bitter pith: the smell of a lemon without the sourness of one.",
     ),
@@ -259,14 +259,14 @@ INGREDIENTS: list[tuple[str, str, bool, str]] = [
     ),
     (
         "Rosehip",
-        "fruit",
+        "berry",
         False,
         "Tangy and slightly floral, with a jammy thickness to it. Almost always found "
         "holding hands with hibiscus.",
     ),
     (
         "Bergamot oil",
-        "fruit",
+        "extract",
         False,
         "The perfume that makes Earl Grey Earl Grey: sour orange, lemon and cologne. "
         "Wonderful, right up until there is too much of it.",
@@ -286,6 +286,86 @@ INGREDIENTS: list[tuple[str, str, bool, str]] = [
         "Popped and toasted grain — nutty, savoury, not far off popcorn. Rounds the "
         "sharpness off a green tea.",
     ),
+    # ------------------------------------------------------------------ M9 additions
+    # The six-category vocabulary was making "spice" hold bark, root and seed at once,
+    # so the entries above were re-filed and these fill out the categories that opened
+    # up. Everything here is something that actually turns up on a tea packet.
+    (
+        "Sarsaparilla root",
+        "root",
+        False,
+        "Earthy and faintly medicinal, like old-fashioned root beer.",
+    ),
+    (
+        "Chicory root",
+        "root",
+        False,
+        "Roasted and bitter-sweet; the coffee stand-in in a caffeine-free blend.",
+    ),
+    (
+        "Turmeric root",
+        "root",
+        False,
+        "Peppery, resinous and staining. Carries a golden blend on its own.",
+    ),
+    ("Cassia bark", "bark", False, "Cinnamon's blunter cousin — hotter, sweeter and much cheaper."),
+    ("Willow bark", "bark", False, "Dry, tannic and faintly bitter; a herbalist's staple."),
+    ("Coriander seed", "seed", False, "Citrus and warm wood, quite unlike the leaf."),
+    ("Aniseed", "seed", False, "Sweet liquorice without the cloying edge."),
+    (
+        "Cocoa nib",
+        "seed",
+        False,
+        "Roasted, bitter and unmistakably chocolate. Adds body more than sweetness.",
+    ),
+    ("Barley", "grain", False, "Toasted and nutty. The backbone of a roasted-grain tisane."),
+    ("Buckwheat", "grain", False, "Warm, biscuity and gently sweet — soba-cha in a cup."),
+    ("Puffed rice", "grain", False, "Popcorn on the nose; what turns green tea into genmaicha."),
+    ("Almond", "nut", False, "Marzipan sweetness, soft and rounding."),
+    ("Coconut", "nut", False, "Creamy and tropical; reads as sweetness without sugar."),
+    ("Grapefruit peel", "peel", False, "Sharp, bitter and bracing. Wakes up a flat blend."),
+    ("Lime peel", "peel", False, "Green, sherbet-like and louder than lemon."),
+    (
+        "Juniper berry",
+        "berry",
+        False,
+        "Piney and resinous — gin's backbone, and it behaves the same in tea.",
+    ),
+    (
+        "Goji berry",
+        "berry",
+        False,
+        "Mildly sweet and faintly savoury, closer to tomato than to raisin.",
+    ),
+    ("Sea buckthorn", "berry", False, "Sharply sour and oily-bright; a lot of it goes a long way."),
+    ("Peppermint oil", "extract", False, "Cold and piercing where the leaf is merely cool."),
+    (
+        "Jasmine essence",
+        "extract",
+        False,
+        "The scent without the petals; used where a whole flower would clog an infuser.",
+    ),
+    (
+        "Cornflower petal",
+        "flower",
+        False,
+        "Almost tasteless. It is there because a blue petal in a green tea is worth looking at.",
+    ),
+    ("Calendula petal", "flower", False, "Faintly peppery, mostly decorative."),
+    (
+        "Butterfly pea flower",
+        "flower",
+        False,
+        "Vegetal and mild, and it turns the cup blue — then purple with a squeeze of lemon.",
+    ),
+    (
+        "Lemon myrtle",
+        "leaf",
+        False,
+        "More lemon than a lemon; sharp, clean and slightly medicinal.",
+    ),
+    ("Tulsi", "herb", False, "Holy basil: clove-like, peppery and warming."),
+    ("Lemon balm", "herb", False, "Soft, sweet lemon with none of the acid."),
 ]
 
 # (name, country, website)

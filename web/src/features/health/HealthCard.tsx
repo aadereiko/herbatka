@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
 import { getHealth } from '../../lib/api'
+import { TeaSprigMark } from '../../components/ui/botanical'
 
 function StatusDot({ state }: { state: 'ok' | 'bad' | 'pending' }) {
   const colour =
@@ -53,8 +54,11 @@ export function HealthCard() {
   return (
     <section className="w-full max-w-md rounded-2xl border border-brand-200 bg-white p-8 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex items-center gap-3">
-        <span className="text-3xl" role="img" aria-label="teacup">
-          🍵
+        <span
+          aria-hidden="true"
+          className="wood-frame grid size-12 shrink-0 place-items-center rounded-md"
+        >
+          <TeaSprigMark className="size-8 text-brand-100" />
         </span>
         <div>
           <h2 className="text-xl font-semibold text-brand-900 dark:text-brand-100">Herbatka</h2>

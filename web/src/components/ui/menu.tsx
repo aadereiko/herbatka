@@ -247,10 +247,10 @@ export function Menu({
         aria-controls={menuId}
         data-testid={triggerTestId}
         onClick={() => setOpen((value) => !value)}
-        // The identical `btn btn-md btn-quiet` the nav's inactive entries wear: a menu
+        // The identical `btn btn-sm sm:btn-md btn-quiet` the nav's inactive entries wear: a menu
         // trigger sitting in that row and looking like something else was the old bar's
         // one visible seam.
-        className={`btn btn-md btn-quiet focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${triggerClassName}`}
+        className={`btn btn-sm sm:btn-md btn-quiet text-xs uppercase tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${triggerClassName}`}
       >
         {trigger}
         {/* 0.75rem rather than 0.6: the caret is drawn by a monochrome symbol font now

@@ -16,6 +16,7 @@ import type {
 import type { ListingWithShop, ShopSummary } from '../../lib/shop'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
+import { ThemeProvider } from '../../components/ui/theme'
 
 /* --------------------------------------------------------------------- fixtures */
 
@@ -27,7 +28,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
@@ -97,6 +100,10 @@ const brewEvent: StockEvent = {
 
 const senchaDetail: StockItemDetail = {
   ...sencha,
+  // Null is the ordinary case for a fixture: below the server's evidence floors there is
+  // no forecast, and the tin page has to render that as "not enough history yet" rather
+  // than as a rate of zero.
+  pace: null,
   notes: 'From the good shop on the corner.',
   purchased_at: '2026-07-20',
   price_paid_minor: 1250,
@@ -263,14 +270,16 @@ function renderApp(path: string) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <LocationSpy />
-          <AppRoutes />
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <LocationSpy />
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 
@@ -979,6 +988,194 @@ test('changing the tea drops the old tea’s shops instead of leaving them one t
   expect(sold).not.toHaveTextContent('Herbaciarnia u Kruka')
 })
 
+/* ------------------------------------- a tea, or a shop, the catalog does not have yet */
+
+/** Everything `TeaForm` asks the API for the moment it appears, plus an empty catalog for
+ *  the picker to find nothing in. Empty on purpose: the whole point of these tests is the
+ *  branch where the search comes back with nothing. */
+function emptyCatalog(overrides: Record<string, Handler> = {}) {
+  return shelf({
+    'GET /catalog/teas': () => json(pageOf([], { size: 8 })),
+    'GET /catalog/brands': () => json(pageOf([])),
+    'GET /catalog/ingredients': () => json(pageOf([])),
+    ...overrides,
+  })
+}
+
+const yuzuDetail: StockItemDetail = {
+  ...senchaDetail,
+  id: 'item-3',
+  tea: { id: 'tea-9', slug: 'yuzu-sencha', name: 'Yuzu Sencha', tea_type: 'green', image_url: null },
+  shop: null,
+}
+
+/** Type a name the catalog does not have, and wait for the debounce to settle on it. */
+async function searchForAnUnknownTea(name: string) {
+  fireEvent.change(screen.getByLabelText('Which tea?'), { target: { value: name } })
+  return screen.findByTestId('tea-picker-compose')
+}
+
+test('an unknown tea can be written from the shelf form, and rides on the tin', async () => {
+  emptyCatalog({ 'POST /households/hh-1/stock': () => json(yuzuDetail, 201) })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+
+  // The grams are answered *first*, because this is the thing that used to be lost. The
+  // old dead end said "add it under Teas first", which meant walking away from this box.
+  fireEvent.change(await screen.findByLabelText('How much is in it?'), { target: { value: '80' } })
+
+  fireEvent.click(await searchForAnUnknownTea('Yuzu Sencha'))
+
+  // The tea form, with the name already in it — nobody should have to type it twice.
+  const teaForm = await screen.findByTestId('add-tin-tea-form')
+  expect(screen.getByLabelText('Name')).toHaveValue('Yuzu Sencha')
+  // And not the shop half of it: the tin has already asked where it came from, and asking
+  // again on one screen is how you get the same shop twice under two slugs.
+  expect(screen.queryByLabelText('Shop name')).toBeNull()
+
+  fireEvent.submit(teaForm)
+
+  // Back on the tin, with the tea shown as a draft rather than as a catalog pick — nothing
+  // has been saved yet — and the 80 g still where it was left.
+  const drafted = await screen.findByTestId('tea-drafted')
+  expect(drafted).toHaveTextContent('Yuzu Sencha')
+  expect(within(drafted).getByTestId('pending-badge')).toBeInTheDocument()
+  expect(screen.getByLabelText('How much is in it?')).toHaveValue(80)
+
+  fireEvent.submit(screen.getByTestId('add-tin-form'))
+
+  expect(await screen.findByTestId('stock-notice')).toHaveTextContent(
+    'Added “Yuzu Sencha” to the shelf, and to the catalog for an admin to check.',
+  )
+
+  // One request, not two: the tea travels inside the tin's body, so the server writes both
+  // in one transaction and a failure writes neither. Nothing was posted to the catalog on
+  // the way past — that would be the version where a tea can outlive the tin it was for.
+  expect(calls.some((call) => call.method === 'POST' && call.path === '/catalog/teas')).toBe(false)
+  expect(
+    calls.filter((call) => call.method === 'POST' && call.path === '/households/hh-1/stock'),
+  ).toHaveLength(1)
+  expect(bodyOf('POST', '/households/hh-1/stock')).toEqual({
+    quantity_grams: 80,
+    new_tea: {
+      name: 'Yuzu Sencha',
+      tea_type: 'green',
+      caffeine_level: 'medium',
+      ingredients: [],
+      new_ingredients: [],
+    },
+  })
+})
+
+test('the tea form can be backed out of, and the tin is still there', async () => {
+  emptyCatalog()
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.change(await screen.findByLabelText('How much is in it?'), { target: { value: '40' } })
+
+  fireEvent.click(await searchForAnUnknownTea('Nothing Like It'))
+  await screen.findByTestId('add-tin-tea-form')
+
+  fireEvent.click(screen.getByTestId('new-tea-cancel'))
+
+  // No draft, no tea, and the grams untouched — a cancel is not a reset.
+  expect(screen.queryByTestId('tea-drafted')).toBeNull()
+  expect(screen.getByLabelText('How much is in it?')).toHaveValue(40)
+  expect(screen.getByTestId('add-tin-form')).toBeInTheDocument()
+})
+
+test('a drafted tea and a picked tea are never both set', async () => {
+  // A search-aware catalog: Sencha is in it, "Something Else" is not. A handler that
+  // answered the same way whatever was asked could not tell the two branches apart.
+  emptyCatalog({
+    'GET /catalog/teas': ({ url }) =>
+      json(pageOf(url.searchParams.get('q') ? [] : [senchaTea], { size: 8 })),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+  expect(screen.getByTestId('tea-picked')).toHaveTextContent('Sencha')
+
+  // "Change", then write one instead. The catalog pick has to go: one tin holds one tea,
+  // and a body carrying both `tea_id` and `new_tea` is refused by the server anyway.
+  fireEvent.click(screen.getByTestId('tea-picker-clear'))
+  fireEvent.change(screen.getByLabelText('Which tea?'), { target: { value: 'Something Else' } })
+  await waitFor(() => expect(screen.queryByTestId('tea-picker-results')).toBeNull())
+  fireEvent.click(await screen.findByTestId('tea-picker-compose'))
+  fireEvent.submit(await screen.findByTestId('add-tin-tea-form'))
+
+  await screen.findByTestId('tea-drafted')
+  expect(screen.queryByTestId('tea-picked')).toBeNull()
+})
+
+test('an unknown shop can be written too, and lands on the tin as new_shop', async () => {
+  emptyCatalog({
+    'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })),
+    'GET /shops': () => json(pageOf([], { size: 8 })),
+    'POST /households/hh-1/stock': () =>
+      json({ ...senchaDetail, shop: { id: 'shop-9', slug: 'czajnik', name: 'Czajnik na Rogu' } }, 201),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+  fireEvent.change(screen.getByLabelText('How much is in it?'), { target: { value: '60' } })
+
+  fireEvent.change(screen.getByLabelText('Where did it come from?'), {
+    target: { value: 'Czajnik na Rogu' },
+  })
+  fireEvent.click(await screen.findByTestId('shop-picker-compose'))
+
+  // Three fields, not a whole shop form: this is the tin being unpacked, not the shop
+  // directory being edited.
+  fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Gdańsk' } })
+  fireEvent.submit(screen.getByTestId('add-tin-form'))
+
+  await screen.findByTestId('stock-notice')
+  // A catalog tea and a brand-new shop. The server creates the shop, a listing for this
+  // tea in it, and the tin — so "where do we get this again?" has an answer next time.
+  expect(bodyOf('POST', '/households/hh-1/stock')).toEqual({
+    tea_id: 'tea-1',
+    quantity_grams: 60,
+    new_shop: { name: 'Czajnik na Rogu', city: 'Gdańsk' },
+  })
+})
+
+test('a new shop with nowhere to find it is refused before the request', async () => {
+  emptyCatalog({
+    'GET /catalog/teas': () => json(pageOf([senchaTea], { size: 8 })),
+    'GET /shops': () => json(pageOf([], { size: 8 })),
+  })
+  renderApp('/households/hh-1')
+
+  await screen.findByTestId('stock-list')
+  fireEvent.click(screen.getByTestId('toggle-add-tin'))
+  fireEvent.click(await screen.findByTestId('tea-result-tea-1'))
+  fireEvent.change(screen.getByLabelText('How much is in it?'), { target: { value: '60' } })
+
+  fireEvent.change(screen.getByLabelText('Where did it come from?'), {
+    target: { value: 'Nowhere' },
+  })
+  fireEvent.click(await screen.findByTestId('shop-picker-compose'))
+  fireEvent.submit(screen.getByTestId('add-tin-form'))
+
+  // Mirrors `NewShopIn.reachable_somehow` and the CHECK behind it, so the answer is a
+  // message under the field rather than a 422 on the whole tin.
+  expect(screen.getByTestId('add-tin-new-shop-name-error')).toHaveTextContent(
+    'A shop needs a city or a website, so people can find it.',
+  )
+  expect(
+    calls.some((call) => call.method === 'POST' && call.path === '/households/hh-1/stock'),
+  ).toBe(false)
+})
+
 test('a tin that came from a shop says where, on the tin’s own page', async () => {
   shelf({ 'GET /households/hh-1/stock/item-1': () => json(senchaDetail) })
   renderApp('/households/hh-1/stock/item-1')
@@ -990,4 +1187,54 @@ test('a tin that came from a shop says where, on the tin’s own page', async ()
     'href',
     '/shops/u-kruka',
   )
+})
+
+test('a tin says how fast it is going, and shows its working', async () => {
+  shelf({
+    'GET /households/hh-1/stock/item-1': () =>
+      json({
+        ...senchaDetail,
+        pace: { grams_per_week: 14, days_observed: 28, events_counted: 8, days_remaining: 5 },
+      }),
+  })
+  renderApp('/households/hh-1/stock/item-1')
+
+  const pace = await screen.findByTestId('tin-pace')
+  expect(pace).toHaveTextContent('14 g a week')
+  expect(within(pace).getByTestId('tin-pace-left')).toHaveTextContent('about 5 days left')
+
+  // The evidence, in words. A projection off eight rows should not be presented with the
+  // same confidence as a measurement.
+  expect(pace).toHaveTextContent('from 8 entries over 4 weeks')
+})
+
+test('a tin with too little history says so rather than reporting nought grams a week', async () => {
+  shelf({
+    'GET /households/hh-1/stock/item-1': () => json({ ...senchaDetail, pace: null }),
+  })
+  renderApp('/households/hh-1/stock/item-1')
+
+  // Null is not zero. A tin nobody has recorded twice is not a tin nobody is drinking,
+  // and rendering it as 0 g a week would tell the reader to stop restocking it.
+  const unknown = await screen.findByTestId('tin-pace-unknown')
+  expect(unknown).toHaveTextContent('Not enough history yet')
+  expect(unknown).not.toHaveTextContent('0 g')
+})
+
+test('an empty tin has a rate but no deadline', async () => {
+  shelf({
+    'GET /households/hh-1/stock/item-1': () =>
+      json({
+        ...senchaDetail,
+        quantity_grams: 0,
+        pace: { grams_per_week: 20, days_observed: 40, events_counted: 12, days_remaining: null },
+      }),
+  })
+  renderApp('/households/hh-1/stock/item-1')
+
+  const pace = await screen.findByTestId('tin-pace')
+  expect(pace).toHaveTextContent('20 g a week')
+  // Nothing left to run out. The server sends null for exactly this, so the page must not
+  // print "runs out today" — it already has.
+  expect(within(pace).queryByTestId('tin-pace-left')).toBeNull()
 })

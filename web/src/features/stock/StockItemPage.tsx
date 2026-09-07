@@ -29,6 +29,7 @@ import type {
 } from '../../lib/household'
 import { STOCK_EVENT_INPUT_KINDS, STOCK_EVENT_LABELS } from '../../lib/household'
 import { describeActor, formatDay, formatDelta, formatGrams, formatMoment, formatPrice } from './format'
+import { PaceNote } from './PaceNote'
 import {
   useDeleteStockItem,
   useStockAdjust,
@@ -378,6 +379,18 @@ export function StockItemPage() {
               <EditTinForm householdId={id} item={item} onDone={() => setEditing(false)} />
             </Panel>
           )}
+
+          {/* Between the tin's numbers and its log, which is where the question forms:
+              you have just read "62 g left" and the next thing you want to know is
+              whether that is a fortnight or a year. Putting it above the history also
+              means the answer arrives before the evidence for it, which is the right
+              order for a summary. */}
+          <Panel ariaLabel="How fast it is going" testId="tin-pace-panel">
+            <h2 className="mb-3 text-lg font-semibold text-brand-900 dark:text-brand-100">
+              How fast it is going
+            </h2>
+            <PaceNote pace={item.pace} testId="tin-pace" />
+          </Panel>
 
           <Panel ariaLabel="History" testId="tin-events">
             <h2 className="mb-3 text-lg font-semibold text-brand-900 dark:text-brand-100">History</h2>

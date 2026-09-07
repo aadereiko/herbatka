@@ -13,6 +13,7 @@ import type {
 } from '../../lib/profile'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
+import { ThemeProvider } from '../../components/ui/theme'
 
 /* --------------------------------------------------------------------- fixtures */
 
@@ -24,7 +25,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: 'Counting steps, mostly.',
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
@@ -76,7 +79,9 @@ const grace: PublicProfile = {
   avatar_url: null,
   pronouns: 'she/her',
   bio: 'Compiles her own blends.',
-  location: 'Arlington',
+  status: 'Working through a kilo of dan cong',
+  city: 'Arlington',
+  country: { code: 'US', name: 'United States of America' },
   favourite_tea_type: 'oolong',
   member_since: '2026-02-01T09:00:00Z',
   review_count: 12,
@@ -97,7 +102,9 @@ const mine: PublicProfile = {
   id: ada.id,
   display_name: ada.display_name,
   pronouns: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   bio: 'Counting steps, mostly.',
   friend_state: 'self',
   // Your own profile shows all of yours, and every one of them is one you are in.
@@ -149,20 +156,31 @@ function renderApp(path: string) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
+
+const COUNTRIES = [
+  { code: 'IE', name: 'Ireland' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'GB', name: 'United Kingdom' },
+]
 
 const signedIn = (overrides: Record<string, Handler> = {}) =>
   mockFetch({
     'POST /auth/refresh': () => json(session),
     'GET /friends/requests': () => json([]),
+    // Fetched by the settings form's country picker. Answered here rather than in each
+    // test because the form asks for it on mount, and an unmocked request rejects.
+    'GET /countries': () => json(COUNTRIES),
     ...overrides,
   })
 
@@ -563,4 +581,126 @@ test('settings is behind the door', async () => {
 
   expect(await screen.findByTestId('login-page')).toBeInTheDocument()
   expect(screen.queryByTestId('settings-form')).toBeNull()
+})
+
+/* --------------------------------------------------------- status, city and country */
+
+test('the picker offers the list the server sent, and sends back a code', async () => {
+  signedIn({ 'PATCH /auth/me': () => json({ ...ada, city: 'Kraków' }) })
+  renderApp('/settings')
+
+  const form = await screen.findByTestId('settings-form')
+  const country = await screen.findByLabelText('Country')
+  await waitFor(() => expect(within(country).getAllByRole('option').length).toBe(4))
+
+  // Every option the server will accept, plus a real "not saying" — without which there
+  // would be no way to take a country back off once set.
+  expect([...within(country).getAllByRole('option')].map((o) => o.textContent)).toEqual([
+    'Not saying',
+    'Ireland',
+    'Poland',
+    'United Kingdom',
+  ])
+
+  fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Kraków' } })
+  fireEvent.change(country, { target: { value: 'PL' } })
+  fireEvent.submit(form)
+
+  await waitFor(() => expect(countOf('PATCH /auth/me')).toBe(1))
+  // The code, never the name. Names are presentation and change; codes do not.
+  expect(bodyOf('PATCH /auth/me')).toEqual({ city: 'Kraków', country_code: 'PL' })
+})
+
+test('a status is saved on its own', async () => {
+  signedIn({ 'PATCH /auth/me': () => json({ ...ada, status: 'Brewing' }) })
+  renderApp('/settings')
+
+  const form = await screen.findByTestId('settings-form')
+  fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'Brewing' } })
+  fireEvent.submit(form)
+
+  await waitFor(() => expect(countOf('PATCH /auth/me')).toBe(1))
+  expect(bodyOf('PATCH /auth/me')).toEqual({ status: 'Brewing' })
+})
+
+test('clearing the country sends null rather than an empty string', async () => {
+  signedIn({
+    'POST /auth/refresh': () =>
+      json({ ...session, user: { ...ada, country: { code: 'PL', name: 'Poland' } } }),
+    'PATCH /auth/me': () => json({ ...ada, country: null }),
+  })
+  renderApp('/settings')
+
+  const form = await screen.findByTestId('settings-form')
+  const country = await screen.findByLabelText('Country')
+  await waitFor(() => expect(within(country).getAllByRole('option').length).toBe(4))
+  fireEvent.change(country, { target: { value: '' } })
+  fireEvent.submit(form)
+
+  await waitFor(() => expect(countOf('PATCH /auth/me')).toBe(1))
+  expect(bodyOf('PATCH /auth/me')).toEqual({ country_code: null })
+})
+
+test('a profile reads “City, Country”, and either half stands alone', async () => {
+  signedOut({ 'GET /users/user-2/profile': () => json(grace) })
+  renderApp('/users/user-2')
+
+  const place = await screen.findByTestId('profile-location')
+  expect(place).toHaveTextContent('Arlington, United States of America')
+
+  // The status sits under the name, because it is the one thing on the page that is true
+  // today — the bio is a standing description and the counts are history.
+  expect(screen.getByTestId('profile-status')).toHaveTextContent(
+    'Working through a kilo of dan cong',
+  )
+})
+
+test('a profile with a country and no city does not render a stray comma', async () => {
+  signedOut({
+    'GET /users/user-2/profile': () =>
+      json({ ...grace, city: null, country: { code: 'IE', name: 'Ireland' } }),
+  })
+  renderApp('/users/user-2')
+
+  expect(await screen.findByTestId('profile-location')).toHaveTextContent('Ireland ·')
+})
+
+test('a person who has said neither gets no place line at all', async () => {
+  signedOut({
+    'GET /users/user-2/profile': () => json({ ...grace, city: null, country: null }),
+  })
+  renderApp('/users/user-2')
+
+  await screen.findByTestId('profile-member-since')
+  expect(screen.queryByTestId('profile-location')).toBeNull()
+})
+
+test('a profile leads with what they have been drinking, then friends, then households', async () => {
+  // Your own profile, so both connection panels are shown even when empty — the case
+  // where all three blocks exist at once and their order is actually visible.
+  signedIn({ 'GET /users/user-1/profile': () => json({ ...grace, id: ada.id, friend_state: 'self' }) })
+  renderApp('/users/user-1')
+
+  const reviews = await screen.findByTestId('profile-reviews')
+  const friends = screen.getByTestId('profile-friends')
+  const households = screen.getByTestId('profile-households')
+
+  // Document order, which is what a screen reader and a phone both follow — the two-column
+  // grid at `lg` is a presentation of this order, not a replacement for it.
+  const order = (node: HTMLElement) =>
+    reviews.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
+  expect(order(friends)).toBeTruthy()
+  expect(order(households)).toBeTruthy()
+  expect(friends.compareDocumentPosition(households) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+test('with nothing to put beside them, the reviews take the whole width', async () => {
+  // A stranger sees neither panel, so the two-column grid must not apply — otherwise the
+  // reviews sit in two thirds of the page next to a column of air.
+  signedOut({ 'GET /users/user-2/profile': () => json({ ...grace, households: [], friends: [] }) })
+  renderApp('/users/user-2')
+
+  const reviews = await screen.findByTestId('profile-reviews')
+  expect(screen.queryByTestId('profile-friends')).toBeNull()
+  expect(reviews.parentElement?.className).not.toContain('grid-cols-')
 })

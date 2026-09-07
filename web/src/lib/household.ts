@@ -94,6 +94,26 @@ export type StockEvent = components['schemas']['StockEvent']
  */
 export type StockItem = components['schemas']['StockItem']
 
+/**
+ * How fast a tin is going, and how long that leaves.
+ *
+ * **Nullable, and the null means something.** Below the floors in the server's
+ * `services/consumption` there is no honest answer, so it sends `null` rather than a
+ * confident wrong number. Render that as "not enough history yet" — never as zero. A tin
+ * nobody has brewed twice is not a tin being drunk at 0 g a week, and `days_remaining`
+ * is separately null when the tin is already empty, which is a different fact again.
+ */
+export type StockPace = components['schemas']['StockPace']
+
+export type DrinkerShare = components['schemas']['DrinkerShare']
+export type TeaShare = components['schemas']['TeaShare']
+export type TinForecast = components['schemas']['TinForecast']
+
+/** What a shelf gets through. Note `grams_out` counts everything that left the tins —
+ *  including tea thrown away — while `drinkers` and `teas` count brewing only, so the
+ *  two deliberately disagree wherever something was discarded. */
+export type HouseholdConsumption = components['schemas']['HouseholdConsumption']
+
 export type StockItemDetail = components['schemas']['StockItemDetail']
 
 /* ------------------------------------------------------------------ write payloads */
@@ -173,3 +193,7 @@ export type StockListParams = {
   page?: number
   size?: number
 }
+
+/** A ledger row on a household's timeline: `StockEvent` plus the tea it happened to,
+ *  which a shelf-wide log needs and a single tin's page does not. */
+export type HouseholdEvent = components['schemas']['HouseholdEvent']

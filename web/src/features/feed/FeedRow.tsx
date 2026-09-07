@@ -1,25 +1,30 @@
-import { useState } from 'react'
 import { Link } from 'react-router'
 
 import { Avatar } from '../../components/ui/avatar'
-import {
-  Badge,
-  EmptyState,
-  ErrorNote,
-  PageHeading,
-  PageShell,
-  Pagination,
-  Panel,
-  Skeleton,
-} from '../../components/ui/page'
-import { describeApiError } from '../../lib/api'
+import { TeaCupMark } from '../../components/ui/botanical'
+import { Badge, Panel } from '../../components/ui/page'
 import { TEA_TYPE_LABELS } from '../../lib/catalog'
 import { formatMoment } from '../../lib/format'
-import type { FeedActor, FeedItem, FeedReviewItem, FeedStockedItem } from '../../lib/friend'
+import type {
+  FeedActor,
+  FeedBrewedItem,
+  FeedItem,
+  FeedReviewItem,
+  FeedStockedItem,
+} from '../../lib/friend'
 import { formatScore } from '../review/format'
-import { useFeed } from './queries'
 
-const PAGE_SIZE = 20
+/**
+ * One row of the activity timeline, in its three shapes.
+ *
+ * This used to live in `FeedPage.tsx` and be exported from it so the home page could show
+ * the first few of the same stream. The page is gone — the home panel turned out to be
+ * enough of it — and the rows outlived it, which is why they are a file of their own now
+ * rather than a component exported from a screen that no longer exists.
+ *
+ * Nothing here fetches. The rows are handed whatever `GET /home` already returned, which
+ * is the same `FeedItem` union the feed endpoint serves.
+ */
 
 /**
  * Who did the thing, as a face and a link to them.
@@ -125,80 +130,67 @@ function StockedItem({ item }: { item: FeedStockedItem }) {
   )
 }
 
-/** The discriminator does the work. Two kinds, two shapes on screen — collapsing them
- *  into one row with a verb slot would make "rated 9" and "added 100 g" look like the
- *  same event, which they are not. */
-/** Exported so the home page can show the first few of the same timeline
- *  without a second rendering of the same data that could drift from this one. */
-export function FeedRow({ item }: { item: FeedItem }) {
-  return item.kind === 'review' ? <ReviewItem item={item} /> : <StockedItem item={item} />
+/**
+ * Somebody on a shelf you share made a cup.
+ *
+ * The quietest row in the stream, and deliberately so. A rating is an opinion worth
+ * reading and a new tin is a thing you can go and use; a cup of tea is neither — it is
+ * companionship. It gets one line, no heading and no card furniture, so that a household
+ * that drinks six cups a day does not bury the two reviews underneath them.
+ *
+ * The note is the exception and the reason this row is worth having at all. "Last of the
+ * tin" or "couldn't sleep" is the most human thing the whole app records, and it is
+ * already sitting in the ledger.
+ *
+ * Like `StockedItem`, the link goes to the *household* rather than the tea: the useful
+ * next move is to see what is left on that shelf.
+ */
+function BrewedItem({ item }: { item: FeedBrewedItem }) {
+  return (
+    <li
+      data-testid="feed-item-brewed"
+      className="flex items-start gap-3 px-1 py-3 text-sm text-neutral-600 dark:text-neutral-400"
+    >
+      <TeaCupMark aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-leaf-600" />
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-1">
+          <Actor actor={item.actor} /> brewed {formatGrams(item.grams)} of{' '}
+          <Link
+            to={`/teas/${item.tea.slug}`}
+            className="font-medium text-brand-900 hover:underline dark:text-brand-100"
+          >
+            {item.tea.name}
+          </Link>{' '}
+          from{' '}
+          <Link
+            to={`/households/${item.household.id}`}
+            className="font-medium text-brand-700 hover:underline dark:text-brand-300"
+          >
+            {item.household.name}
+          </Link>
+        </p>
+        {item.note && (
+          <p className="mt-0.5 text-xs italic text-neutral-600 dark:text-neutral-400">
+            “{item.note}”
+          </p>
+        )}
+        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+          {formatMoment(item.at)}
+        </p>
+      </div>
+    </li>
+  )
 }
 
-/**
- * What your friends have been drinking, and what has appeared on your shared shelves.
+/** The discriminator does the work. Three kinds, three shapes on screen — collapsing
+ *  them into one row with a verb slot would make "rated 9", "added 100 g" and "brewed
+ *  5 g" look like the same event, which they are not: the first is an opinion, the
+ *  second is a thing you can go and use, and the third is neither.
  *
- * Two sources with quite different privacy rules, deliberately in one stream: reviews
- * are your *friends'*, tins are your *households'*. The server merges and orders them;
- * this page does not re-sort, because "newest first" across two clocks is the server's
- * question to answer once rather than the client's to guess at per page.
- */
-export function FeedPage() {
-  const [page, setPage] = useState(1)
-  const feed = useFeed({ page, size: PAGE_SIZE })
-
-  const items = feed.data?.items ?? []
-
-  return (
-    <PageShell>
-      <PageHeading
-        title="Activity"
-        subtitle="What your friends have rated, and what has landed on your shelves."
-        actions={
-          <Link
-            to="/friends"
-            className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
-          >
-            Friends →
-          </Link>
-        }
-      />
-
-      {feed.isPending && (
-        <div role="status" aria-live="polite" data-testid="feed-loading" className="space-y-4">
-          <span className="sr-only">Loading your feed…</span>
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      )}
-
-      {feed.isError && <ErrorNote testId="feed-error">{describeApiError(feed.error)}</ErrorNote>}
-
-      {!feed.isPending && !feed.isError && items.length === 0 && (
-        <EmptyState title="Nothing here yet" testId="feed-empty">
-          <p>
-            This fills up as your friends rate teas, and as tins are added to households you
-            are in. Add a few friends and it will not stay quiet for long.
-          </p>
-          <Link to="/friends" className="font-medium text-brand-700 dark:text-brand-300">
-            Find friends
-          </Link>
-        </EmptyState>
-      )}
-
-      {items.length > 0 && (
-        <ul
-          data-testid="feed-list"
-          className={`space-y-4 ${feed.isPlaceholderData ? 'opacity-60' : ''}`}
-        >
-          {/* Not keyed on the actor: a stocked item's is nullable, and two anonymous
-              tins added in the same second would collide on `undefined`. */}
-          {items.map((item) => (
-            <FeedRow key={`${item.kind}-${item.tea.id}-${item.at}`} item={item} />
-          ))}
-        </ul>
-      )}
-
-      <Pagination page={feed.data?.page ?? page} pages={feed.data?.pages ?? 1} onPageChange={setPage} />
-    </PageShell>
-  )
+ *  Exported so the home page can show the first few of the same timeline without a
+ *  second rendering of the same data that could drift from this one. */
+export function FeedRow({ item }: { item: FeedItem }) {
+  if (item.kind === 'review') return <ReviewItem item={item} />
+  if (item.kind === 'stocked') return <StockedItem item={item} />
+  return <BrewedItem item={item} />
 }

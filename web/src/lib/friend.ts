@@ -66,10 +66,15 @@ export type FeedReviewItem = components['schemas']['ReviewFeedItem']
  */
 export type FeedStockedItem = components['schemas']['StockedFeedItem']
 
+/** Somebody on a shelf you share made a cup. Visible on household terms, not friend
+ *  terms — see the server's `services/feed._sources`: a brew says what is on a
+ *  household's shelf and who was in the house, so a friend outside it sees nothing. */
+export type FeedBrewedItem = components['schemas']['BrewedFeedItem']
+
 /** Two sources, one stream: your friends' reviews, and tins added to households you are
  *  in. `kind` is the discriminator, and the only honest way to render the two — they
  *  link to different places and mean different things. */
-export type FeedItem = FeedReviewItem | FeedStockedItem
+export type FeedItem = FeedReviewItem | FeedStockedItem | FeedBrewedItem
 
 /* ------------------------------------------------------------------- query strings */
 

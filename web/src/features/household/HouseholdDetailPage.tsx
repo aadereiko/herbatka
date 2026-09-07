@@ -20,6 +20,7 @@ import type { HouseholdPatch } from '../../lib/household'
 import { MEMBER_ROLE_LABELS } from '../../lib/household'
 import { pluralise } from '../catalog/format'
 import { useAuth } from '../auth/auth-context'
+import { HouseholdActivity } from '../stock/HouseholdActivity'
 import { StockList } from '../stock/StockList'
 import { InvitesPanel } from './InvitesPanel'
 import { MembersPanel } from './MembersPanel'
@@ -229,6 +230,17 @@ export function HouseholdDetailPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={isOwner ? 'brand' : 'neutral'}>{MEMBER_ROLE_LABELS[detail.role]}</Badge>
+            {/* Beside the shelf rather than in the nav: "what do we drink" is a question
+                about *this* household, and there is no answer to it without one in the
+                path. Every member sees it — the ledger is shared, so the summary of it is
+                too, and hiding your own household's habits from you would be odd. */}
+            <Link
+              to={`/households/${id}/consumption`}
+              data-testid="household-consumption-link"
+              className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
+            >
+              What we drink →
+            </Link>
             <Link
               to="/households"
               className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
@@ -321,6 +333,13 @@ export function HouseholdDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <StockList householdId={id} />
+
+        {/* Under the shelf, not above it. What is *on* the shelf is why somebody opens
+            this page; what has been happening to it is the second question, and putting
+            a timeline first would push the tins below the fold on a phone. */}
+        <div className="mt-6">
+          <HouseholdActivity householdId={id} />
+        </div>
 
         <div className="space-y-6">
           <MembersPanel

@@ -25,8 +25,8 @@ import type { IngredientCategory } from '../../lib/catalog'
  *
  * **On the line work.** Flat, chunky, `currentColor`, no fills, round joins, nothing
  * smaller than a stroke width across. A restyle that retints `--color-brand-*` or wraps
- * these in a wooden frame gets all six for free, because the only colours here are the
- * two Tailwind tokens on the wrapper. Anything airbrushed or realistic would have to be
+ * these in a wooden frame gets all fourteen for free, because the only colours here are
+ * the two Tailwind tokens on the wrapper. Anything airbrushed or realistic would have to be
  * redrawn instead.
  */
 const CATEGORY_ART: Record<IngredientCategory, ReactNode> = {
@@ -61,6 +61,78 @@ const CATEGORY_ART: Record<IngredientCategory, ReactNode> = {
       <circle cx="24.4" cy="42.5" r="8.5" />
       <circle cx="19.6" cy="28" r="8.5" />
       <circle cx="32" cy="32" r="5" />
+    </>
+  ),
+  // A taproot with fibres off it — ginger, liquorice, chicory.
+  root: (
+    <>
+      <path d="M32 8v18" />
+      <path d="M32 26c-6 4-9 12-8 22 7-2 11-9 11-16" />
+      <path d="M32 26c6 4 9 12 8 22-7-2-11-9-11-16" />
+      <path d="M25 38l-8-4" />
+      <path d="M39 38l8-4" />
+      <path d="M32 48v8" />
+    </>
+  ),
+  // A quill of bark, curled the way cinnamon dries.
+  bark: (
+    <>
+      <path d="M20 14h24l-6 36H14Z" />
+      <path d="M26 14l-6 36" />
+      <path d="M32 14l-6 36" />
+      <path d="M38 14l-6 36" />
+    </>
+  ),
+  // A seed pod, split, with three seeds in it — cardamom, coriander, anise.
+  seed: (
+    <>
+      <path d="M32 8c11 10 11 38 0 48-11-10-11-38 0-48Z" />
+      <circle cx="32" cy="21" r="3.5" />
+      <circle cx="32" cy="32" r="3.5" />
+      <circle cx="32" cy="43" r="3.5" />
+    </>
+  ),
+  // A cluster on a stalk. Distinct from `fruit` by being several small ones.
+  berry: (
+    <>
+      <path d="M32 8v10" />
+      <circle cx="32" cy="25" r="7" />
+      <circle cx="23" cy="39" r="7" />
+      <circle cx="41" cy="39" r="7" />
+      <circle cx="32" cy="51" r="7" />
+    </>
+  ),
+  // A spiral of peel, the way it comes off a citrus in one piece.
+  peel: (
+    <>
+      <path d="M46 12c-14 0-26 9-26 22 0 8 6 13 12 13 6 0 10-4 10-9 0-4-3-7-7-7-3 0-5 2-5 4" />
+      <path d="M46 12c0 6-2 10-5 13" />
+    </>
+  ),
+  // An ear of grain: paired kernels up a stem.
+  grain: (
+    <>
+      <path d="M32 56V20" />
+      <path d="M32 20c-6 2-9 7-9 13 6-1 9-6 9-13Z" />
+      <path d="M32 20c6 2 9 7 9 13-6-1-9-6-9-13Z" />
+      <path d="M32 34c-6 2-9 7-9 13 6-1 9-6 9-13Z" />
+      <path d="M32 34c6 2 9 7 9 13-6-1-9-6-9-13Z" />
+      <path d="M32 8v12" />
+    </>
+  ),
+  // A shelled nut: a rounded triangle with a seam.
+  nut: (
+    <>
+      <path d="M32 10c12 6 18 20 15 32-4 8-26 8-30 0-3-12 3-26 15-32Z" />
+      <path d="M32 12v38" />
+    </>
+  ),
+  // A dropper bottle — the one category that is a preparation, not a plant part.
+  extract: (
+    <>
+      <path d="M26 8h12v8H26Z" />
+      <path d="M28 16h8l4 10v26a4 4 0 0 1-4 4H28a4 4 0 0 1-4-4V26Z" />
+      <path d="M25 36h14" />
     </>
   ),
   // Star anise, which is the one spice with a silhouette everybody already knows.

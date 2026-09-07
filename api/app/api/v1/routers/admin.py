@@ -124,6 +124,20 @@ async def create_ingredient(payload: IngredientCreate, db: DbSession) -> Ingredi
     return IngredientOut.model_validate(await catalog_service.create_ingredient(db, payload))
 
 
+@router.post("/ingredients/{ingredient_id}/approve", response_model=IngredientOut)
+async def approve_ingredient(ingredient_id: uuid.UUID, db: DbSession) -> IngredientOut:
+    """Vouch for a suggested ingredient. Idempotent — approving an approved one is a
+    no-op rather than an error, because two admins clearing the same queue is normal."""
+    try:
+        return IngredientOut.model_validate(
+            await catalog_service.approve_ingredient(db, ingredient_id)
+        )
+    except NotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found"
+        ) from exc
+
+
 @router.patch("/ingredients/{ingredient_id}", response_model=IngredientOut)
 async def update_ingredient(
     ingredient_id: uuid.UUID, payload: IngredientUpdate, db: DbSession

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 if TYPE_CHECKING:
     from app.schemas.preference import BrewingNote
@@ -10,7 +10,26 @@ if TYPE_CHECKING:
 
 TeaType = Literal["green", "black", "oolong", "puerh", "white", "herbal", "rooibos", "blend"]
 CaffeineLevel = Literal["none", "low", "medium", "high"]
-IngredientCategory = Literal["leaf", "herb", "flower", "spice", "fruit", "other"]
+#: Kept in step with `IngredientCategoryEnum` in models/catalog.py by hand — the database
+#: guards the same list with a CHECK constraint, and the two must not drift. Widened from
+#: six because the old set made "spice" hold cinnamon bark, ginger root and cardamom seed
+#: at once, so filtering for one always returned the others.
+IngredientCategory = Literal[
+    "leaf",
+    "herb",
+    "flower",
+    "spice",
+    "fruit",
+    "berry",
+    "peel",
+    "root",
+    "bark",
+    "seed",
+    "grain",
+    "nut",
+    "extract",
+    "other",
+]
 
 
 class IngredientOut(BaseModel):
@@ -21,6 +40,10 @@ class IngredientOut(BaseModel):
     name: str
     category: IngredientCategory
     is_caffeinated: bool
+    #: False for one somebody suggested that no admin has vouched for yet. It is still
+    #: listed and still usable in a recipe — see the note on `TeaOut.is_approved` — and
+    #: the client marks it rather than hiding it.
+    is_approved: bool
     description: str | None
     #: A seeded Commons photograph for most of the starter vocabulary, an admin upload for
     #: the rest, and null for anything neither has reached. The client draws a category
@@ -164,6 +187,44 @@ class TeaDetail(TeaSummary):
     my_brewing: "BrewingNote | None" = None
 
 
+class NewIngredientIn(BaseModel):
+    """An ingredient that does not exist yet, proposed while writing a tea's recipe.
+
+    Deliberately thinner than `IngredientCreate`: a name, what kind of thing it is, and
+    whether it has caffeine in it. Somebody halfway through describing a blend is not
+    also going to write a description or find a photograph, and asking them to is how
+    you get an abandoned form instead of a suggestion.
+    """
+
+    name: str = Field(min_length=1, max_length=120)
+    category: IngredientCategory = "other"
+    is_caffeinated: bool = False
+    percentage: float | None = Field(default=None, gt=0, le=100)
+    is_primary: bool = False
+
+
+class NewShopIn(BaseModel):
+    """A shop that does not exist yet, proposed while adding a tea you bought there.
+
+    Creating it also creates a listing for the tea, because otherwise the two facts —
+    "this shop exists" and "it sells this" — arrive separately and the second one, which
+    is the useful half, gets lost.
+    """
+
+    name: str = Field(min_length=1, max_length=160)
+    website: str | None = Field(default=None, max_length=500)
+    city: str | None = Field(default=None, max_length=120)
+    country: str | None = Field(default=None, max_length=60)
+
+    @model_validator(mode="after")
+    def reachable_somehow(self) -> "NewShopIn":
+        # Mirrors ck_shop_reachable_somehow and `ShopCreate`. A shop with neither a
+        # website nor a city cannot be found by anybody.
+        if not (self.website or self.city):
+            raise ValueError("a shop needs a website or at least a city")
+        return self
+
+
 class TeaCreate(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     tea_type: TeaType
@@ -176,6 +237,11 @@ class TeaCreate(BaseModel):
     brew_seconds: int | None = Field(default=None, gt=0)
     grams_per_100ml: float | None = Field(default=None, gt=0)
     ingredients: list[TeaIngredientIn] = Field(default_factory=list)
+    #: Ingredients the vocabulary does not have yet. Created unapproved and attached to
+    #: this tea in the same transaction, so a blend is never saved with half its recipe.
+    new_ingredients: list[NewIngredientIn] = Field(default_factory=list)
+    #: A shop the catalog does not have yet, plus a listing for this tea in it.
+    new_shop: NewShopIn | None = None
 
 
 class TeaUpdate(BaseModel):

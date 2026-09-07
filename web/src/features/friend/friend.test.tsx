@@ -10,6 +10,7 @@ import type { FeedItem, Friend, FriendRequest, SearchResult } from '../../lib/fr
 import type { UserRef } from '../../lib/household'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
+import { ThemeProvider } from '../../components/ui/theme'
 
 /* --------------------------------------------------------------------- fixtures */
 
@@ -21,7 +22,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
@@ -171,13 +174,15 @@ function renderApp(path: string, { staleTime = 0 } = {}) {
     },
   })
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 
@@ -200,7 +205,7 @@ afterEach(() => {
 
 /* --------------------------------------------------------------- pending requests */
 
-test('accepting a request moves them into the friends list, clears the badge, and reaches the feed', async () => {
+test('accepting a request moves them into the friends list, clears the badge, and refreshes home', async () => {
   // Stateful, so every refetch can disagree with what was on screen. Frozen fixtures
   // would let this pass with all the invalidations deleted.
   let requests = [fromGrace, toKatherine]
@@ -210,7 +215,18 @@ test('accepting a request moves them into the friends list, clears the badge, an
   friendsPage({
     'GET /friends': () => json(friends),
     'GET /friends/requests': () => json(requests),
-    'GET /feed': () => json(pageOf(feed)),
+    'GET /home': () =>
+      json({
+        display_name: 'Ada Lovelace',
+        household_count: 0,
+        tin_count: 0,
+        low_stock: [],
+        friend_count: friends.length,
+        pending_requests: 0,
+        review_count: 0,
+        recent_activity: feed,
+        unrated: [],
+      }),
     'POST /friends/requests/req-1/accept': () => {
       requests = [toKatherine]
       friends = [alanFriend, graceFriend]
@@ -219,12 +235,19 @@ test('accepting a request moves them into the friends list, clears the badge, an
     },
   })
 
-  // Start on the feed so it is warm *before* the accept. A fresh-forever cache means a
-  // second /feed request afterwards can only be the invalidation.
-  renderApp('/feed', { staleTime: Infinity })
+  // Start on the home page so its activity panel is warm *before* the accept. A
+  // fresh-forever cache means a second /home request afterwards can only be the
+  // invalidation.
+  //
+  // It used to start on `/feed`, which no longer exists. The panel it moved to was never
+  // in this invalidation at all — accepting a request refreshed the feed page and left
+  // the home stream showing a timeline without the person you had just accepted — so
+  // this test now covers a path that was previously broken rather than the same one
+  // renamed.
+  renderApp('/', { staleTime: Infinity })
 
-  expect(await screen.findByTestId('feed-empty')).toBeInTheDocument()
-  expect(countOf('GET', '/feed')).toBe(1)
+  await screen.findByTestId('home-activity')
+  expect(countOf('GET', '/home')).toBe(1)
 
   // The badge is the thing people scan the nav for, and it is on screen before we ever
   // open /friends — one incoming request, not two: the outgoing one does not count.
@@ -253,12 +276,19 @@ test('accepting a request moves them into the friends list, clears the badge, an
   expect(screen.queryByTestId('nav-friends-badge')).toBeNull()
   expect(screen.getAllByTestId('outgoing-request')).toHaveLength(1)
 
-  // And the feed: her review is only visible because she is now a friend, so the fourth
-  // invalidation is the one that decides whether the stream looks broken.
-  fireEvent.click(screen.getByTestId('nav-feed'))
-  await waitFor(() => expect(countOf('GET', '/feed')).toBe(2))
-  expect(await screen.findByTestId('feed-item-review')).toHaveTextContent('Grace Hopper')
-  expect(screen.queryByTestId('feed-empty')).toBeNull()
+  // And the activity stream: her review is only visible because she is now a friend, so
+  // this fourth invalidation is the one that decides whether the home page looks stale.
+  //
+  // Asserted by *going back to it* rather than by counting requests at the moment of the
+  // accept, because React Query only refetches queries that are currently mounted — and
+  // by then this one is not, since accepting happens on /friends. The invalidation marks
+  // it stale; returning is what collects. That is also the real path a person takes, and
+  // the thing that would actually look broken.
+  fireEvent.click(screen.getByRole('link', { name: /Herbatka/ }))
+
+  await waitFor(() => expect(countOf('GET', '/home')).toBe(2))
+  const activity = await screen.findByTestId('home-activity')
+  await waitFor(() => expect(within(activity).getByText('Grace Hopper')).toBeInTheDocument())
 })
 
 test('declining removes the request without making a friend, and cancelling withdraws your own', async () => {
@@ -549,7 +579,6 @@ test('the friends nav entry is signed-in only, and wears no badge at zero', asyn
 
   await screen.findByTestId('tea-list-empty')
   expect(screen.queryByTestId('nav-friends')).toBeNull()
-  expect(screen.queryByTestId('nav-feed')).toBeNull()
   // Signed out, the authenticated endpoint is never touched — the mock would have
   // rejected loudly, but the count is the assertion that says so.
   expect(countOf('GET', '/friends/requests')).toBe(0)
@@ -559,7 +588,9 @@ test('the friends nav entry is signed-in only, and wears no badge at zero', asyn
   renderApp('/friends')
 
   expect(await screen.findByTestId('nav-friends')).toHaveAttribute('href', '/friends')
-  expect(screen.getByTestId('nav-feed')).toHaveAttribute('href', '/feed')
+  // No Activity entry beside it any more: the page it pointed at is gone and the home
+  // page carries the same stream.
+  expect(screen.queryByTestId('nav-feed')).toBeNull()
   // One outgoing request and nothing incoming: a permanent "0" is a badge people learn
   // to stop seeing, so there is none.
   await screen.findByTestId('outgoing-request')

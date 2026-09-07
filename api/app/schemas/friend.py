@@ -64,6 +64,27 @@ class StockedFeedItem(BaseModel):
     grams: float
 
 
+class BrewedFeedItem(BaseModel):
+    """Somebody on a shelf you share made a cup.
+
+    Visible on exactly the same terms as `StockedFeedItem`, and for the same reason: a
+    brew is an event on a *household's* tin, so it follows the household rule rather than
+    the friend rule. A friend's reviews are public; what a friend drinks at home is not,
+    and the feed keeps it that way — see `services/feed._sources`.
+
+    `note` rides along because it is already in the ledger and it is the most human thing
+    in the whole stream. "Last of the tin" is the line that makes a feed worth reading.
+    """
+
+    kind: Literal["brewed"] = "brewed"
+    at: datetime
+    actor: FeedActor | None
+    tea: TeaRef
+    household: HouseholdRef
+    grams: float
+    note: str | None
+
+
 # A discriminated union rather than one wide optional-everything model: the generated
 # TypeScript then narrows on `kind`, so a client cannot read `household` off a review.
-FeedItem = Annotated[ReviewFeedItem | StockedFeedItem, Field(discriminator="kind")]
+FeedItem = Annotated[ReviewFeedItem | StockedFeedItem | BrewedFeedItem, Field(discriminator="kind")]

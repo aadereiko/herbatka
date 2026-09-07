@@ -19,5 +19,9 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts"]
+  // capacitor.config.ts sits here rather than in tsconfig.app.json for the same
+  // reason vite.config.ts does: it is build tooling that runs in Node, not app
+  // code. Left out of both, nothing would typecheck it at all — `tsc -b` only
+  // sees what a project references.
+  "include": ["vite.config.ts", "capacitor.config.ts"]
 }

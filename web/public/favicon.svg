@@ -1,1 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍵</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Herbatka">
+  <!--
+    Two leaves and a bud, in a filled circle - the same mark the header wears, at the
+    contrast a 16px tab strip needs.
+
+    WHAT CHANGED AND WHY. This replaced a cream sprig on a brown rounded square, which
+    matched a design made of timber and paper. There is no timber left: the app is now
+    white, green and flat, and a brown tile in the tab was the last piece of the old skin
+    still on screen. The shape follows the header too, where the mark sits in a round
+    green chip rather than a square wooden one.
+
+    THE COLOURS ARE INVERTED RELATIVE TO THE HEADER, on purpose. In the app the chip is
+    pale green with a dark sprig, which is right on a white page. A favicon has no page:
+    it sits on whatever the browser paints behind a tab, so it has to hold up on both. A
+    pale chip vanishes on white chrome. This green measures 4.6:1 on a white strip and
+    3.0:1 on Chrome's dark one, with the sprig at 4.2:1 inside it either way - so the mark
+    reads whichever the reader is using.
+
+    THE DRAWING IS STILL FILLED, NOT STROKED, and still has no veins. At 16px the app's
+    1-1.9px ink outlines collide and the shapes they enclose fill in; solid shapes have no
+    such floor. Scaled to 86% so the leaf tips keep air inside the circle rather than
+    running into its edge.
+
+    Colours are literals: this file is fetched on its own and never sees the stylesheet.
+    They are brand-400 and a near-white off the neutral ramp. If the palette moves, move
+    them by hand.
+
+    Note for editors: an XML comment may not contain two consecutive hyphens, so CSS
+    custom properties cannot be named in here the way they are everywhere else in this
+    codebase. Writing one is not a style slip, it is a parse error, and a favicon that
+    fails to parse renders as nothing at all.
+  -->
+  <circle cx="32" cy="32" r="32" fill="#5e7c4b"/>
+  <g transform="translate(32 32) scale(0.86) translate(-32 -32)" fill="#f2f5ec">
+    <path d="M32 53.5c-.8-7.9-1-15.8-.6-23.7" fill="none" stroke="#f2f5ec" stroke-width="3.6" stroke-linecap="round"/>
+    <path d="M30 43c-9.4-1.4-18-8-22.6-17.6 10.2.2 18.8 6.4 22.6 17.6z"/>
+    <path d="M34 36.4c3.4-11.2 12.2-17.6 22.8-18.2-4.6 9.6-13.4 16-22.8 18.2z"/>
+    <path d="M32.2 32c-5.4-8-5-18.4.6-26.2 4.8 8 3.9 18.4-.6 26.2z"/>
+  </g>
+</svg>

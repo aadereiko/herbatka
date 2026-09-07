@@ -6,7 +6,7 @@ import { USER_SEARCH_MIN_LENGTH } from '../../lib/friend'
 import type { UserRef } from '../../lib/household'
 import { toQuery } from '../../lib/query-string'
 import { useViewer } from '../auth/viewer'
-import { feedKeys } from '../feed/queries'
+import { homeKeys } from '../home/queries'
 
 /**
  * Query keys as data, same as `catalog/queries.ts` and `stock/queries.ts`.
@@ -131,18 +131,27 @@ function useInvalidateFriends() {
   }
 }
 
-function useInvalidateFriendsAndFeed() {
+/**
+ * Friendship changed, so both the friends lists and the activity stream are stale.
+ *
+ * It used to invalidate `feedKeys.all` — the `/feed` page's cache — and that page is gone.
+ * The home summary is now the only place a friend's ratings appear, and it was *never* in
+ * this invalidation: accepting a request refreshed a feed page and left the home panel
+ * showing a timeline that did not yet include the person you had just accepted. Removing
+ * the page turned a latent bug into the only path, so the key moved with the surface.
+ */
+function useInvalidateFriendsAndHome() {
   const client = useQueryClient()
   const invalidateFriends = useInvalidateFriends()
   return () => {
     invalidateFriends()
-    void client.invalidateQueries({ queryKey: feedKeys.all })
+    void client.invalidateQueries({ queryKey: homeKeys.mine })
   }
 }
 
 /**
- * Sending a request changes nothing about what you can see, so the feed is left alone —
- * they are not a friend until they accept.
+ * Sending a request changes nothing about what you can see, so the activity stream is
+ * left alone — they are not a friend until they accept.
  *
  * Callers must render `SEND_REQUEST_FAILED` for *every* failure of this mutation rather
  * than `describeApiError`. `lib/friend.ts` explains why at length; the short version is
@@ -164,7 +173,7 @@ export function useSendFriendRequest() {
 /** The one mutation that unambiguously widens the feed: their reviews are now yours to
  *  see, and a stream that stays empty right after you accept somebody reads as broken. */
 export function useAcceptFriendRequest() {
-  const invalidate = useInvalidateFriendsAndFeed()
+  const invalidate = useInvalidateFriendsAndHome()
   return useMutation({
     mutationFn: (requestId: string) =>
       api<Friend>(`${requestPath(requestId)}/accept`, { method: 'POST' }),
@@ -184,7 +193,7 @@ export function useDismissFriendRequest() {
 }
 
 export function useUnfriend() {
-  const invalidate = useInvalidateFriendsAndFeed()
+  const invalidate = useInvalidateFriendsAndHome()
   return useMutation({
     mutationFn: (userId: string) => api<void>(friendPath(userId), { method: 'DELETE' }),
     onSuccess: invalidate,
@@ -195,7 +204,7 @@ export function useUnfriend() {
  *  request in either direction, so the feed loses their posts along with everything on
  *  this page moving. */
 export function useBlockUser() {
-  const invalidate = useInvalidateFriendsAndFeed()
+  const invalidate = useInvalidateFriendsAndHome()
   return useMutation({
     mutationFn: (userId: string) => api<void>(`${friendPath(userId)}/block`, { method: 'POST' }),
     onSuccess: invalidate,

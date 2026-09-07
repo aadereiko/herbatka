@@ -1,4 +1,3 @@
-import { Link } from 'react-router'
 
 import { PageHeading, PageShell } from '../../components/ui/page'
 import { BlockedPanel } from './BlockedPanel'
@@ -21,15 +20,7 @@ export function FriendsPage() {
     <PageShell>
       <PageHeading
         title="Friends"
-        subtitle="What your friends rate shows up in your feed, and yours in theirs."
-        actions={
-          <Link
-            to="/feed"
-            className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
-          >
-            Your feed →
-          </Link>
-        }
+        subtitle="What your friends rate shows up on your home page, and yours on theirs."
       />
 
       <div className="space-y-6">

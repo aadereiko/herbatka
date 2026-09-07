@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, expect, test, vi } from 'vitest'
 
@@ -9,6 +9,7 @@ import type { Page } from '../../lib/catalog'
 import type { FeedItem, FeedStockedItem } from '../../lib/friend'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
+import { ThemeProvider } from '../../components/ui/theme'
 
 /* --------------------------------------------------------------------- fixtures */
 
@@ -20,7 +21,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
@@ -66,6 +69,16 @@ const alanStocked: FeedStockedItem = {
   grams: 100,
 }
 
+const adaBrewed: FeedItem = {
+  kind: 'brewed',
+  at: '2026-08-26T07:05:00Z',
+  actor: { id: 'user-1', display_name: 'Ada Lovelace', avatar_url: null },
+  tea: sencha,
+  household: { id: 'hh-1', name: 'Flat 3' },
+  grams: 5,
+  note: 'last of the tin',
+}
+
 function pageOf<T>(items: T[], extra: Partial<Page<T>> = {}): Page<T> {
   return { items, total: items.length, page: 1, size: 20, pages: 1, ...extra }
 }
@@ -102,21 +115,20 @@ function mockFetch(handlers: Record<string, Handler>) {
   })
 }
 
-const feedRequests = () =>
-  calls.filter((call) => call.method === 'GET' && call.path === '/feed').map((call) => call.search)
-
 function renderApp(path: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 
@@ -130,6 +142,31 @@ function feed(overrides: Record<string, Handler> = {}) {
   })
 }
 
+/**
+ * The rows, through the only screen that still shows them.
+ *
+ * `/feed` is gone — the home page's "Lately" panel carries the head of the same timeline
+ * and turned out to be as much of it as anybody read. These tests are about `FeedRow`, so
+ * they now reach it the way the app does, through `GET /home`.
+ */
+function homeShowing(items: unknown[], overrides: Record<string, Handler> = {}) {
+  return feed({
+    'GET /home': () =>
+      json({
+        display_name: 'Ada Lovelace',
+        household_count: 1,
+        tin_count: 2,
+        low_stock: [],
+        friend_count: 1,
+        pending_requests: 0,
+        review_count: 0,
+        recent_activity: items,
+        unrated: [],
+      }),
+    ...overrides,
+  })
+}
+
 afterEach(() => {
   vi.restoreAllMocks()
   clearAccessToken()
@@ -138,10 +175,10 @@ afterEach(() => {
 /* ------------------------------------------------------------------------- tests */
 
 test('the two kinds read differently and lead to different places', async () => {
-  feed({ 'GET /feed': () => json(pageOf([graceRated, alanStocked])) })
-  renderApp('/feed')
+  homeShowing([graceRated, alanStocked])
+  renderApp('/')
 
-  const list = await screen.findByTestId('feed-list')
+  const list = await screen.findByTestId('home-activity')
 
   // Newest first, as the server sent it — the page does not re-sort across two clocks.
   const items = within(list).getAllByRole('listitem')
@@ -177,8 +214,7 @@ test('the two kinds read differently and lead to different places', async () => 
 })
 
 test('the links actually go where they say', async () => {
-  feed({
-    'GET /feed': () => json(pageOf([graceRated])),
+  homeShowing([graceRated], {
     'GET /catalog/teas/jasmine-pearls': () =>
       json({
         ...jasminePearls,
@@ -203,83 +239,23 @@ test('the links actually go where they say', async () => {
       }),
     'GET /catalog/teas/jasmine-pearls/reviews': () => json(pageOf([], { size: 10 })),
   })
-  renderApp('/feed')
+  renderApp('/')
 
-  await screen.findByTestId('feed-list')
+  await screen.findByTestId('home-activity')
   fireEvent.click(screen.getByRole('link', { name: 'Jasmine Pearls' }))
 
   // Not just an href: the route resolves and the tea page renders behind it.
   expect(await screen.findByRole('heading', { level: 1, name: 'Jasmine Pearls' })).toBeVisible()
 })
 
-test('an empty feed explains itself and points at /friends', async () => {
-  feed({ 'GET /feed': () => json(pageOf([])) })
-  renderApp('/feed')
 
-  const empty = await screen.findByTestId('feed-empty')
-  // It says what would fill it, in terms of something the reader can go and do.
-  expect(empty).toHaveTextContent('friends rate teas')
-  expect(empty).toHaveTextContent('households you are in')
-  expect(within(empty).getByRole('link', { name: 'Find friends' })).toHaveAttribute(
-    'href',
-    '/friends',
-  )
-
-  // Not a spinner and not a list, which are the two things an empty stream gets mistaken
-  // for when nobody wrote this branch.
-  expect(screen.queryByTestId('feed-list')).toBeNull()
-  expect(screen.queryByTestId('feed-loading')).toBeNull()
-  expect(screen.queryByTestId('pagination')).toBeNull()
-})
-
-test('the feed pages, asking for the page it is showing', async () => {
-  feed({
-    'GET /feed': ({ url }) =>
-      json(
-        url.searchParams.get('page') === '2'
-          ? pageOf([alanStocked], { total: 2, page: 2, pages: 2 })
-          : pageOf([graceRated], { total: 2, page: 1, pages: 2 }),
-      ),
-  })
-  renderApp('/feed')
-
-  await screen.findByTestId('feed-item-review')
-  expect(feedRequests()[0]).toContain('page=1')
-  expect(feedRequests()[0]).toContain('size=20')
-
-  fireEvent.click(screen.getByTestId('page-next'))
-
-  expect(await screen.findByTestId('feed-item-stocked')).toHaveTextContent('Alan Turing')
-  expect(feedRequests().at(-1)).toContain('page=2')
-  expect(screen.queryByTestId('feed-item-review')).toBeNull()
-})
-
-test('a feed that fails says so instead of pretending to be empty', async () => {
-  feed({ 'GET /feed': () => json({ detail: 'The feed is having a lie down.' }, 503) })
-  renderApp('/feed')
-
-  expect(await screen.findByTestId('feed-error')).toHaveTextContent(
-    'The feed is having a lie down.',
-  )
-  // The distinction that matters: a failure is not "you have no friends yet".
-  expect(screen.queryByTestId('feed-empty')).toBeNull()
-})
-
-test('/feed is signed-in only, and the home page does not bury it', async () => {
-  mockFetch({ 'POST /auth/refresh': () => json({ detail: 'Missing refresh cookie' }, 401) })
-  renderApp('/feed')
-
-  // RequireAuth sends a stranger to the sign-in page rather than to an empty stream.
-  expect(await screen.findByTestId('login-page')).toBeInTheDocument()
-  expect(calls.some((call) => call.path === '/feed')).toBe(false)
-})
 
 /**
  * The home page used to be a stack of link cards, and this asserted the feed sat in the
  * first of them. It is a dashboard now: the first few feed items are on the page itself,
  * with a link through to the rest. Showing beats linking, so the assertion moved with it.
  */
-test('the signed-in home shows the start of the feed and links to the rest', async () => {
+test('the signed-in home shows the activity stream, and is the only place it lives', async () => {
   mockFetch({
     'POST /auth/refresh': () => json(session),
     'GET /home': () =>
@@ -300,18 +276,20 @@ test('the signed-in home shows the start of the feed and links to the rest', asy
 
   const activity = await screen.findByTestId('home-activity')
   expect(within(activity).getByText(/Jasmine Pearls/)).toBeInTheDocument()
-  expect(within(activity).getByRole('link', { name: /All activity/ })).toHaveAttribute(
-    'href',
-    '/feed',
-  )
+
+  // No "all activity →". It pointed at a page showing a longer version of this same
+  // stream, and the longer version is the part that turned out not to be needed — so
+  // this panel is the whole of it, and offering a link to more would be a dead end.
+  expect(within(activity).queryByRole('link', { name: /All activity/ })).toBeNull()
+  expect(screen.queryByTestId('nav-feed')).toBeNull()
 })
 
 test('a tin measured in fractions of a gram does not read like a lab notebook', async () => {
-  feed({
-    'GET /feed': () =>
-      json(pageOf([{ ...alanStocked, grams: 12.5 }, { ...alanStocked, at: '2026-08-24T18:00:00Z' }])),
-  })
-  renderApp('/feed')
+  homeShowing([
+    { ...alanStocked, grams: 12.5 },
+    { ...alanStocked, at: '2026-08-24T18:00:00Z' },
+  ])
+  renderApp('/')
 
   const items = await screen.findAllByTestId('feed-item-stocked')
   expect(items[0]).toHaveTextContent('added 12.5 g of')
@@ -327,10 +305,8 @@ test('a tin measured in fractions of a gram does not read like a lab notebook', 
  * `item.actor.display_name` unguarded takes the whole page down with a TypeError.
  */
 test('a tin whose owner is unknown renders as “somebody” rather than crashing', async () => {
-  feed({
-    'GET /feed': () => json(pageOf([{ ...alanStocked, actor: null }])),
-  })
-  renderApp('/feed')
+  homeShowing([{ ...alanStocked, actor: null }])
+  renderApp('/')
 
   const stocked = await screen.findByTestId('feed-item-stocked')
   expect(stocked).toHaveTextContent('Somebody added 100 g of')
@@ -340,29 +316,110 @@ test('a tin whose owner is unknown renders as “somebody” rather than crashin
     'href',
     '/households/hh-1',
   )
-  expect(screen.queryByTestId('feed-error')).toBeNull()
 })
 
-test('the feed waits for the session rather than asking as a stranger', async () => {
-  let releaseRefresh: (value: Response) => void = () => {}
-  const refreshPending = new Promise<Response>((resolve) => {
-    releaseRefresh = resolve
+
+test('a brew reads as a quiet line, not as a card competing with the ratings', async () => {
+  homeShowing([adaBrewed, graceRated])
+  renderApp('/')
+
+  const brewed = await screen.findByTestId('feed-item-brewed')
+  expect(brewed).toHaveTextContent('Ada Lovelace')
+  expect(brewed).toHaveTextContent('brewed 5 g of')
+  expect(brewed).toHaveTextContent('Sencha')
+  expect(brewed).toHaveTextContent('Flat 3')
+
+  // The note is the reason this row is worth having. It is already in the ledger, and
+  // "last of the tin" is the most human thing the app records.
+  expect(brewed).toHaveTextContent('last of the tin')
+
+  // Stored as a negative delta — it left the tin — and shown positive, because
+  // "brewed −5 g" is not a sentence anybody says.
+  expect(brewed).not.toHaveTextContent('−5')
+})
+
+test('a brew with no note is still a complete sentence', async () => {
+  homeShowing([{ ...adaBrewed, note: null }])
+  renderApp('/')
+
+  const brewed = await screen.findByTestId('feed-item-brewed')
+  expect(brewed).toHaveTextContent('brewed 5 g of')
+  expect(brewed).not.toHaveTextContent('“')
+})
+
+test('a brew by a departed member says “somebody” rather than dropping the cup', async () => {
+  homeShowing([{ ...adaBrewed, actor: null }])
+  renderApp('/')
+
+  // Same rule as a tin whose buyer is gone: the event happened, and inventing a name or
+  // hiding it would both be worse than saying so.
+  expect(await screen.findByTestId('feed-item-brewed')).toHaveTextContent('Somebody')
+})
+
+/* ------------------------------------------------------- running low, forecast-aware */
+
+const tinRef = {
+  id: 'item-1',
+  tea: sencha,
+  quantity_grams: 60,
+  low_stock_grams: 20,
+  is_low: false,
+  location: null,
+  opened_at: null,
+  best_before: null,
+  updated_at: '2026-08-26T09:00:00Z',
+  shop: null,
+}
+
+function homeWith(lowStock: unknown[]) {
+  return mockFetch({
+    'POST /auth/refresh': () => json(session),
+    'GET /home': () =>
+      json({
+        display_name: 'Ada Lovelace',
+        household_count: 1,
+        tin_count: 2,
+        low_stock: lowStock,
+        friend_count: 1,
+        pending_requests: 0,
+        review_count: 0,
+        recent_activity: [],
+        unrated: [],
+      }),
   })
+}
 
-  mockFetch({
-    'POST /auth/refresh': () => refreshPending,
-    'GET /friends/requests': () => json([]),
-    'GET /feed': () => json(pageOf([graceRated])),
-  })
-  renderApp('/feed')
+test('a tin above its threshold still warns when the ledger says it is going fast', async () => {
+  // 60 g against a 20 g threshold: the hand-set rule says nothing at all. The forecast is
+  // the whole reason this tin is on the page, so the forecast is what the row shows.
+  homeWith([
+    {
+      item: tinRef,
+      household: { id: 'hh-1', name: 'Flat 3' },
+      pace: { grams_per_week: 40, days_observed: 30, events_counted: 9, days_remaining: 4 },
+    },
+  ])
+  renderApp('/')
 
-  // RequireAuth renders nothing at all while the silent refresh is in flight, so the
-  // request cannot go out without an Authorization header on it.
-  await waitFor(() => expect(calls.some((call) => call.path === '/auth/refresh')).toBe(true))
-  expect(calls.some((call) => call.path === '/feed')).toBe(false)
+  const low = await screen.findByTestId('home-low-stock')
+  expect(within(low).getByTestId('low-forecast-item-1')).toHaveTextContent('about 4 days left')
+  // And not the threshold, which the reader can already see from the grams.
+  expect(low).not.toHaveTextContent('below 20 g')
+})
 
-  releaseRefresh(json(session))
+test('a tin below its threshold with no forecast says which rule caught it', async () => {
+  homeWith([
+    {
+      item: { ...tinRef, quantity_grams: 8, is_low: true },
+      household: { id: 'hh-1', name: 'Flat 3' },
+      pace: null,
+    },
+  ])
+  renderApp('/')
 
-  expect(await screen.findByTestId('feed-item-review')).toBeInTheDocument()
-  expect(feedRequests()).toHaveLength(1)
+  const low = await screen.findByTestId('home-low-stock')
+  // `pace: null` is not a deadline. Saying "below 20 g" is the honest reason, and it
+  // stops the row implying a projection nobody computed.
+  expect(low).toHaveTextContent('below 20 g')
+  expect(screen.queryByTestId('low-forecast-item-1')).toBeNull()
 })

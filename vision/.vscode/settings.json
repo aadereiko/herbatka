@@ -1,0 +1,8 @@
+{
+  // Applies when vision/ is opened as its own folder. Opening the repository root
+  // instead is fine — pick the kernel per notebook from the top-right picker, since
+  // api/.venv and vision/.venv both exist and VS Code cannot tell which one a given
+  // file wants.
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "jupyter.notebookFileRoot": "${workspaceFolder}"
+}
