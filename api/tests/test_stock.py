@@ -1,14 +1,25 @@
+from collections.abc import AsyncGenerator
 from decimal import Decimal
 
 from httpx import AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.session import get_db
+from app.main import app
+from app.models.catalog import Ingredient, Tea
+from app.models.household import StockItem
+from app.models.shop import Shop, ShopListing
 from app.services.stock import ledger_total
 from tests.conftest import Account
 
 
 def stock_url(household_id: str) -> str:
     return f"/api/v1/households/{household_id}/stock"
+
+
+async def _count(db: AsyncSession, model: type, *where: object) -> int:
+    return await db.scalar(select(func.count()).select_from(model).where(*where)) or 0  # type: ignore[arg-type]
 
 
 class TestAddTin:
@@ -65,6 +76,318 @@ class TestAddTin:
         )
 
         assert response.status_code >= 400
+
+
+class TestAddTinWithANewTea:
+    """Putting a tin on the shelf when the catalog has never heard of the tea.
+
+    The alternative this replaces was a dead end: the picker said "add it under Teas
+    first", which meant abandoning a half-filled form, going somewhere else, and starting
+    over. `new_tea` carries the whole `TeaCreate` body instead, and the tea and the tin
+    are written in one request.
+    """
+
+    async def test_the_tea_and_the_tin_arrive_together(
+        self, client: AsyncClient, owner: Account, household: dict
+    ) -> None:
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "new_tea": {"name": "Yuzu Sencha", "tea_type": "green"},
+                "quantity_grams": 50,
+            },
+        )
+
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["tea"]["name"] == "Yuzu Sencha"
+        assert body["quantity_grams"] == 50.0
+        # The ledger still explains the grams, exactly as it does for a catalog tea.
+        assert [e["kind"] for e in body["recent_events"]] == ["purchase"]
+
+        # And it is a real catalog entry, not a private label on one household's tin.
+        in_catalog = await client.get(f"/api/v1/catalog/teas/{body['tea']['slug']}")
+        assert in_catalog.status_code == 200
+        assert in_catalog.json()["name"] == "Yuzu Sencha"
+
+    async def test_a_tea_shelved_by_a_user_lands_unapproved(
+        self, client: AsyncClient, owner: Account, household: dict
+    ) -> None:
+        """The permission matrix says a user *submits* a tea; only an admin approves one.
+
+        Which form it was typed into is not one of the inputs to that rule, so this has to
+        match `POST /catalog/teas` exactly.
+        """
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={"new_tea": {"name": "Shelf Blend", "tea_type": "blend"}, "quantity_grams": 20},
+        )
+
+        slug = response.json()["tea"]["slug"]
+        detail = await client.get(f"/api/v1/catalog/teas/{slug}")
+        assert detail.json()["is_approved"] is False
+
+    async def test_an_admin_shelving_a_tea_gets_an_unapproved_one_too(
+        self, client: AsyncClient, admin_headers: dict[str, str]
+    ) -> None:
+        """`POST /admin/teas` is how an admin adds an approved tea. Being an admin who
+        happens to be standing at a shelf is not."""
+        made = await client.post(
+            "/api/v1/households", headers=admin_headers, json={"name": "Boss Flat"}
+        )
+        response = await client.post(
+            stock_url(made.json()["id"]),
+            headers=admin_headers,
+            json={"new_tea": {"name": "Boss Oolong", "tea_type": "oolong"}, "quantity_grams": 10},
+        )
+
+        assert response.status_code == 201, response.text
+        slug = response.json()["tea"]["slug"]
+        detail = await client.get(f"/api/v1/catalog/teas/{slug}")
+        assert detail.json()["is_approved"] is False
+
+    async def test_a_blend_brings_its_new_ingredients_with_it(
+        self, client: AsyncClient, owner: Account, household: dict, db: AsyncSession
+    ) -> None:
+        """The same `new_ingredients` the Teas page sends, because it is the same service
+        call — a blend typed at the shelf must not lose half its recipe."""
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "new_tea": {
+                    "name": "Yuzu Rooibos",
+                    "tea_type": "rooibos",
+                    "new_ingredients": [
+                        {"name": "Yuzu peel", "category": "peel", "is_primary": True},
+                        {"name": "Rooibos leaf", "category": "leaf"},
+                    ],
+                },
+                "quantity_grams": 30,
+            },
+        )
+
+        assert response.status_code == 201, response.text
+        slug = response.json()["tea"]["slug"]
+        detail = await client.get(f"/api/v1/catalog/teas/{slug}")
+        names = [row["ingredient"]["name"] for row in detail.json()["ingredients"]]
+        assert names == ["Yuzu peel", "Rooibos leaf"]
+        # Unapproved, like the tea that named them.
+        assert await _count(db, Ingredient, Ingredient.name == "Yuzu peel") == 1
+        assert detail.json()["ingredients"][0]["ingredient"]["is_approved"] is False
+
+    async def test_an_unknown_ingredient_refuses_the_whole_tin(
+        self, client: AsyncClient, owner: Account, household: dict, db: AsyncSession
+    ) -> None:
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "new_tea": {
+                    "name": "Ghost Blend",
+                    "tea_type": "blend",
+                    "ingredients": [{"ingredient_id": "00000000-0000-0000-0000-000000000000"}],
+                },
+                "quantity_grams": 30,
+            },
+        )
+
+        assert response.status_code == 400
+        assert "ingredient" in response.json()["detail"]
+        assert await _count(db, Tea, Tea.name == "Ghost Blend") == 0
+
+    async def test_a_tin_needs_exactly_one_of_the_two(
+        self, client: AsyncClient, owner: Account, household: dict, tea
+    ) -> None:
+        """Neither is a tin of nothing; both is two answers to one question."""
+        neither = await client.post(
+            stock_url(household["id"]), headers=owner.headers, json={"quantity_grams": 10}
+        )
+        both = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "tea_id": str(tea.id),
+                "new_tea": {"name": "Both Ways", "tea_type": "green"},
+                "quantity_grams": 10,
+            },
+        )
+
+        assert neither.status_code == 422
+        assert both.status_code == 422
+
+    async def test_a_refused_tin_takes_its_brand_new_tea_with_it(
+        self, client: AsyncClient, owner: Account, household: dict, db: AsyncSession
+    ) -> None:
+        """One request, one transaction.
+
+        `TeaCreate` already promises a blend is never saved with half its recipe; a tea
+        left in the catalog with no tin to explain it is the same failure one level up.
+        The tin is refused *after* the tea has been inserted — an unknown `shop_id` is
+        resolved once the tea exists, because a proposed shop needs it for the listing —
+        so this is the window where an orphan could survive, and nothing is committed in
+        it.
+
+        The `client` fixture's `get_db` override deliberately has only the commit half, so
+        this test brings the rollback that production's `get_db` does. Without it the
+        assertion below would pass on flushed-but-uncommitted rows still sitting in the
+        session, and prove nothing.
+        """
+
+        async def rolling_back_db() -> AsyncGenerator[AsyncSession]:
+            try:
+                yield db
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                raise
+
+        app.dependency_overrides[get_db] = rolling_back_db
+
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "new_tea": {"name": "Orphan Oolong", "tea_type": "oolong"},
+                "shop_id": "00000000-0000-0000-0000-000000000000",
+                "quantity_grams": 40,
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "No such shop"
+        assert await _count(db, Tea, Tea.name == "Orphan Oolong") == 0
+        assert await _count(db, StockItem, StockItem.household_id == household["id"]) == 0
+
+
+class TestAddTinWithANewShop:
+    """The softer dead end beside the tea: "no shop matches that".
+
+    Separable from the tea half on purpose — the two fields are independent, and a tin of
+    a catalog tea from a shop nobody has listed is the commoner case of the pair.
+    """
+
+    async def test_the_shop_is_created_listed_and_landed_on_the_tin(
+        self, client: AsyncClient, owner: Account, household: dict, tea, db: AsyncSession
+    ) -> None:
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "tea_id": str(tea.id),
+                "new_shop": {"name": "Czajnik na Rogu", "city": "Gdańsk"},
+                "quantity_grams": 60,
+            },
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["shop"]["name"] == "Czajnik na Rogu"
+
+        # Not just the shop: the listing that says it sells this tea is the half that
+        # answers "where do we get this again?" when the tin runs out.
+        shop_id = response.json()["shop"]["id"]
+        assert await _count(db, Shop, Shop.name == "Czajnik na Rogu") == 1
+        assert (
+            await _count(
+                db, ShopListing, ShopListing.shop_id == shop_id, ShopListing.tea_id == tea.id
+            )
+            == 1
+        )
+
+    async def test_a_proposed_shop_lands_unapproved(
+        self, client: AsyncClient, owner: Account, household: dict, tea, db: AsyncSession
+    ) -> None:
+        await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "tea_id": str(tea.id),
+                "new_shop": {"name": "Unvouched", "city": "Kraków"},
+                "quantity_grams": 60,
+            },
+        )
+
+        shop = await db.scalar(select(Shop).where(Shop.name == "Unvouched"))
+        assert shop is not None
+        assert shop.is_approved is False
+
+    async def test_a_new_tea_and_a_new_shop_in_one_request(
+        self, client: AsyncClient, owner: Account, household: dict, db: AsyncSession
+    ) -> None:
+        """The whole dead end, both halves, one POST."""
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "new_tea": {"name": "Corner Shop Sencha", "tea_type": "green"},
+                "new_shop": {"name": "Corner Shop", "website": "https://corner.example"},
+                "quantity_grams": 100,
+            },
+        )
+
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["tea"]["name"] == "Corner Shop Sencha"
+        assert body["shop"]["name"] == "Corner Shop"
+        # The listing points at the tea this same request created.
+        tea_row = await db.scalar(select(Tea).where(Tea.name == "Corner Shop Sencha"))
+        assert tea_row is not None
+        assert await _count(db, ShopListing, ShopListing.tea_id == tea_row.id) == 1
+
+    async def test_a_shop_needs_a_city_or_a_website(
+        self, client: AsyncClient, owner: Account, household: dict, tea
+    ) -> None:
+        """Mirrors `NewShopIn` and the CHECK behind it: a shop with neither cannot be
+        found by anybody."""
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "tea_id": str(tea.id),
+                "new_shop": {"name": "Nowhere"},
+                "quantity_grams": 60,
+            },
+        )
+
+        assert response.status_code == 422
+
+    async def test_the_shop_is_proposed_on_the_tin_not_on_the_tea(
+        self, client: AsyncClient, owner: Account, household: dict
+    ) -> None:
+        """`TeaCreate.new_shop` is the Teas page's field. Honouring both would create the
+        same shop twice, under two slugs, from one form."""
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "new_tea": {
+                    "name": "Double Shop",
+                    "tea_type": "green",
+                    "new_shop": {"name": "Twice Over", "city": "Kraków"},
+                },
+                "quantity_grams": 60,
+            },
+        )
+
+        assert response.status_code == 422
+
+    async def test_a_shop_and_a_shop_id_are_two_answers_to_one_question(
+        self, client: AsyncClient, owner: Account, household: dict, tea, shop: dict
+    ) -> None:
+        response = await client.post(
+            stock_url(household["id"]),
+            headers=owner.headers,
+            json={
+                "tea_id": str(tea.id),
+                "shop_id": shop["id"],
+                "new_shop": {"name": "Also This", "city": "Kraków"},
+                "quantity_grams": 60,
+            },
+        )
+
+        assert response.status_code == 422
 
 
 class TestBrewing:

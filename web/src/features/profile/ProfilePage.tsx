@@ -18,8 +18,10 @@ import { pluralise } from '../catalog/format'
 import { formatAverage, formatScore } from '../review/format'
 import { ReviewDetails } from '../review/ReviewList'
 import { FriendAction } from './FriendAction'
+import { hasProfileConnections } from './connections-visibility'
 import { ProfileConnections } from './ProfileConnections'
 import { useProfile } from './queries'
+import { BrewIcon } from '../../components/ui/botanical'
 
 /** One number and what it counts. Three of them, and the average is the one that is
  *  allowed to be absent — somebody who has rated nothing has no average, and "0.0" would
@@ -82,6 +84,10 @@ function ProfileReviewRow({ review }: { review: ProfileReview }) {
 
 function ProfileBody({ profile }: { profile: PublicProfile }) {
   const { friend_state } = profile
+  // Decides the *layout*, not just whether the aside renders — see the note on the grid
+  // below, and `hasProfileConnections` for why the predicate is exported rather than
+  // inferred from whether the component returned anything.
+  const connections = hasProfileConnections(profile)
 
   return (
     <>
@@ -106,13 +112,32 @@ function ProfileBody({ profile }: { profile: PublicProfile }) {
               )}
             </h1>
             <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-              {profile.location && (
-                <span data-testid="profile-location">{profile.location} · </span>
+              {/* "Kraków, Poland", or either half on its own. Joined here rather than
+                  server-side because the two are separate facts — somebody may give a
+                  country and no city, or the reverse — and a pre-joined string would make
+                  "which of these did they actually say" unanswerable. */}
+              {(profile.city || profile.country) && (
+                <span data-testid="profile-location">
+                  {[profile.city, profile.country?.name].filter(Boolean).join(', ')} ·{' '}
+                </span>
               )}
               <span data-testid="profile-member-since">
                 Member since {formatDay(profile.member_since)}
               </span>
             </p>
+            {/* Under the name, above everything else, and in the ink the headings wear.
+                A status is the one thing on this page that is true *today* — the bio is a
+                standing description and the counts are history — so it goes where the eye
+                already is rather than into the panel below. */}
+            {profile.status && (
+              <p
+                data-testid="profile-status"
+                className="mt-2 flex items-start gap-1.5 text-sm text-brand-900 dark:text-brand-100"
+              >
+                <BrewIcon glyph="cup" aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-leaf-600" />
+                <span>{profile.status}</span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -165,38 +190,49 @@ function ProfileBody({ profile }: { profile: PublicProfile }) {
             none, which is the honest version of the same information. */}
       </dl>
 
-      <Panel ariaLabel="Recent reviews" testId="profile-reviews">
-        <h2 className="mb-3 text-lg font-semibold text-brand-900 dark:text-brand-100">
-          Recent reviews
-        </h2>
-        {profile.recent_reviews.length === 0 ? (
-          <p
-            data-testid="profile-reviews-empty"
-            className="text-sm text-neutral-600 dark:text-neutral-400"
-          >
-            {friend_state === 'self'
-              ? 'You have not rated anything yet.'
-              : `${profile.display_name} has not rated anything yet.`}
-          </p>
-        ) : (
-          <>
-            <ul>
-              {profile.recent_reviews.map((review) => (
-                <ProfileReviewRow key={review.id} review={review} />
-              ))}
-            </ul>
-            {/* The list is the most recent handful, not the whole history — saying so is
-                cheaper than a pagination control nobody asked for on somebody else's
-                page. `review_count` above is the real total. */}
-            <p className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
-              The most recent of {pluralise(profile.review_count, 'review')}.
+      {/* What they have been doing is the main block; who they know is beside it.
+          
+          All three used to be full-width and stacked, with the two connection panels
+          sharing a row *under* the reviews. Same components, same data — but a page that
+          gives equal width to "what this person thinks about tea" and "which households
+          they are in" is a page with no opinion about why anybody opened it.
+          
+          The grid collapses to one column when there is nothing to put beside the
+          reviews, which is every signed-out visit and most stranger visits. Without that
+          branch the reviews would sit in two thirds of the page beside a column of air. */}
+      <div className={connections ? 'grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]' : ''}>
+        <Panel ariaLabel="Recent reviews" testId="profile-reviews">
+          <h2 className="mb-3 text-lg font-semibold text-brand-900 dark:text-brand-100">
+            Recent reviews
+          </h2>
+          {profile.recent_reviews.length === 0 ? (
+            <p
+              data-testid="profile-reviews-empty"
+              className="text-sm text-neutral-600 dark:text-neutral-400"
+            >
+              {friend_state === 'self'
+                ? 'You have not rated anything yet.'
+                : `${profile.display_name} has not rated anything yet.`}
             </p>
-          </>
-        )}
-      </Panel>
+          ) : (
+            <>
+              <ul>
+                {profile.recent_reviews.map((review) => (
+                  <ProfileReviewRow key={review.id} review={review} />
+                ))}
+              </ul>
+              {/* The list is the most recent handful, not the whole history — saying so is
+                  cheaper than a pagination control nobody asked for on somebody else's
+                  page. `review_count` above is the real total. */}
+              <p className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+                The most recent of {pluralise(profile.review_count, 'review')}.
+              </p>
+            </>
+          )}
+        </Panel>
 
-      {/* Below the reviews, and often not there at all — see `ProfileConnections`. */}
-      <ProfileConnections profile={profile} />
+        {connections && <ProfileConnections profile={profile} />}
+      </div>
     </>
   )
 }

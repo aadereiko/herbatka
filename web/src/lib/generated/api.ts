@@ -126,9 +126,38 @@ export interface paths {
         put?: never;
         /**
          * Submit Tea
-         * @description A signed-in user proposes a tea; it stays invisible until an admin approves it.
+         * @description A signed-in user proposes a tea.
+         *
+         *     It appears in the catalog straight away, carrying `is_approved: false` so the client
+         *     can mark it. It used to be invisible until an admin approved it, which meant the
+         *     suggester submitted a form and then could not find what they had added.
          */
         post: operations["submit_tea_api_v1_catalog_teas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/teas/{slug}/consumption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tea Consumption
+         * @description How much of this tea the viewer's households have been drinking, by week.
+         *
+         *     Signed-in only, and scoped to the viewer's own shelves. The tea page around it is
+         *     public — what is in a blend is public information — but how much of it you get
+         *     through is household business, and this follows the same rule the feed does rather
+         *     than the one the catalog does.
+         */
+        get: operations["tea_consumption_api_v1_catalog_teas__slug__consumption_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -162,7 +191,18 @@ export interface paths {
         /** List Ingredients */
         get: operations["list_ingredients_api_v1_catalog_ingredients_get"];
         put?: never;
-        post?: never;
+        /**
+         * Suggest Ingredient
+         * @description A signed-in reader proposes a word for the shared vocabulary.
+         *
+         *     The mirror of `POST /catalog/teas`, and it exists for a specific moment: somebody is
+         *     typing out a blend's recipe, the herb in it is not in the list, and the alternative to
+         *     this endpoint is abandoning the tea. It appears immediately with `is_approved: false`.
+         *
+         *     Admins have their own `POST /admin/ingredients`, which lands approved. Same service
+         *     call, two arguments different.
+         */
+        post: operations["suggest_ingredient_api_v1_catalog_ingredients_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -372,6 +412,27 @@ export interface paths {
         put?: never;
         /** Create Ingredient */
         post: operations["create_ingredient_api_v1_admin_ingredients_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ingredients/{ingredient_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Ingredient
+         * @description Vouch for a suggested ingredient. Idempotent — approving an approved one is a
+         *     no-op rather than an error, because two admins clearing the same queue is normal.
+         */
+        post: operations["approve_ingredient_api_v1_admin_ingredients__ingredient_id__approve_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -762,8 +823,40 @@ export interface paths {
         /** List Stock */
         get: operations["list_stock_api_v1_households__household_id__stock_get"];
         put?: never;
-        /** Add Tin */
+        /**
+         * Add Tin
+         * @description A tin on the shelf, and — with `new_tea` — the catalog entry it needs to sit on.
+         *
+         *     One request, so one transaction: the tea, any ingredients or shop proposed with it,
+         *     and the tin itself are all written under this request's session, which `get_db`
+         *     commits once at the end. Nothing here creates a tea and hopes the tin lands too.
+         */
         post: operations["add_tin_api_v1_households__household_id__stock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/stock/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Household Activity
+         * @description What has been happening on this shelf: every cup, tin and recount, newest first.
+         *
+         *     Declared **above** `/{item_id}`, and that is load-bearing rather than tidiness.
+         *     FastAPI matches routes in declaration order, and `item_id` is a `uuid.UUID` path
+         *     parameter — put this second and `/activity` is parsed as a malformed UUID and answers
+         *     422 instead of a timeline.
+         */
+        get: operations["household_activity_api_v1_households__household_id__stock_activity_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -820,6 +913,23 @@ export interface paths {
         put?: never;
         /** Adjust Tin */
         post: operations["adjust_tin_api_v1_households__household_id__stock__item_id__adjust_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/households/{household_id}/consumption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Household Consumption Summary */
+        get: operations["household_consumption_summary_api_v1_households__household_id__consumption_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1283,6 +1393,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/countries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Countries
+         * @description Every ISO 3166-1 alpha-2 country, sorted by name.
+         *
+         *     Served rather than hardcoded in the client so the picker and the validator cannot
+         *     disagree: a country in the dropdown that the API rejects is a form nobody can submit,
+         *     and a country the API accepts that is missing from the dropdown is one nobody can
+         *     choose. One list, one place.
+         *
+         *     Sorted here rather than in the client because it is a fixed answer to a fixed
+         *     question, and doing it once on the server beats doing it in every browser. Note the
+         *     sort is by *name*: `NAMES` is keyed by code, so its natural order puts Åland second
+         *     and Zimbabwe nowhere near the bottom.
+         */
+        get: operations["list_countries_api_v1_countries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1349,6 +1489,37 @@ export interface components {
             website?: string | null;
         };
         /**
+         * BrewedFeedItem
+         * @description Somebody on a shelf you share made a cup.
+         *
+         *     Visible on exactly the same terms as `StockedFeedItem`, and for the same reason: a
+         *     brew is an event on a *household's* tin, so it follows the household rule rather than
+         *     the friend rule. A friend's reviews are public; what a friend drinks at home is not,
+         *     and the feed keeps it that way — see `services/feed._sources`.
+         *
+         *     `note` rides along because it is already in the ledger and it is the most human thing
+         *     in the whole stream. "Last of the tin" is the line that makes a feed worth reading.
+         */
+        BrewedFeedItem: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "brewed";
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            actor: components["schemas"]["FeedActor"] | null;
+            tea: components["schemas"]["TeaRef"];
+            household: components["schemas"]["HouseholdRef"];
+            /** Grams */
+            grams: number;
+            /** Note */
+            note: string | null;
+        };
+        /**
          * BrewingNote
          * @description Your own figures for a tea. Every field optional — somebody who only ever changes
          *     the temperature should not have to restate the dose to say so.
@@ -1397,6 +1568,35 @@ export interface components {
             currency?: string | null;
             /** Purchased At */
             purchased_at?: string | null;
+        };
+        /**
+         * Country
+         * @description A country as the API hands it out: the stored code, plus a label to print.
+         *
+         *     Both, rather than only the code, so that rendering one profile does not require the
+         *     client to hold all 249 names. The picker fetches the full list once; every other
+         *     response carries the one name it needs.
+         */
+        Country: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * DrinkerShare
+         * @description One person's brewing on one shelf.
+         *
+         *     `user` is nullable for the same reason the feed's actor is: `stock_event.user_id` is
+         *     ON DELETE SET NULL, so a departed member's brews stay in the ledger the rest of the
+         *     household still shares, with nobody's name on them.
+         */
+        DrinkerShare: {
+            user: components["schemas"]["ActorRef"] | null;
+            /** Grams */
+            grams: number;
+            /** Brews */
+            brews: number;
         };
         /** FeedActor */
         FeedActor: {
@@ -1508,7 +1708,7 @@ export interface components {
             /** Review Count */
             review_count: number;
             /** Recent Activity */
-            recent_activity: (components["schemas"]["ReviewFeedItem"] | components["schemas"]["StockedFeedItem"])[];
+            recent_activity: (components["schemas"]["ReviewFeedItem"] | components["schemas"]["StockedFeedItem"] | components["schemas"]["BrewedFeedItem"])[];
             /** Unrated */
             unrated: components["schemas"]["TeaSummary"][];
         };
@@ -1531,6 +1731,29 @@ export interface components {
             name: string;
             /** Image Url */
             image_url: string | null;
+        };
+        /**
+         * HouseholdConsumption
+         * @description What a shelf gets through, and what to buy next.
+         *
+         *     Two totals that deliberately do not match: `grams_out` counts everything that left
+         *     the shelf, including tea thrown away, because that is what empties a tin; the
+         *     `drinkers` and `teas` breakdowns count brewing only, because throwing out a stale tin
+         *     is not drinking it. Where they differ, something was discarded.
+         */
+        HouseholdConsumption: {
+            /** Window Days */
+            window_days: number;
+            /** Grams Out */
+            grams_out: number;
+            /** Grams Per Week */
+            grams_per_week: number;
+            /** Drinkers */
+            drinkers: components["schemas"]["DrinkerShare"][];
+            /** Teas */
+            teas: components["schemas"]["TeaShare"][];
+            /** Running Out */
+            running_out: components["schemas"]["TinForecast"][];
         };
         /** HouseholdCreate */
         HouseholdCreate: {
@@ -1566,6 +1789,41 @@ export interface components {
             created_at: string;
             /** Members */
             members: components["schemas"]["Member"][];
+        };
+        /**
+         * HouseholdEvent
+         * @description A ledger row on the household timeline.
+         *
+         *     `StockEvent` plus the tea, because on a single tin's page the heading already says
+         *     which tea it is and here it does not — a shelf's activity is unreadable without it.
+         */
+        HouseholdEvent: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "purchase" | "brew" | "adjust" | "discard";
+            /** Delta Grams */
+            delta_grams: number;
+            /** Note */
+            note: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            actor: components["schemas"]["ActorRef"] | null;
+            tea: components["schemas"]["TeaRef"];
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
         };
         /** HouseholdRef */
         HouseholdRef: {
@@ -1620,7 +1878,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "other";
+            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "berry" | "peel" | "root" | "bark" | "seed" | "grain" | "nut" | "extract" | "other";
             /**
              * Is Caffeinated
              * @default false
@@ -1646,9 +1904,11 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "other";
+            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "berry" | "peel" | "root" | "bark" | "seed" | "grain" | "nut" | "extract" | "other";
             /** Is Caffeinated */
             is_caffeinated: boolean;
+            /** Is Approved */
+            is_approved: boolean;
             /** Description */
             description: string | null;
             /** Image Url */
@@ -1692,9 +1952,11 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "other";
+            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "berry" | "peel" | "root" | "bark" | "seed" | "grain" | "nut" | "extract" | "other";
             /** Is Caffeinated */
             is_caffeinated: boolean;
+            /** Is Approved */
+            is_approved: boolean;
             /** Description */
             description: string | null;
             /** Image Url */
@@ -1719,7 +1981,7 @@ export interface components {
             /** Name */
             name?: string | null;
             /** Category */
-            category?: ("leaf" | "herb" | "flower" | "spice" | "fruit" | "other") | null;
+            category?: ("leaf" | "herb" | "flower" | "spice" | "fruit" | "berry" | "peel" | "root" | "bark" | "seed" | "grain" | "nut" | "extract" | "other") | null;
             /** Is Caffeinated */
             is_caffeinated?: boolean | null;
             /** Description */
@@ -1889,11 +2151,16 @@ export interface components {
         };
         /**
          * LowTin
-         * @description A tin running out, and which shelf it is on.
+         * @description A tin worth reordering, which shelf it is on, and how long it has left.
+         *
+         *     `pace` is None when the ledger cannot forecast this tin yet — it is on the list
+         *     because it fell below its hand-set threshold, and the client has to say exactly that
+         *     rather than imply a deadline nobody computed.
          */
         LowTin: {
             item: components["schemas"]["StockItem"];
             household: components["schemas"]["HouseholdRef"];
+            pace: components["schemas"]["StockPace"] | null;
         };
         /** Member */
         Member: {
@@ -1941,10 +2208,59 @@ export interface components {
             updated_at: string;
             tea: components["schemas"]["TeaRef"];
         };
-        /** Page[Annotated[Union[ReviewFeedItem, StockedFeedItem], FieldInfo(annotation=NoneType, required=True, discriminator='kind')]] */
-        Page_Annotated_Union_ReviewFeedItem__StockedFeedItem___FieldInfo_annotation_NoneType__required_True__discriminator__kind____: {
+        /**
+         * NewIngredientIn
+         * @description An ingredient that does not exist yet, proposed while writing a tea's recipe.
+         *
+         *     Deliberately thinner than `IngredientCreate`: a name, what kind of thing it is, and
+         *     whether it has caffeine in it. Somebody halfway through describing a blend is not
+         *     also going to write a description or find a photograph, and asking them to is how
+         *     you get an abandoned form instead of a suggestion.
+         */
+        NewIngredientIn: {
+            /** Name */
+            name: string;
+            /**
+             * Category
+             * @default other
+             * @enum {string}
+             */
+            category: "leaf" | "herb" | "flower" | "spice" | "fruit" | "berry" | "peel" | "root" | "bark" | "seed" | "grain" | "nut" | "extract" | "other";
+            /**
+             * Is Caffeinated
+             * @default false
+             */
+            is_caffeinated: boolean;
+            /** Percentage */
+            percentage?: number | null;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary: boolean;
+        };
+        /**
+         * NewShopIn
+         * @description A shop that does not exist yet, proposed while adding a tea you bought there.
+         *
+         *     Creating it also creates a listing for the tea, because otherwise the two facts —
+         *     "this shop exists" and "it sells this" — arrive separately and the second one, which
+         *     is the useful half, gets lost.
+         */
+        NewShopIn: {
+            /** Name */
+            name: string;
+            /** Website */
+            website?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country */
+            country?: string | null;
+        };
+        /** Page[Annotated[Union[ReviewFeedItem, StockedFeedItem, BrewedFeedItem], FieldInfo(annotation=NoneType, required=True, discriminator='kind')]] */
+        Page_Annotated_Union_ReviewFeedItem__StockedFeedItem__BrewedFeedItem___FieldInfo_annotation_NoneType__required_True__discriminator__kind____: {
             /** Items */
-            items: (components["schemas"]["ReviewFeedItem"] | components["schemas"]["StockedFeedItem"])[];
+            items: (components["schemas"]["ReviewFeedItem"] | components["schemas"]["StockedFeedItem"] | components["schemas"]["BrewedFeedItem"])[];
             /** Total */
             total: number;
             /** Page */
@@ -1958,6 +2274,19 @@ export interface components {
         Page_BrandOut_: {
             /** Items */
             items: components["schemas"]["BrandOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Pages */
+            pages: number;
+        };
+        /** Page[HouseholdEvent] */
+        Page_HouseholdEvent_: {
+            /** Items */
+            items: components["schemas"]["HouseholdEvent"][];
             /** Total */
             total: number;
             /** Page */
@@ -2144,8 +2473,12 @@ export interface components {
             pronouns?: string | null;
             /** Bio */
             bio?: string | null;
-            /** Location */
-            location?: string | null;
+            /** Status */
+            status?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country Code */
+            country_code?: string | null;
             /** Favourite Tea Type */
             favourite_tea_type?: ("green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend") | null;
         };
@@ -2171,8 +2504,11 @@ export interface components {
             pronouns: string | null;
             /** Bio */
             bio: string | null;
-            /** Location */
-            location: string | null;
+            /** Status */
+            status: string | null;
+            /** City */
+            city: string | null;
+            country: components["schemas"]["Country"] | null;
             /** Favourite Tea Type */
             favourite_tea_type: ("green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend") | null;
             /**
@@ -2560,13 +2896,12 @@ export interface components {
         };
         /** StockItemCreate */
         StockItemCreate: {
-            /**
-             * Tea Id
-             * Format: uuid
-             */
-            tea_id: string;
+            /** Tea Id */
+            tea_id?: string | null;
+            new_tea?: components["schemas"]["TeaCreate"] | null;
             /** Shop Id */
             shop_id?: string | null;
+            new_shop?: components["schemas"]["NewShopIn"] | null;
             /** Quantity Grams */
             quantity_grams: number;
             /** Location */
@@ -2625,6 +2960,7 @@ export interface components {
             currency: string | null;
             /** Recent Events */
             recent_events: components["schemas"]["StockEvent"][];
+            pace: components["schemas"]["StockPace"] | null;
         };
         /**
          * StockItemUpdate
@@ -2650,6 +2986,25 @@ export interface components {
             notes?: string | null;
             /** Low Stock Grams */
             low_stock_grams?: number | null;
+        };
+        /**
+         * StockPace
+         * @description How fast one tin is going, and how long that leaves.
+         *
+         *     Nullable on the tin it describes, and that is the contract: below the floors in
+         *     `services.consumption` there is no honest answer, and `null` says so. A client must
+         *     render the absence as "not enough history yet" rather than as zero — a tin nobody has
+         *     touched twice is not a tin being drunk at 0 g a week.
+         */
+        StockPace: {
+            /** Grams Per Week */
+            grams_per_week: number;
+            /** Days Observed */
+            days_observed: number;
+            /** Events Counted */
+            events_counted: number;
+            /** Days Remaining */
+            days_remaining: number | null;
         };
         /** StockedFeedItem */
         StockedFeedItem: {
@@ -2700,6 +3055,9 @@ export interface components {
             grams_per_100ml?: number | null;
             /** Ingredients */
             ingredients?: components["schemas"]["TeaIngredientIn"][];
+            /** New Ingredients */
+            new_ingredients?: components["schemas"]["NewIngredientIn"][];
+            new_shop?: components["schemas"]["NewShopIn"] | null;
         };
         /** TeaDetail */
         TeaDetail: {
@@ -2805,6 +3163,34 @@ export interface components {
             /** Image Url */
             image_url: string | null;
         };
+        /**
+         * TeaSeries
+         * @description Weekly grams of one tea on the viewer's own shelves.
+         *
+         *     Always exactly `weeks` entries, oldest first, including the weeks in which nothing
+         *     happened. A plot that silently drops empty weeks spaces the remaining ones evenly and
+         *     draws steady drinking out of three scattered cups — the gaps are the most informative
+         *     part of a consumption series, so they are transmitted rather than inferred.
+         *
+         *     `total_grams` of 0 means the viewer has genuinely brewed none of it: the client shows
+         *     nothing at all rather than twelve empty columns.
+         */
+        TeaSeries: {
+            /** Weeks */
+            weeks: components["schemas"]["TeaWeek"][];
+            /** Total Grams */
+            total_grams: number;
+            /** Total Brews */
+            total_brews: number;
+        };
+        /** TeaShare */
+        TeaShare: {
+            tea: components["schemas"]["TeaRef"];
+            /** Grams */
+            grams: number;
+            /** Brews */
+            brews: number;
+        };
         /** TeaSummary */
         TeaSummary: {
             /**
@@ -2867,6 +3253,26 @@ export interface components {
             /** Ingredients */
             ingredients?: components["schemas"]["TeaIngredientIn"][] | null;
         };
+        /**
+         * TeaWeek
+         * @description One column of the plot on a tea's page.
+         */
+        TeaWeek: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /** Grams */
+            grams: number;
+            /** Brews */
+            brews: number;
+        };
+        /** TinForecast */
+        TinForecast: {
+            item: components["schemas"]["StockItem"];
+            pace: components["schemas"]["StockPace"];
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -2911,8 +3317,11 @@ export interface components {
             pronouns: string | null;
             /** Bio */
             bio: string | null;
-            /** Location */
-            location: string | null;
+            /** Status */
+            status: string | null;
+            /** City */
+            city: string | null;
+            country: components["schemas"]["Country"] | null;
             /** Favourite Tea Type */
             favourite_tea_type: ("green" | "black" | "oolong" | "puerh" | "white" | "herbal" | "rooibos" | "blend") | null;
             /**
@@ -3225,6 +3634,37 @@ export interface operations {
             };
         };
     };
+    tea_consumption_api_v1_catalog_teas__slug__consumption_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeaSeries"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_tea_api_v1_catalog_teas__slug__get: {
         parameters: {
             query?: never;
@@ -3260,7 +3700,7 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
-                category?: ("leaf" | "herb" | "flower" | "spice" | "fruit" | "other") | null;
+                category?: ("leaf" | "herb" | "flower" | "spice" | "fruit" | "berry" | "peel" | "root" | "bark" | "seed" | "grain" | "nut" | "extract" | "other") | null;
                 page?: number;
                 size?: number;
             };
@@ -3277,6 +3717,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_IngredientTaste_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_ingredient_api_v1_catalog_ingredients_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngredientCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngredientOut"];
                 };
             };
             /** @description Validation Error */
@@ -3783,6 +4256,37 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngredientOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_ingredient_api_v1_admin_ingredients__ingredient_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ingredient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4779,6 +5283,40 @@ export interface operations {
             };
         };
     };
+    household_activity_api_v1_households__household_id__stock_activity_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_HouseholdEvent_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_tin_api_v1_households__household_id__stock__item_id__get: {
         parameters: {
             query?: never;
@@ -4936,6 +5474,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockItemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    household_consumption_summary_api_v1_households__household_id__consumption_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdConsumption"];
                 };
             };
             /** @description Validation Error */
@@ -5270,7 +5839,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_Annotated_Union_ReviewFeedItem__StockedFeedItem___FieldInfo_annotation_NoneType__required_True__discriminator__kind____"];
+                    "application/json": components["schemas"]["Page_Annotated_Union_ReviewFeedItem__StockedFeedItem__BrewedFeedItem___FieldInfo_annotation_NoneType__required_True__discriminator__kind____"];
                 };
             };
             /** @description Validation Error */
@@ -5810,6 +6379,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_countries_api_v1_countries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Country"][];
                 };
             };
         };

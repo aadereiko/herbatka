@@ -5,7 +5,7 @@ from app.api.v1.routers.friends import _feed_items
 from app.schemas.catalog import tea_summary
 from app.schemas.friend import HouseholdRef
 from app.schemas.home import HomeSummary, LowTin, PublicSummary
-from app.schemas.household import stock_item
+from app.schemas.household import stock_item, stock_pace
 from app.services import feed as feed_service
 from app.services import home as home_service
 
@@ -21,8 +21,12 @@ async def home(user: CurrentUser, db: DbSession) -> HomeSummary:
         display_name=user.display_name,
         **await home_service.counts(db, user.id),
         low_stock=[
-            LowTin(item=stock_item(item), household=HouseholdRef.model_validate(household))
-            for item, household in await home_service.low_tins(db, user.id)
+            LowTin(
+                item=stock_item(item),
+                household=HouseholdRef.model_validate(household),
+                pace=stock_pace(pace) if pace is not None else None,
+            )
+            for item, household, pace in await home_service.low_tins(db, user.id)
         ],
         recent_activity=_feed_items(entries),
         unrated=[

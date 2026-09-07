@@ -7,6 +7,7 @@ import { AuthProvider } from '../../features/auth/AuthProvider'
 import type { Session, User } from '../../lib/api'
 import { clearAccessToken } from '../../lib/token'
 import { PageShell } from './page'
+import { ThemeProvider } from '../../components/ui/theme'
 
 /* --------------------------------------------------------------------- fixtures */
 
@@ -18,7 +19,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
@@ -72,17 +75,19 @@ function renderNav(path = '/teas') {
   </PageShell>
 
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route path="/teas" element={page('Teas page')} />
-            <Route path="/settings" element={page('Settings page')} />
-            <Route path="*" element={page('Somewhere else')} />
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route path="/teas" element={page('Teas page')} />
+              <Route path="/settings" element={page('Settings page')} />
+              <Route path="*" element={page('Somewhere else')} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 
@@ -302,7 +307,6 @@ test('signed out there is no account menu, and Sign in is on the bar', async () 
 
   // Catalog is the whole nav for a stranger, and it still works.
   expect(screen.getByTestId('nav-catalog')).toBeInTheDocument()
-  expect(screen.queryByTestId('nav-feed')).toBeNull()
   expect(screen.queryByTestId('nav-households')).toBeNull()
 
   // No hamburger either: one entry does not need a disclosure button, and the panel is
@@ -316,19 +320,23 @@ test('signed out there is no account menu, and Sign in is on the bar', async () 
 
 /* -------------------------------------------------------------------------- mobile */
 
-test('below sm the four primary entries sit behind the hamburger', async () => {
+test('below lg the four primary entries sit behind the hamburger', async () => {
   signedIn()
   renderNav()
 
   const toggle = await screen.findByTestId('nav-toggle')
   const panel = screen.getByTestId('nav-primary')
 
-  // `hidden`/`flex` is the mechanism: the panel is a row from `sm` up whatever this
+  // `hidden`/`flex` is the mechanism: the panel is a row from `lg` up whatever this
   // button says, and only below it does the button decide.
+  //
+  // `lg`, not `sm`, since the bar became a three-column grid with the entries in
+  // letterspaced caps. Caps are measurably wider, and four of them plus a wordmark and a
+  // person's name do not fit a 640px bar — the breakpoint moved with the type.
   expect(toggle).toHaveAttribute('aria-expanded', 'false')
   expect(toggle).toHaveAttribute('aria-controls', 'nav-primary')
   expect(panel.className).toContain('hidden')
-  expect(panel.className).toContain('sm:flex')
+  expect(panel.className).toContain('lg:flex')
 
   fireEvent.click(toggle)
 

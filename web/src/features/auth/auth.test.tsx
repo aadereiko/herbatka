@@ -10,6 +10,7 @@ import type { Session, User } from '../../lib/api'
 import { clearAccessToken, setAccessToken } from '../../lib/token'
 import { AuthProvider } from './AuthProvider'
 import { LoginPage } from './LoginPage'
+import { ThemeProvider } from '../../components/ui/theme'
 
 const ada: User = {
   id: '6f8b0a1e-5c4d-4f2b-9d3a-11d0a7c5e001',
@@ -19,7 +20,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
@@ -71,11 +74,13 @@ function mockFetch(handlers: Record<string, Handler>) {
 function renderWithProviders(ui: ReactNode, initialPath = '/') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[initialPath]}>{ui}</MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[initialPath]}>{ui}</MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 

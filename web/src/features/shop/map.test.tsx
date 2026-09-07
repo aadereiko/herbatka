@@ -11,6 +11,7 @@ import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
 import type { NearPosition, PinnedShop } from './nearby'
 import { NEAR_STORAGE_KEY } from './nearby'
+import { ThemeProvider } from '../../components/ui/theme'
 
 /**
  * The map, "shops near me", and the admin's pin editor.
@@ -75,7 +76,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
@@ -259,14 +262,16 @@ function renderApp(path: string) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <LocationProbe />
-          <AppRoutes />
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <LocationProbe />
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 

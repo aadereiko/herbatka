@@ -1,10 +1,13 @@
+import { API_BASE_URL } from './api-base'
 import type { components } from './generated/api'
 import { clearAccessToken, getAccessToken, setAccessToken } from './token'
 
 /**
  * Thin fetch wrapper. Everything goes through /api, which Vite proxies to the
  * API in dev and a reverse proxy handles in production — so no base URL, and no
- * CORS preflight in the browser during development.
+ * CORS preflight in the browser during development. `API_BASE_URL` is the empty
+ * string unless something explicitly sets it (a native shell has no proxy to
+ * hide behind); see the note in `api-base.ts`.
  *
  * It also owns the whole access-token lifecycle: attaching the bearer header, and the
  * single silent refresh that a 401 triggers. Funnelling every call through one function
@@ -57,7 +60,7 @@ const NO_REFRESH_PATHS = new Set(['/auth/login', '/auth/register', '/auth/refres
 function send(path: string, init?: RequestInit): Promise<Response> {
   const token = getAccessToken()
   const multipart = init?.body instanceof FormData
-  return fetch(`/api/v1${path}`, {
+  return fetch(`${API_BASE_URL}/api/v1${path}`, {
     ...init,
     credentials: 'include',
     headers: {

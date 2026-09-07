@@ -46,12 +46,35 @@ export type CaffeineLevel = keyof typeof CAFFEINE_LEVEL_LABELS
 
 export const CAFFEINE_LEVELS = Object.keys(CAFFEINE_LEVEL_LABELS) as CaffeineLevel[]
 
+/**
+ * The shared vocabulary's own vocabulary.
+ *
+ * Six of these were doing too much work: "spice" held cinnamon bark, ginger root and
+ * cardamom seed at once, so filtering for any one of them returned the others. The
+ * additions are splits of that kind rather than new territory.
+ *
+ * Insertion order is what the filter dropdown and every category picker render, so it is
+ * arranged as a reader would group them — what part of the plant it is, then the odd ones
+ * out — rather than alphabetically. `other` stays last: a vocabulary with no escape hatch
+ * is one people lie to.
+ *
+ * Kept in step by hand with `IngredientCategory` in schemas/catalog.py and the CHECK
+ * constraint behind it. Three places, one list; adding a word means touching all three.
+ */
 export const INGREDIENT_CATEGORY_LABELS = {
   leaf: 'Leaf',
   herb: 'Herb',
   flower: 'Flower',
+  root: 'Root',
+  bark: 'Bark',
+  seed: 'Seed',
   spice: 'Spice',
   fruit: 'Fruit',
+  berry: 'Berry',
+  peel: 'Peel',
+  grain: 'Grain',
+  nut: 'Nut',
+  extract: 'Extract',
   other: 'Other',
 } as const
 
@@ -163,6 +186,10 @@ export type TeaIngredientInput = components['schemas']['TeaIngredientIn']
 /** Body of both `POST /catalog/teas` and `POST /admin/teas` — the same shape, and the
  *  only difference is which `is_approved` the server hands back. */
 export type TeaInput = components['schemas']['TeaCreate']
+/** A shop the catalog does not have yet, proposed alongside the thing it was bought
+ *  with. Rides on `TeaInput.new_shop` from the Teas page and on `StockItemInput.new_shop`
+ *  from the shelf form; both create the shop *and* a listing for the tea. */
+export type NewShopInput = components['schemas']['NewShopIn']
 export type TeaPatch = components['schemas']['TeaUpdate']
 export type IngredientInput = components['schemas']['IngredientCreate']
 export type IngredientPatch = components['schemas']['IngredientUpdate']
@@ -192,3 +219,16 @@ export type BrandListParams = {
   page?: number
   size?: number
 }
+
+/** One week of the plot on a tea's page. */
+export type TeaWeek = components['schemas']['TeaWeek']
+
+/**
+ * Weekly grams of one tea on the viewer's own shelves.
+ *
+ * Always exactly twelve entries, oldest first, **including the weeks nothing happened**.
+ * The server generates the range rather than returning only the weeks with rows, because
+ * a plot that drops empty weeks spaces the survivors evenly and draws steady drinking out
+ * of three scattered cups. `total_grams === 0` means draw nothing at all.
+ */
+export type TeaSeries = components['schemas']['TeaSeries']

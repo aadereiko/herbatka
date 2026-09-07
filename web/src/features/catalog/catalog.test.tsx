@@ -9,6 +9,7 @@ import type { Session, User } from '../../lib/api'
 import type { BrewingNote, IngredientTaste, Page, TeaDetail, TeaSummary } from '../../lib/catalog'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
+import { ThemeProvider } from '../../components/ui/theme'
 
 /* --------------------------------------------------------------------- fixtures */
 
@@ -20,6 +21,7 @@ const jasmineFlower: IngredientTaste = {
   name: 'Jasmine',
   category: 'flower',
   is_caffeinated: false,
+  is_approved: true,
   description: 'Picked at night, layered with the leaf until it takes the scent.',
   // Null, so the drawn fallback is what this fixture renders. The seed now gives all
   // thirty-nine starter ingredients a real photograph, but the *component* contract is
@@ -60,6 +62,7 @@ const greenLeaf: IngredientTaste = {
   name: 'Green tea',
   category: 'leaf',
   is_caffeinated: true,
+  is_approved: true,
   description: null,
   image_url: null,
   image_attribution: null,
@@ -173,14 +176,16 @@ function renderApp(path: string) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <LocationSpy />
-          <AppRoutes />
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <LocationSpy />
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 
@@ -380,7 +385,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }

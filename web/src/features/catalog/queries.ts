@@ -6,12 +6,15 @@ import type {
   BrandListParams,
   BrewingInput,
   BrewingNote,
+  Ingredient,
+  IngredientInput,
   IngredientListParams,
   IngredientTaste,
   Page,
   TeaDetail,
   TeaInput,
   TeaListParams,
+  TeaSeries,
   TeaSummary,
 } from '../../lib/catalog'
 import { toQuery } from '../../lib/query-string'
@@ -31,6 +34,7 @@ export const catalogKeys = {
   teaList: (params: TeaListParams) => ['catalog', 'teas', params] as const,
   teaDetails: ['catalog', 'tea'] as const,
   teaDetail: (slug: string) => ['catalog', 'tea', slug] as const,
+  teaConsumption: (slug: string) => ['catalog', 'tea', slug, 'consumption'] as const,
   ingredientLists: ['catalog', 'ingredients'] as const,
   ingredientList: (params: IngredientListParams) => ['catalog', 'ingredients', params] as const,
   brandLists: ['catalog', 'brands'] as const,
@@ -69,6 +73,49 @@ export function useTeaList(params: TeaListParams) {
     queryFn: () => fetchTeas(params),
     placeholderData: keepPreviousData,
     enabled: authReady,
+  })
+}
+
+/**
+ * How much of one tea the viewer's households have been drinking, by week.
+ *
+ * Keyed by viewer like `useTeaDetail` and for a stronger reason: this response is
+ * *entirely* the viewer's own data on a page that is otherwise public, so a cache entry
+ * leaking across a sign-out would show one person another's shelves.
+ *
+ * `enabled` on having a session, not merely on `authReady`. The tea page is public and a
+ * signed-out reader would otherwise fire an authenticated request on every visit and get
+ * a 401 for their trouble.
+ */
+/**
+ * Propose a word for the shared vocabulary.
+ *
+ * Invalidates the ingredient lists rather than writing the new row into them by hand: it
+ * arrives unapproved and every list is sorted by name, so there is no position a client
+ * could put it in that the server would agree with.
+ */
+export function useSuggestIngredient() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: IngredientInput) =>
+      api<Ingredient>('/catalog/ingredients', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: catalogKeys.ingredientLists })
+    },
+  })
+}
+
+export function useTeaConsumption(slug: string) {
+  const { viewer, authReady, isSignedIn } = useViewer()
+  return useQuery({
+    queryKey: [...catalogKeys.teaConsumption(slug), viewer],
+    queryFn: () => api<TeaSeries>(`/catalog/teas/${encodeURIComponent(slug)}/consumption`),
+    // `isSignedIn`, not a truthiness check on `viewer` — that segment is the string
+    // `'anon'` for a signed-out reader, which is deliberately truthy so it can key a
+    // cache entry. Guarding on it would fire an authenticated request on every public
+    // visit and collect a 401.
+    enabled: slug !== '' && authReady && isSignedIn,
+    retry: false,
   })
 }
 

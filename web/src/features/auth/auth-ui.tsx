@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { TextField } from '../../components/ui/form'
+import { TeaSprigMark } from '../../components/ui/botanical'
 
 // The label/error/aria wiring these three used to own moved to components/ui/form.tsx
 // in M2, when the catalog and admin screens needed the same primitives plus selects,
@@ -22,8 +23,15 @@ export function AuthCard({
     <main className="page-ground grid min-h-dvh place-items-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-brand-200 bg-white p-8 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-center gap-3">
-          <span className="text-3xl" role="img" aria-label="teacup">
-            🍵
+          {/* The same hanging sign as the nav's, since these two pages render outside
+              `PageShell` and so have no nav to carry it. `aria-hidden` rather than the old
+              `aria-label="teacup"`: the heading beside it already says where you are, and
+              announcing "teacup" before "Sign in" helps nobody. */}
+          <span
+            aria-hidden="true"
+            className="wood-frame grid size-12 shrink-0 place-items-center rounded-md"
+          >
+            <TeaSprigMark className="size-8 text-brand-100" />
           </span>
           <div>
             <h1 className="text-xl font-semibold text-brand-900 dark:text-brand-100">{title}</h1>

@@ -1,10 +1,12 @@
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.core import countries
 from app.schemas.catalog import TeaType
+from app.schemas.common import Country
 
 
 class RegisterRequest(BaseModel):
@@ -28,7 +30,10 @@ class UserOut(BaseModel):
     avatar_url: str | None
     pronouns: str | None
     bio: str | None
-    location: str | None
+    status: str | None
+    city: str | None
+    #: Resolved from `country_code` by `user_out` — the model stores the code.
+    country: Country | None
     favourite_tea_type: TeaType | None
     created_at: datetime
 
@@ -51,5 +56,57 @@ class ProfileUpdate(BaseModel):
     avatar_url: str | None = Field(default=None, max_length=500)
     pronouns: str | None = Field(default=None, max_length=40)
     bio: str | None = Field(default=None, max_length=1000)
-    location: str | None = Field(default=None, max_length=120)
+    status: str | None = Field(default=None, max_length=140)
+    city: str | None = Field(default=None, max_length=120)
+    #: An ISO 3166-1 alpha-2 code, or null to clear it. Normalised and checked below.
+    country_code: str | None = Field(default=None, min_length=2, max_length=2)
     favourite_tea_type: TeaType | None = None
+
+    @field_validator("country_code")
+    @classmethod
+    def known_country(cls, value: str | None) -> str | None:
+        """Upper-cases first, then checks membership.
+
+        Normalising before validating means a client sending `pl` is corrected rather
+        than rejected — the case of a two-letter code is not a thing worth failing a form
+        over, and the column's CHECK constraint requires upper-case anyway.
+
+        The error names the field and the problem rather than listing 249 valid values,
+        which no error message can usefully carry; the picker is the discovery mechanism.
+        """
+        if value is None:
+            return None
+        code = value.upper()
+        if not countries.is_valid(code):
+            raise ValueError("not a known ISO 3166-1 alpha-2 country code")
+        return code
+
+
+def country_ref(code: str | None) -> Country | None:
+    """`PL` -> `{code: "PL", name: "Poland"}`, or None.
+
+    Tolerates a code the list does not know rather than raising. Writes are validated, so
+    the only way an unknown code reaches here is a row that predates a list change or was
+    written straight to the database — and a profile page that 500s because a country was
+    renamed is worse than one that shows the code.
+    """
+    if code is None:
+        return None
+    return Country(code=code, name=countries.NAMES.get(code, code))
+
+
+def user_out(user: Any) -> UserOut:
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        role=user.role,
+        avatar_url=user.avatar_url,
+        pronouns=user.pronouns,
+        bio=user.bio,
+        status=user.status,
+        city=user.city,
+        country=country_ref(user.country_code),
+        favourite_tea_type=user.favourite_tea_type,
+        created_at=user.created_at,
+    )

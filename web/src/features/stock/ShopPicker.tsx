@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button'
 import { TextField } from '../../components/ui/form'
 import { Skeleton } from '../../components/ui/page'
 import { describeApiError } from '../../lib/api'
+import type { NewShopInput } from '../../lib/catalog'
 import { useDebouncedValue } from '../../lib/debounce'
 import type { ListingWithShop, ShopRef, ShopSummary } from '../../lib/shop'
 import { describePlace, formatListingPrice, formatPack } from '../shop/format'
@@ -56,21 +57,41 @@ function describeListing(listing: ListingWithShop): string {
  * above the search box that is the real answer anyway.
  *
  * Optional, unlike the tea, so there is a way to say "actually, never mind" once
- * something is picked — and no error slot, because leaving this blank is the ordinary
- * case rather than an unfinished field.
+ * something is picked. The only thing that can be *wrong* here is a half-written new
+ * shop, which is why `draftError` is the one error slot: leaving this blank is the
+ * ordinary case rather than an unfinished field.
+ *
+ * A third way in arrived with `draft`. "No shop matches that" was a softer dead end than
+ * the tea's but a dead end all the same, and the catalog already knew how to take a shop
+ * nobody has listed — `NewShopIn`, which the Teas page has been sending for a while. The
+ * fields are written here and posted as the tin's `new_shop`; the server creates the shop,
+ * a listing for this tin's tea, and the tin, in one transaction.
  */
 export function ShopPicker({
   idPrefix,
   selected,
+  draft,
   onSelect,
+  onDraft,
+  draftError,
   teaSlug = null,
 }: {
   idPrefix: string
   selected: ShopRef | null
+  /** A shop being written on the way past, with no id to point at yet. Mutually exclusive
+   *  with `selected`. */
+  draft: NewShopInput | null
   /** The listing rides along when the pick came from the shortlist, because it knows the
    *  pack size and the price and the caller can do something useful with both. Absent for
    *  a search result, which knows neither, and absent for the clear. */
   onSelect: (shop: ShopRef | null, listing?: ListingWithShop) => void
+  /** Every keystroke in the three draft fields, and `null` to abandon the draft. The state
+   *  is lifted because the tin form is what submits it and what validates it — a copy kept
+   *  in here as well is two answers to "what shop did you say". */
+  onDraft: (draft: NewShopInput | null) => void
+  /** A shop with neither a city nor a website cannot be found by anybody; the tin form
+   *  mirrors the server's rule and puts the answer here. */
+  draftError?: string
   /** Which tea this tin holds, once that has been decided; `null` until then. It is what
    *  turns the shortlist on — without it this is the plain search box it has always
    *  been, which is exactly right for a caller that has no tea to ask about. */
@@ -83,6 +104,46 @@ export function ShopPicker({
   // unconditionally and disabling it there is the only shape the rules of hooks allow.
   const sellers = useTeaShops(teaSlug ?? '', { size: SHORTLIST_LIMIT })
 
+  if (draft) {
+    return (
+      <fieldset className="space-y-3" data-testid="shop-drafted">
+        <legend className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+          A shop the catalog does not have
+        </legend>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <TextField
+            id={`${idPrefix}-new-shop-name`}
+            label="Shop name"
+            value={draft.name}
+            onChange={(name) => onDraft({ ...draft, name })}
+            error={draftError}
+          />
+          <TextField
+            id={`${idPrefix}-new-shop-city`}
+            label="City"
+            value={draft.city ?? ''}
+            onChange={(city) => onDraft({ ...draft, city })}
+            placeholder="Gdańsk"
+          />
+          <TextField
+            id={`${idPrefix}-new-shop-website`}
+            label="Website"
+            value={draft.website ?? ''}
+            onChange={(website) => onDraft({ ...draft, website })}
+            placeholder="https://…"
+          />
+        </div>
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          One of the last two, so somebody else can find it. It is added with this tin, for
+          an admin to check.
+        </p>
+        <Button variant="ghost" size="sm" testId="shop-draft-clear" onClick={() => onDraft(null)}>
+          Never mind the shop
+        </Button>
+      </fieldset>
+    )
+  }
+
   if (selected) {
     // Deliberately not a `Field`: there is no control left to label once the choice is
     // made, and a <label for> pointing at nothing is worse for a screen reader than a
@@ -94,7 +155,7 @@ export function ShopPicker({
         </p>
         <div
           data-testid="shop-picked"
-          className="flex flex-wrap items-center gap-2 border border-brand-200 bg-brand-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-950"
+          className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-950"
         >
           <span className="font-medium text-brand-900 dark:text-brand-100">{selected.name}</span>
           <span className="ml-auto">
@@ -204,9 +265,25 @@ export function ShopPicker({
       )}
 
       {!results.isPending && items.length === 0 && (
-        <p data-testid="shop-picker-empty" className="text-xs text-neutral-500 dark:text-neutral-400">
-          No shop matches that. Leave it blank if it did not come from one we know.
-        </p>
+        <div
+          data-testid="shop-picker-empty"
+          className="space-y-2 text-xs text-neutral-500 dark:text-neutral-400"
+        >
+          {settled ? (
+            <>
+              <p>No shop matches that.</p>
+              <Button
+                testId="shop-picker-compose"
+                onClick={() => onDraft({ name: settled.trim() })}
+              >
+                Add “{settled}” as a new shop
+              </Button>
+            </>
+          ) : (
+            <p>No shops in the catalog yet.</p>
+          )}
+          <p>Or leave it blank — a gift came from nowhere the catalog can name.</p>
+        </div>
       )}
 
       {items.length > 0 && (

@@ -8,6 +8,7 @@ import type { Session, User } from '../../lib/api'
 import type { Ingredient, Page, TeaDetail, TeaSummary } from '../../lib/catalog'
 import { clearAccessToken } from '../../lib/token'
 import { AuthProvider } from '../auth/AuthProvider'
+import { ThemeProvider } from '../../components/ui/theme'
 
 /* --------------------------------------------------------------------- fixtures */
 
@@ -19,7 +20,9 @@ const ada: User = {
   avatar_url: null,
   pronouns: null,
   bio: null,
-  location: null,
+  status: null,
+  city: null,
+  country: null,
   favourite_tea_type: null,
   created_at: '2026-01-01T09:00:00Z',
 }
@@ -39,6 +42,7 @@ const jasmine: Ingredient = {
   name: 'Jasmine',
   category: 'flower',
   is_caffeinated: false,
+  is_approved: true,
   description: null,
   image_url: null,
   // No picture, so nobody to credit. The four travel together: an ingredient either has a
@@ -130,13 +134,15 @@ function renderApp(path: string) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return render(
-    <QueryClientProvider client={client}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 
@@ -268,6 +274,9 @@ test('the create form posts what the contract asks for', async () => {
     name: 'Rooibos',
     category: 'leaf',
     is_caffeinated: true,
+    // No `is_approved`: it is not a field on `IngredientCreate`. Whether a suggestion is
+    // vouched for is decided by *which endpoint* was called, never by the client saying
+    // so — a body that could set it would be a body a reader could forge.
     // An explicit null rather than an omitted key, so the same submit handler can also
     // *remove* a picture on edit. See the note on `handleSubmit`.
     image_url: null,

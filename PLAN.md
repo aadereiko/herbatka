@@ -86,17 +86,27 @@ herbatka/
 │   │   ├── services/          # business logic, kept out of routers
 │   │   └── seed/              # ingredient + tea starter data
 │   └── tests/
-└── web/
-    ├── package.json
-    ├── vite.config.ts
-    └── src/
-        ├── app/               # router, query client, auth provider
-        ├── features/          # auth catalog household stock reviews friends admin
-        ├── components/ui/     # button, input, dialog, badge…
-        └── lib/
-            ├── api.ts         # fetch wrapper, refresh-on-401
-            └── generated/     # OpenAPI → TS types, do not hand-edit
+├── web/
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── src/
+│       ├── app/               # router, query client, auth provider
+│       ├── features/          # auth catalog household stock reviews friends admin
+│       ├── components/ui/     # button, input, dialog, badge…
+│       └── lib/
+│           ├── api.ts         # fetch wrapper, refresh-on-401
+│           └── generated/     # OpenAPI → TS types, do not hand-edit
+├── vision/                    # tin recognition — own venv, heavy CV deps
+│   ├── herbatka_vision/
+│   └── notebooks/
+└── analysis/                  # the catalogue as data — own venv, read-only DB access
+    ├── herbatka_analysis/
+    └── notebooks/
 ```
+
+Three Python projects, three lockfiles, three virtualenvs, on purpose: `vision/` pulls in
+hundreds of megabytes of CV stack and `analysis/` pulls in a notebook stack, and neither has
+any business in the API's image. They share the database and the `.env`, never a dependency.
 
 Routers stay thin: parse, authorize, delegate to `services/`, serialize. Every rule
 worth testing lives in a service function that takes plain arguments, so tests never
@@ -592,6 +602,38 @@ and appear in the nav, friend rows, review authors, feed actors and household me
   restyle carried it over. No background fixes it: the value that finally reads as a state
   change (neutral-600, 3.09) drops the item's own text to 3.24. Menu items now take a real
   inset ring in `brand-300`, which measures 3.30 on the focused row and 5.73 on the panel.
+
+### M6l — The shelf form stops sending people away ✅
+- **`POST …/stock` takes `new_tea` as well as `tea_id`.** The tea picker's answer to a
+  search that found nothing used to be "add it under Teas first", which is an instruction
+  to abandon a half-filled form, go somewhere else, create the tea and start over. The
+  whole `TeaCreate` body now rides on the tin instead, and the same `new_shop` the Teas
+  page has been sending since M6 rides beside it for a shop nobody has listed.
+- **One request, so one transaction.** The tea, its new ingredients, the proposed shop,
+  the shop's listing and the tin are all written under the request's session, which
+  `get_db` commits once at the end — the same standard `TeaCreate` already sets for a
+  blend never being saved with half its recipe. A tin refused after its tea was inserted
+  leaves no tea, and there is a test that fails if a stray `commit()` is added.
+- **`catalog_service.create_tea` and nothing else**, called from the stock service. A
+  second tea insert written for that module is how the slug deduplication, the unapproved
+  default and the ingredient handling quietly stop agreeing between the two forms.
+  `_create_suggested_shop` became public for the same reason: the tin needs the row back
+  to fill in its own `shop_id`, and proposing a shop should mean one thing.
+- `approved=False` unconditionally, exactly as `POST /catalog/teas` does. The permission
+  matrix has no row where submitting a tea also approves it, and an admin who means to
+  approve one has `POST /admin/teas` — the difference is which endpoint you call, not
+  which shelf you happened to be standing at.
+- **One tea form in the app, not two.** `TeaForm` never posted anything itself — it hands
+  its caller a `TeaInput` — so the shelf reuses it whole for two new props (`withShop`,
+  `initialName`). It *replaces* the tin's fields while open rather than nesting inside
+  them: a `<form>` in a `<form>` is invalid HTML, and the version where the inner submit
+  button silently submits the outer form is a bug nobody enjoys finding. Nothing is lost
+  by the swap, because every field on that screen is controlled from `AddTinForm`.
+- Both drafts are shown *as* drafts, with the "Awaiting review" badge an unapproved
+  ingredient already wears. Nothing has been saved at that point, and a chip that looked
+  like a catalog pick would be claiming otherwise.
+- An unknown `shop_id` on a tin is now a 400 naming what was not found, rather than a 500
+  from the foreign key. It fell out of resolving the two shop cases in one place.
 
 ### M7 — Polish
 Tea images (local disk in dev, S3-compatible later). Empty and loading states across

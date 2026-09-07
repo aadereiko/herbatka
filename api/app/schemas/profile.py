@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from app.schemas.catalog import TeaType
+from app.schemas.common import Country
 from app.schemas.household import TeaRef
 
 FriendState = Literal["none", "incoming", "outgoing", "friends", "blocked", "self"]
@@ -49,7 +50,9 @@ class PublicProfile(BaseModel):
     avatar_url: str | None
     pronouns: str | None
     bio: str | None
-    location: str | None
+    status: str | None
+    city: str | None
+    country: Country | None
     favourite_tea_type: TeaType | None
     member_since: datetime
 

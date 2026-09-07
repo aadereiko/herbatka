@@ -3,15 +3,18 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import App from './App'
+import { ThemeProvider } from './components/ui/theme'
 
 afterEach(() => vi.restoreAllMocks())
 
 function renderApp() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={client}>
-      <App />
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={client}>
+        <App />
+      </QueryClientProvider>
+    </ThemeProvider>,
   )
 }
 

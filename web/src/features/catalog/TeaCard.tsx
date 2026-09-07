@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 
 import { EntityImage } from '../../components/ui/image'
-import { Badge } from '../../components/ui/page'
+import { Badge, PendingBadge } from '../../components/ui/page'
 import type { TeaSummary } from '../../lib/catalog'
 import { CAFFEINE_LEVEL_LABELS, TEA_TYPE_LABELS } from '../../lib/catalog'
 import { FavouriteStar } from '../favourite/FavouriteStar'
@@ -62,17 +62,30 @@ export function TeaCard({ tea }: { tea: TeaSummary }) {
       <Link
         to={`/teas/${tea.slug}`}
         data-testid="tea-card"
-        className="flex h-full flex-col overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm transition hover:border-brand-400 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-neutral-800 dark:bg-neutral-900"
+        // Borderless, after the reference: a big image well, then the name under it in
+        // plain type. The old card was a bordered box with the picture inset in it, which
+        // is a different idea — there the card was the object and the photograph was a
+        // detail on it. Here the *tea* is the object and the card is only the space it
+        // occupies, so the only thing separating one from the next is the gap.
+        //
+        // Which is why the hover is on the image rather than the box: with no edge to
+        // light up, the picture receding slightly is the whole affordance.
+        className="group flex h-full flex-col focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
       >
-        {/* The leaf placeholder this card introduced in M2 now lives in `EntityImage`,
-            because M6 gives shops and households pictures too and three copies of one
-            fallback is three chances to pick a different emoji. Empty alt: the whole
-            card is one link and the tea's name is its text. */}
-        <EntityImage src={tea.image_url} alt="" className="h-32 w-full" testId="tea-card-image" />
+        {/* A tall image well rather than a 128px strip. The reference gives the picture
+            most of the card and the words a caption's worth underneath, and on a catalog
+            where two thirds of the teas have no photograph the well is doing real work:
+            it makes the drawn leaf look like a chosen placeholder rather than a gap.
 
-        <div className="flex flex-1 flex-col gap-2 p-4">
+            `aspect-[4/5]` rather than a fixed height, so a row of cards lines up at every
+            width without the grid having to know how tall a card is. */}
+        <div className="aspect-[4/5] w-full overflow-hidden rounded-2xl bg-neutral-800 transition-opacity duration-200 group-hover:opacity-90">
+          <EntityImage src={tea.image_url} alt="" className="size-full" testId="tea-card-image" />
+        </div>
+
+        <div className="flex flex-1 flex-col gap-2 pt-3">
           <div>
-            <h3 className="text-base font-semibold text-brand-900 dark:text-brand-100">
+            <h3 className="text-base font-medium text-brand-900 group-hover:underline dark:text-brand-100">
               {tea.name}
             </h3>
             <p className="text-sm text-neutral-500 dark:text-neutral-400">
@@ -98,7 +111,7 @@ export function TeaCard({ tea }: { tea: TeaSummary }) {
             <Badge tone={tea.caffeine_level === 'none' ? 'neutral' : 'amber'}>
               {CAFFEINE_LEVEL_LABELS[tea.caffeine_level]}
             </Badge>
-            {!tea.is_approved && <Badge tone="rose">Awaiting review</Badge>}
+            {!tea.is_approved && <PendingBadge />}
           </div>
 
           {tea.primary_ingredients.length > 0 && (

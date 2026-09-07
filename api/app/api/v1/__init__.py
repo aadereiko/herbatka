@@ -4,12 +4,14 @@ from app.api.v1.routers import (
     admin,
     auth,
     catalog,
+    consumption,
     favourites,
     friends,
     health,
     home,
     households,
     profile,
+    reference,
     reviews,
     shops,
     stock,
@@ -22,9 +24,11 @@ api_router.include_router(catalog.router)
 api_router.include_router(admin.router)
 api_router.include_router(households.router)
 api_router.include_router(stock.router)
+api_router.include_router(consumption.router)
 api_router.include_router(reviews.router)
 api_router.include_router(friends.router)
 api_router.include_router(shops.router)
 api_router.include_router(home.router)
 api_router.include_router(profile.router)
 api_router.include_router(favourites.router)
+api_router.include_router(reference.router)

@@ -25,6 +25,7 @@ web: ## Run the Vite dev server
 install: ## Install all dependencies
 	cd api && uv sync
 	cd web && npm install
+	cd analysis && uv sync
 
 migrate: ## Apply migrations
 	cd api && uv run alembic upgrade head
@@ -65,4 +66,44 @@ dev: db migrate ## Start the database, migrate, then run api + web together
 	( cd web && npm run dev ) & \
 	wait
 
-.PHONY: help db db-down db-reset adminer api web install migrate revision downgrade admin people seed test-db-drop test lint dev
+# Everything `dev` does, plus binding both servers to every interface so a phone
+# on the same Wi-Fi can open the app. Separate target rather than a flag on `dev`,
+# and that is the whole point of it:
+#
+#   `make dev` binds 127.0.0.1. The API has no rate limiting, its dev JWT secret is
+#   the one checked into .env.example, and behind it is a Postgres full of
+#   hand-entered real data. On 0.0.0.0 all of that is reachable by anything on the
+#   network — the hotel Wi-Fi, the coworking Wi-Fi, the neighbour's kid. That is
+#   sometimes exactly what you want and it is never something you should get by
+#   accident, so it is a different word you have to type on purpose.
+#
+# The frontend still talks to the API through Vite's proxy, so the phone only ever
+# speaks to one origin and CORS never enters into it. Widening CORS_ORIGINS is only
+# needed if you point the app straight at the API with VITE_API_BASE_URL — see the
+# note in .env.example.
+dev-lan: db migrate ## Opt-in: `make dev`, but bound to the LAN so a phone can reach it
+	@ip=$$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null \
+	      || hostname -I 2>/dev/null | awk '{print $$1}'); \
+	if [ -z "$$ip" ]; then echo "Could not work out this machine's LAN address." >&2; exit 1; fi; \
+	echo ""; \
+	echo "  ⚠  Both servers are bound to 0.0.0.0. Every device on this network can"; \
+	echo "     reach the API and the dev database behind it. Ctrl-C when you are done."; \
+	echo ""; \
+	echo "  → on this phone:  http://$$ip:$${WEB_PORT:-17310}"; \
+	echo "  → api:            http://$$ip:$${API_PORT:-17311}/docs"; \
+	echo ""; \
+	echo "     No service worker and no install prompt over plain http — browsers"; \
+	echo "     only allow those on https or localhost. See web/CAPACITOR.md."; \
+	echo ""; \
+	trap 'kill 0' EXIT INT TERM; \
+	( cd api && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port $${API_PORT:-17311} ) & \
+	( cd web && npm run dev -- --host ) & \
+	wait
+
+vision: ## Run JupyterLab for the tin-recognition experiments
+	cd vision && uv run --group dev jupyter lab
+
+analysis: ## Run JupyterLab for the catalogue analysis notebooks
+	cd analysis && uv run --group dev jupyter lab
+
+.PHONY: help db db-down db-reset adminer api web install migrate revision downgrade admin people seed test-db-drop test lint dev dev-lan vision analysis

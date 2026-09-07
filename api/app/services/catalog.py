@@ -10,12 +10,14 @@ from sqlalchemy.orm import aliased, selectinload
 from app.core.slug import slugify
 from app.models.catalog import Brand, Ingredient, Tea, TeaIngredient
 from app.models.review import Review
+from app.models.shop import Shop, ShopListing
 from app.models.user import User
 from app.schemas.catalog import (
     BrandCreate,
     BrandUpdate,
     IngredientCreate,
     IngredientUpdate,
+    NewShopIn,
     TeaCreate,
     TeaIngredientIn,
     TeaUpdate,
@@ -194,9 +196,27 @@ async def delete_brand(db: AsyncSession, brand_id: uuid.UUID) -> None:
 
 
 async def list_ingredients(
-    db: AsyncSession, q: str | None, category: str | None, page: int, size: int
+    db: AsyncSession,
+    q: str | None,
+    category: str | None,
+    page: int,
+    size: int,
+    *,
+    approved: bool | None = None,
 ) -> tuple[list[Ingredient], int]:
+    """Everything by default, approved or not.
+
+    `approved=None` is the public default and it is a deliberate reversal: a suggested
+    ingredient is listed the moment it is proposed, marked rather than hidden. Somebody
+    who has just typed "lemon myrtle" into a tea's recipe should be able to see it in the
+    vocabulary immediately, and the alternative — a suggestion that vanishes until an
+    admin notices — is a form that appears to have failed.
+
+    The admin queue passes `approved=False` to get the moderation list.
+    """
     query = select(Ingredient).order_by(Ingredient.name)
+    if approved is not None:
+        query = query.where(Ingredient.is_approved.is_(approved))
     if q:
         query = query.where(Ingredient.name.ilike(f"%{q}%"))
     if category:
@@ -211,12 +231,35 @@ async def get_ingredient_by_slug(db: AsyncSession, slug: str) -> Ingredient:
     return ingredient
 
 
-async def create_ingredient(db: AsyncSession, payload: IngredientCreate) -> Ingredient:
+async def create_ingredient(
+    db: AsyncSession,
+    payload: IngredientCreate,
+    *,
+    created_by: User | None = None,
+    approved: bool = True,
+) -> Ingredient:
+    """One ingredient, from an admin (approved) or from anybody else (not).
+
+    The same shape `create_tea` and `create_shop` already have, and for the same reason:
+    the difference between an admin adding a word to the vocabulary and a reader
+    suggesting one is two arguments, not two code paths.
+    """
     ingredient = Ingredient(
         slug=await _unique_slug(db, Ingredient, payload.name),
+        is_approved=approved,
+        created_by_id=created_by.id if created_by else None,
         **payload.model_dump(),
     )
     db.add(ingredient)
+    await db.flush()
+    return ingredient
+
+
+async def approve_ingredient(db: AsyncSession, ingredient_id: uuid.UUID) -> Ingredient:
+    ingredient = await db.get(Ingredient, ingredient_id)
+    if ingredient is None:
+        raise NotFound("ingredient")
+    ingredient.is_approved = True
     await db.flush()
     return ingredient
 
@@ -385,17 +428,95 @@ async def create_tea(
     if payload.brand_id is not None and await db.get(Brand, payload.brand_id) is None:
         raise NotFound("brand")
 
-    fields = payload.model_dump(exclude={"ingredients"})
+    fields = payload.model_dump(exclude={"ingredients", "new_ingredients", "new_shop"})
     tea = Tea(
         slug=await _unique_slug(db, Tea, payload.name),
         is_approved=approved,
         created_by_id=created_by.id if created_by else None,
         **fields,
     )
-    tea.ingredient_links = await _resolve_ingredients(db, payload.ingredients)
+
+    links = await _resolve_ingredients(db, payload.ingredients)
+
+    # Ingredients the vocabulary does not have yet, created here rather than in a second
+    # request from the client. One transaction is the whole point: a blend saved with half
+    # its recipe, because the browser managed three of four follow-up calls, is a worse
+    # outcome than a 422 on the lot.
+    #
+    # They inherit this tea's approval state. An admin adding a tea and naming a new herb
+    # has vouched for the herb by naming it; a reader suggesting both is suggesting both.
+    for position, proposed in enumerate(payload.new_ingredients, start=len(links)):
+        ingredient = await create_ingredient(
+            db,
+            IngredientCreate(
+                name=proposed.name,
+                category=proposed.category,
+                is_caffeinated=proposed.is_caffeinated,
+            ),
+            created_by=created_by,
+            approved=approved,
+        )
+        links.append(
+            TeaIngredient(
+                ingredient_id=ingredient.id,
+                percentage=proposed.percentage,
+                is_primary=proposed.is_primary,
+                position=position,
+            )
+        )
+
+    tea.ingredient_links = links
     db.add(tea)
     await db.flush()
+
+    if payload.new_shop is not None:
+        await create_suggested_shop(
+            db, tea, payload.new_shop, created_by=created_by, approved=approved
+        )
+
     return await get_tea(db, tea.id)
+
+
+async def create_suggested_shop(
+    db: AsyncSession,
+    tea: Tea,
+    proposed: NewShopIn,
+    *,
+    created_by: User | None,
+    approved: bool,
+) -> Shop:
+    """The shop somebody bought this tea from, and the listing that says so.
+
+    Both, never just the shop. "This shop exists" and "it sells this tea" arrive together
+    from the form, and creating only the first would drop the half that is actually
+    useful — the tea's own page answers "where do I get this" from listings, not from the
+    existence of shops.
+
+    Public rather than private because the shelf form proposes a shop too, and the tin it
+    is attached to needs the row back to fill in its own `shop_id`. Two callers, one
+    definition of what proposing a shop means.
+
+    `services.shop` is imported inside the function: it imports from this module for the
+    tea-side of a listing, so a module-level import would be a cycle. The models above
+    are not part of that cycle and are imported normally.
+    """
+    from app.schemas.shop import ShopCreate
+    from app.services import shop as shop_service
+
+    shop, _ = await shop_service.create_shop(
+        db,
+        ShopCreate(
+            name=proposed.name,
+            website=proposed.website,
+            city=proposed.city,
+            country=proposed.country,
+        ),
+        created_by=created_by,
+        approved=approved,
+    )
+    db.add(ShopListing(shop_id=shop.id, tea_id=tea.id))
+    await db.flush()
+    return shop
 
 
 async def update_tea(db: AsyncSession, tea_id: uuid.UUID, payload: TeaUpdate) -> Tea:
