@@ -68,7 +68,9 @@ def main() -> None:
     }
 
     DEST.parent.mkdir(parents=True, exist_ok=True)
-    DEST.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    DEST.write_text(
+        json.dumps(payload, separators=(",", ":"), ensure_ascii=False), encoding="utf-8"
+    )
 
     kb = DEST.stat().st_size / 1024
     print(f"{len(teas)} teas, {len(ingredient_index)} ingredients, {len(shop_index)} shops")
