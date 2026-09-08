@@ -9,6 +9,7 @@ export type VendorTea = {
   teaType: string
   format: TeaFormat
   ingredients: string[]
+  flavours: string[]
   hasCompositionList: boolean
   url: string
 }
@@ -17,30 +18,41 @@ type Payload = {
   generated: string
   shops: { name: string; country: string }[]
   ingredients: string[]
+  flavours: string[]
   /** Positional, to keep the bundle small — see `schema` in the JSON. */
-  teas: [string, number, string, string, number[], boolean, string][]
+  teas: [string, number, string, string, number[], number[], boolean, string][]
   stats: { ingredientRows: number; rowsWithPercentage: number; distinctIngredients: number }
 }
 
 // TypeScript widens every row of the imported JSON to `(string | number | boolean |
-// number[])[]` — it cannot see that each is a fixed 7-tuple — so the assertion has to go
+// number[])[]` — it cannot see that each is a fixed 8-tuple — so the assertion has to go
 // through `unknown`. The shape is guaranteed by `analysis/vendor_catalogues/export_for_web.py`,
 // which writes the `schema` field beside the rows to say what the positions mean.
 const payload = raw as unknown as Payload
 
 /**
  * The rows arrive as positional arrays with ingredients as indexes into a shared list,
- * which is what keeps 1,641 teas inside 214 KB. Widening them once here means every
+ * which is what keeps 2,950 teas inside 418 KB. Widening them once here means every
  * component downstream reads plain named fields.
  */
 export const teas: VendorTea[] = payload.teas.map(
-  ([name, shopIndex, teaType, format, ingredientIndexes, hasCompositionList, url]) => ({
+  ([
+    name,
+    shopIndex,
+    teaType,
+    format,
+    ingredientIndexes,
+    flavourIndexes,
+    hasCompositionList,
+    url,
+  ]) => ({
     name,
     shop: payload.shops[shopIndex].name,
     country: payload.shops[shopIndex].country,
     teaType,
     format: format as TeaFormat,
     ingredients: ingredientIndexes.map((i) => payload.ingredients[i]),
+    flavours: flavourIndexes.map((i) => payload.flavours[i]),
     hasCompositionList,
     url,
   }),
@@ -60,9 +72,17 @@ export function countBy<T>(rows: T[], key: (row: T) => string): { label: string;
 }
 
 export function ingredientFrequency(rows: VendorTea[], limit: number) {
+  return frequency(rows, (t) => t.ingredients, limit)
+}
+
+export function flavourFrequency(rows: VendorTea[], limit: number) {
+  return frequency(rows, (t) => t.flavours, limit)
+}
+
+function frequency(rows: VendorTea[], pick: (t: VendorTea) => string[], limit: number) {
   const counts = new Map<string, number>()
   for (const tea of rows) {
-    for (const ingredient of tea.ingredients) {
+    for (const ingredient of pick(tea)) {
       counts.set(ingredient, (counts.get(ingredient) ?? 0) + 1)
     }
   }
