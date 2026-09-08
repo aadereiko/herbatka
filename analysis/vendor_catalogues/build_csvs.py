@@ -91,9 +91,17 @@ def tea_format(text: str) -> str:
 
 
 # A composition list says what is *in* a tea and never that it is smoky or honeyed. That
-# vocabulary lives only in the shop's prose, and it is a genuinely separate axis: measured
-# over this harvest, flavour families rescue 26% of the tea pairs that share no ingredient
-# at all, taking pair coverage from 32% to 50%.
+# vocabulary lives only in the shop's prose, and it is a genuinely separate axis — but only
+# where there is prose to read. Measured over this harvest:
+#
+#   shops with real descriptions   84% of teas get a family, rescuing 27% of the pairs that
+#                                  share no ingredient (coverage 30% -> 48%)
+#   composition-list shops         27% of teas, rescuing ~1% — their meta description is a
+#                                  one-liner like "sypaný černý čaj aromatizovaný"
+#
+# Scraping the page body instead was tried and is worse than nothing: Adagio's body starts
+# "Skip to main content ACCOUNT" and a Czech page's checkout boilerplate scored a spurious
+# `chocolate`. Nav text would hand every tea the same families and destroy the axis.
 SELF_LABEL = re.compile(r"(?i)\b(green|black|white|herbal|rooibos|oolong) tea\b")
 
 
@@ -244,6 +252,52 @@ def load_raw(path: Path, country: str) -> list[dict]:
     return rows
 
 
+def load_raw_prose(filename: str, shop: str, country: str) -> list[dict]:
+    """Sitemap-crawled shops that publish prose rather than a composition list.
+
+    Same treatment as a Shopify description — sweep the lexicon for ingredients, hand the
+    text to the flavour families — but sourced from `collect_shop.page_prose` instead of a
+    products.json. Adagio is the reason this exists: no ingredient list anywhere, and some
+    of the best tasting notes in the harvest.
+    """
+    path = S / filename
+    if not path.exists():
+        return []
+    rows = []
+    for r in csv.DictReader(path.open(encoding="utf-8")):
+        # The meta description, not the page body. Measured on both: Adagio's body text
+        # starts with "Skip to main content ACCOUNT" and a Czech page yields checkout
+        # boilerplate that scored a spurious `chocolate` family, while the description says
+        # "Honey, orchid, spring grass, buttery finish". Page scrape is the fallback, not
+        # the source.
+        prose = r.get("description", "").strip()
+        if len(prose) < 40:
+            prose = r["ingredients_raw"].strip()
+        if len(prose) < 40:
+            continue
+        folded = lexicon.fold(prose)
+        found: list[str] = []
+        for key in lexicon.KEYS:
+            name = lexicon.LEXICON[key]
+            if key in folded and name not in found:
+                found.append(name)
+        if len(found) < 2 or NOT_TEA.search(prose):
+            continue
+        rows.append(
+            {
+                "shop": shop,
+                "country": country,
+                "name": clean_name(r["name"]),
+                "ingredients_source": ", ".join(found),
+                "source_quality": "named in prose",
+                "url": r["url"],
+                "format": tea_format(f"{r['name']} {r['url']} {prose[:300]}"),
+                "blurb": prose,
+            }
+        )
+    return rows
+
+
 def keep_in_summary(term: str, mapped: str, noise: bool) -> bool:
     """Does this ingredient belong in the tea's `ingredients_english` summary?
 
@@ -292,7 +346,12 @@ def main() -> None:
         ),
         "teas_germany.csv": load_raw(S / "raw_de.csv", "Germany"),
         "teas_czechia.csv": load_raw(S / "raw_cz.csv", "Czechia"),
-        "teas_netherlands.csv": load_raw(S / "raw_nl.csv", "Netherlands"),
+        "teas_netherlands.csv": (
+            load_raw(S / "raw_nl.csv", "Netherlands")
+            # A Dutch retailer specialising in Chinese tea — filed by where the shop is,
+            # which is what every other row in this column means.
+            + load_shopify_prose("shopify_teasenz.json", "Teasenz", "Netherlands", "www.teasenz.eu")
+        ),
         "teas_usa.csv": (
             load_shopify_prose("shopify_harney.json", "Harney & Sons", "USA", "www.harney.com")
             + load_shopify_prose("shopify_rishi.json", "Rishi Tea", "USA", "rishi-tea.com")
@@ -319,13 +378,26 @@ def main() -> None:
                 "USA",
                 "looseleafteamarket.com",
             )
+            + load_shopify_prose("shopify_uptontea.json", "Upton Tea", "USA", "www.uptontea.com")
+            + load_raw_prose("raw_us_adagio.csv", "Adagio Teas", "USA")
         ),
         "teas_canada.csv": load_shopify_prose(
             "shopify_davidstea.json", "DAVIDsTEA", "Canada", "www.davidstea.com"
         ),
-        "teas_india.csv": load_shopify_prose(
-            "shopify_vahdam.json", "Vahdam Teas", "India", "www.vahdamteas.com"
+        "teas_india.csv": (
+            load_shopify_prose("shopify_vahdam.json", "Vahdam Teas", "India", "www.vahdamteas.com")
+            + load_shopify_prose("shopify_teabox.json", "Teabox", "India", "www.teabox.com")
         ),
+        "teas_sri_lanka.csv": (
+            load_shopify_prose(
+                "shopify_basilur.json", "Basilur Tea", "Sri Lanka", "lk.basilurtea.com"
+            )
+            + load_shopify_prose("shopify_dilmah.json", "Dilmah", "Sri Lanka", "shop.dilmahtea.com")
+            + load_shopify_prose(
+                "shopify_ceylontstore.json", "Ceylon T Store", "Sri Lanka", "www.ceylontstore.com"
+            )
+        ),
+        "teas_new_zealand.csv": load_raw_prose("raw_nz.csv", "Zealong", "New Zealand"),
         "teas_australia.csv": load_shopify_prose(
             "shopify_t2.json", "T2 Tea", "Australia", "t2tea.com"
         ),

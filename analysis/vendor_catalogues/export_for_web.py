@@ -25,6 +25,8 @@ COUNTRY_FILES = {
     "Thailand": "teas_thailand.csv",
     "Sweden": "teas_sweden.csv",
     "Argentina": "teas_argentina.csv",
+    "Sri Lanka": "teas_sri_lanka.csv",
+    "New Zealand": "teas_new_zealand.csv",
 }
 
 

@@ -179,6 +179,24 @@ def simon_levelt(body: str) -> str:
     return NL_CUT.split(m.group(1))[0].strip(" .;") if m else ""
 
 
+# --------------------------------------------------------------- prose-only pages
+#
+# Adagio and Zealong publish no composition list at all, but their descriptions are unusually
+# rich in *flavour* language ("burgundy-red, roasted grain, raisin notes, pungent malt").
+# For these the page body is the payload: `build_csvs.load_raw_prose` sweeps the lexicon over
+# it for ingredients and `herbatka_analysis.flavour` for families, exactly as it does for a
+# Shopify description.
+MAIN_PROSE_CUT = re.compile(
+    r"(?i)customer reviews|related products|you may also like|shipping|newsletter"
+    r"|sign up|©|all rights reserved|add to cart|quantity"
+)
+
+
+def page_prose(body: str) -> str:
+    text = strip_tags(body)
+    return MAIN_PROSE_CUT.split(text)[0][:2000].strip()
+
+
 SHOPS = {
     "ronnefeldt": {
         "shop": "Ronnefeldt",
@@ -211,6 +229,22 @@ SHOPS = {
         "cache": "uk_cache",
         "parse": bird_and_blend,
         "out": "raw_uk.csv",
+    },
+    "adagio": {
+        "shop": "Adagio Teas",
+        "country": "US",
+        "urls": "us_adagio_urls.txt",
+        "cache": "adagio_cache",
+        "parse": page_prose,
+        "out": "raw_us_adagio.csv",
+    },
+    "zealong": {
+        "shop": "Zealong",
+        "country": "NZ",
+        "urls": "nz_urls.txt",
+        "cache": "nz_cache",
+        "parse": page_prose,
+        "out": "raw_nz.csv",
     },
     "cafesilesia": {
         "shop": "Cafe Silesia",

@@ -112,8 +112,10 @@ export function LabsPage() {
           <p className="mt-3 text-xs text-neutral-500">
             Read out of each shop's own prose by <code>herbatka_analysis.flavour</code>, on{' '}
             {Math.round((withFlavour / teas.length) * 100)}% of teas. A separate axis from
-            ingredients, and worth it: these rescue 26% of the tea pairs that share no
-            ingredient at all, taking pair coverage from 32% to 50%.
+            ingredients — but only where the shop writes a paragraph. On those, 84% of
+            teas get a family and they rescue 27% of the pairs sharing no ingredient
+            (coverage 30% → 48%). On shops publishing only a one-line meta description,
+            27% get a family and the rescue is ~1%.
           </p>
         </Panel>
         <Panel>
