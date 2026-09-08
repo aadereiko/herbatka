@@ -18,6 +18,11 @@ COUNTRY_FILES = {
     "Canada": "teas_canada.csv",
     "India": "teas_india.csv",
     "Australia": "teas_australia.csv",
+    "Japan": "teas_japan.csv",
+    "Taiwan": "teas_taiwan.csv",
+    "Switzerland": "teas_switzerland.csv",
+    "Finland": "teas_finland.csv",
+    "Thailand": "teas_thailand.csv",
 }
 
 
