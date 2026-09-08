@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 
 import { ThemeProvider } from '../../components/ui/theme'
 import { AuthProvider } from '../../features/auth/AuthProvider'
-import { coOccurrence, countBy, teas } from './data'
+import { coOccurrence, countBy, flavourFrequency, teas } from './data'
 import { LabsPage } from './LabsPage'
 
 afterEach(cleanup)
@@ -89,6 +89,32 @@ test('co-occurrence is symmetric and bounded', () => {
     expect(row.value).toBeGreaterThan(0)
     expect(row.value).toBeLessThanOrEqual(1)
   }
+})
+
+test('flavour families are a real second axis, not a copy of ingredients', () => {
+  const withFlavour = teas.filter((t) => t.flavours.length > 0)
+  expect(withFlavour.length / teas.length).toBeGreaterThan(0.4)
+  // Families come from the controlled vocabulary in herbatka_analysis.flavour, never free
+  // text — the whole point is that two teas can agree on a word.
+  const families = new Set(teas.flatMap((t) => t.flavours))
+  expect(families.size).toBeLessThanOrEqual(23)
+  expect(flavourFrequency(teas, 5).length).toBe(5)
+
+  // The axis only earns its place by rescuing pairs ingredients cannot reach. Sampled
+  // rather than exhaustive: 2,950 teas is 4.3M pairs, and the property holds on any slice.
+  const sample = teas.filter((t) => t.flavours.length > 0).slice(0, 200)
+  let orthogonal = 0
+  let rescued = 0
+  for (let i = 0; i < sample.length; i++) {
+    for (let j = i + 1; j < sample.length; j++) {
+      const sharesIngredient = sample[i].ingredients.some((x) => sample[j].ingredients.includes(x))
+      if (sharesIngredient) continue
+      orthogonal++
+      if (sample[i].flavours.some((f) => sample[j].flavours.includes(f))) rescued++
+    }
+  }
+  expect(orthogonal).toBeGreaterThan(0)
+  expect(rescued / orthogonal).toBeGreaterThan(0.1)
 })
 
 test('countBy totals match the row count', () => {

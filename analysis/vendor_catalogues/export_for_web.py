@@ -23,11 +23,14 @@ COUNTRY_FILES = {
     "Switzerland": "teas_switzerland.csv",
     "Finland": "teas_finland.csv",
     "Thailand": "teas_thailand.csv",
+    "Sweden": "teas_sweden.csv",
+    "Argentina": "teas_argentina.csv",
 }
 
 
 def main() -> None:
     ingredient_index: dict[str, int] = {}
+    flavour_index: dict[str, int] = {}
     shop_index: dict[tuple[str, str], int] = {}
     teas: list[list] = []
 
@@ -41,6 +44,9 @@ def main() -> None:
             names = [n.strip() for n in r["ingredients_english"].split(",") if n.strip()]
             for n in names:
                 ingredient_index.setdefault(n, len(ingredient_index))
+            fams = [f.strip() for f in r["flavour_families"].split(",") if f.strip()]
+            for f in fams:
+                flavour_index.setdefault(f, len(flavour_index))
             teas.append(
                 [
                     r["name"],
@@ -48,6 +54,7 @@ def main() -> None:
                     r["tea_type"],
                     r["format"],
                     sorted({ingredient_index[n] for n in names}),
+                    sorted({flavour_index[f] for f in fams}),
                     r["source_quality"] == "composition list",
                     r["url"],
                 ]
@@ -61,9 +68,19 @@ def main() -> None:
 
     payload = {
         "generated": date.today().isoformat(),
-        "schema": ["name", "shop", "type", "format", "ingredients", "hasCompositionList", "url"],
+        "schema": [
+            "name",
+            "shop",
+            "type",
+            "format",
+            "ingredients",
+            "flavours",
+            "hasCompositionList",
+            "url",
+        ],
         "shops": [{"name": s, "country": c} for s, c in shop_index],
         "ingredients": list(ingredient_index),
+        "flavours": list(flavour_index),
         "teas": teas,
         "stats": {
             "ingredientRows": len(rows),

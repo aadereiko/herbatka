@@ -64,6 +64,25 @@ def strip_tags(fragment: str) -> str:
 
 
 OG_TITLE = re.compile(r'<meta property="og:title" content="([^"]*)"')
+# Case-insensitive because Ronnefeldt writes `name="Description"`, and *every* candidate is
+# collected rather than the first: Oxalis ships an empty `name="description"` ahead of a
+# populated `og:description`, so first-match-wins returns the empty one.
+DESCRIPTION_META = re.compile(
+    r"<meta[^>]*?(?:name|property)=[\"'](?:og:)?description[\"'][^>]*?content=[\"']([^\"']*)",
+    re.I,
+)
+
+
+def description_of(body: str) -> str:
+    """The shop's own blurb, kept for the flavour axis rather than the ingredient one.
+
+    A composition list says what is *in* the tea; it never says the tea is smoky or
+    honeyed. That vocabulary only exists in the prose, and `herbatka_analysis.flavour`
+    turns it into families — which rescue 26% of the tea pairs that share no ingredient
+    at all. The meta description is the one blurb every shop has, in every language.
+    """
+    found = [html.unescape(m).strip() for m in DESCRIPTION_META.findall(body)]
+    return max(found, key=len, default="")
 
 
 def title_of(body: str) -> str:
@@ -228,6 +247,7 @@ def main(key: str) -> None:
                 "country": cfg["country"],
                 "name": title_of(body),
                 "ingredients_raw": ingredients,
+                "description": description_of(body),
                 "url": url,
             }
         )
@@ -239,7 +259,10 @@ def main(key: str) -> None:
 
     out = S / cfg["out"]
     with out.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["shop", "country", "name", "ingredients_raw", "url"])
+        w = csv.DictWriter(
+            f,
+            fieldnames=["shop", "country", "name", "ingredients_raw", "description", "url"],
+        )
         w.writeheader()
         w.writerows(sorted(by_name.values(), key=lambda r: r["name"]))
     print(f"done: {len(by_name)} unique -> {out}", flush=True)

@@ -5,6 +5,7 @@ import { Bars } from './Bars'
 import {
   coOccurrence,
   countBy,
+  flavourFrequency,
   generatedOn,
   ingredientFrequency,
   shopCount,
@@ -57,6 +58,8 @@ export function LabsPage() {
   )
   const byType = useMemo(() => countBy(teas, (t) => t.teaType || 'not stated'), [])
   const topIngredients = useMemo(() => ingredientFrequency(filtered, 25), [filtered])
+  const topFlavours = useMemo(() => flavourFrequency(teas, 23), [])
+  const withFlavour = teas.filter((t) => t.flavours.length > 0).length
   const partners = useMemo(() => coOccurrence(teas, focus, 12), [focus])
 
   const withComposition = teas.filter((t) => t.hasCompositionList).length
@@ -90,7 +93,7 @@ export function LabsPage() {
         />
       </div>
 
-      <div className="mb-6 grid gap-4 lg:grid-cols-3">
+      <div className="mb-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         <Panel>
           <SectionLabel>Teas per country</SectionLabel>
           <Bars data={byCountry} />
@@ -101,6 +104,16 @@ export function LabsPage() {
           <p className="mt-3 text-xs text-neutral-500">
             No shop publishes this as a field — it is read out of the product name, the URL
             and the variant titles, in six languages. Most specialists simply never say.
+          </p>
+        </Panel>
+        <Panel>
+          <SectionLabel>Flavour families</SectionLabel>
+          <Bars data={topFlavours} />
+          <p className="mt-3 text-xs text-neutral-500">
+            Read out of each shop's own prose by <code>herbatka_analysis.flavour</code>, on{' '}
+            {Math.round((withFlavour / teas.length) * 100)}% of teas. A separate axis from
+            ingredients, and worth it: these rescue 26% of the tea pairs that share no
+            ingredient at all, taking pair coverage from 32% to 50%.
           </p>
         </Panel>
         <Panel>

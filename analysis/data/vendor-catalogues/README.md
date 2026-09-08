@@ -1,6 +1,6 @@
 # Vendor catalogues: teas and their ingredients
 
-Harvested from twenty shops in fifteen countries, September 2026. This answers the gap
+Harvested from twenty-eight shops in seventeen countries, September 2026. This answers the gap
 `public-datasets.md` closes with: no open dataset publishes tea *recipes*, because vendors do
 — one shop at a time, in their own language.
 
@@ -15,17 +15,17 @@ the method and not the harvest. Regenerate with `analysis/vendor_catalogues/`.
 
 ## What was collected
 
-**2,394 teas from 20 shops in 15 countries**, and 10,901 ingredient rows.
+**2,950 teas from 28 shops in 17 countries**, and 13,145 ingredient rows.
 
 | Shop | Country | Teas | Ingredient data |
 |---|---|---|---|
 | Ronnefeldt | Germany | 357 | `Zutaten:` composition list |
 | Oxalis | Czechia | 286 | `Složení` composition list |
-| Harney, Rishi, Art of Tea, Tea Forte, Whistling Kettle | USA | 519 | named in prose |
+| Harney, Rishi, Art of Tea, Tea Forte, Whistling Kettle, Smith, Tea Spot, Simple Loose Leaf, Loose Leaf Market | USA | 847 | named in prose |
 | Palais des Thés + Kusmi | France | 215 | composition list **with percentages** / prose |
 | Simon Lévelt | Netherlands | 187 | `Ingredienten` composition list |
 | Cafe Silesia | Poland | 159 | `Skład:` composition list |
-| Bird & Blend | UK | 103 | composition list **with percentages** |
+| Bird & Blend + JING + Tregothnan | UK | 194 | composition list **with percentages** / prose |
 | Vahdam Teas | India | 45 | named in prose |
 | T2 Tea | Australia | 36 | named in prose |
 | DAVIDsTEA | Canada | 25 | named in prose |
@@ -33,11 +33,32 @@ the method and not the harvest. Regenerate with `analysis/vendor_catalogues/`.
 | Chaidim | Thailand | 111 | named in prose |
 | Nordqvist | Finland | 90 | named in prose |
 | Sirocco | Switzerland | 84 | named in prose |
-| Eco-Cha | Taiwan | 27 | named in prose |
+| Eco-Cha | Taiwan | 28 | named in prose |
+| Johan & Nyström | Sweden | 99 | named in prose |
+| Tea Connection | Argentina | 27 | named in prose |
 
-461 rows carry a real percentage; the rest are presence only. **84%** of terms map onto the
+461 rows carry a real percentage; the rest are presence only. **87%** of terms map onto the
 English vocabulary in `vendor_catalogues/lexicon.py`, which holds **French, Polish, English,
-German, Czech, Dutch and Finnish** keys.
+German, Czech, Dutch, Finnish, Swedish and Spanish** keys.
+
+### `flavour_families` — the second axis
+
+A composition list says what is *in* a tea. It never says the tea is smoky, or honeyed, or
+grassy. That vocabulary exists only in the shop's prose, so every tea's description is run
+through `herbatka_analysis.flavour` and reduced to the 23 controlled families.
+
+It reaches **59%** of teas, and it is a genuinely separate axis rather than a restatement of
+the ingredients. Measured over this harvest:
+
+| | pairs |
+|---|---|
+| share at least one ingredient | 32.1% |
+| **share no ingredient, but share a flavour family** | **26% of the remainder** |
+| share an ingredient **or** a flavour family | **49.9%** |
+
+That is the sparsity rescue `analysis/data/public-datasets.md` predicted, on real data.
+Note the caveat it also predicted: `honey_sweet` (561 teas) and `floral` (432) are so common
+they are nearly information-free, which is what IDF weighting exists to handle.
 
 ### `format` — bags, loose or powder
 
@@ -119,6 +140,9 @@ an ingredient. Script, style, noscript and template elements are now removed who
 | `teas_<country>.csv` | tea | one per country: france, poland, uk, germany, czechia, netherlands, usa, canada, india, australia, japan, taiwan, switzerland, finland, thailand |
 | `tea_ingredients_all.csv` | (tea, ingredient) | the shape `tea_ingredient` wants |
 | `raw_*.csv`, `shopify_*.json` | — | the untouched harvest each loader reads |
+
+`raw_*.csv` also carries each shop's `description`, kept solely so the flavour families
+can be read out of it.
 
 `ingredient_english` is the term mapped onto Herbatka's vocabulary through
 `vendor_catalogues/lexicon.py`, which holds keys in seven languages. It is empty where

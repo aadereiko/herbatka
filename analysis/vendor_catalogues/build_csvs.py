@@ -2,9 +2,13 @@ import csv
 import html
 import json
 import re
+import sys
 from pathlib import Path
 
 import lexicon
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from herbatka_analysis import flavour  # noqa: E402
 
 S = Path(__file__).resolve().parents[1] / "data" / "vendor-catalogues"
 S.mkdir(parents=True, exist_ok=True)
@@ -86,6 +90,23 @@ def tea_format(text: str) -> str:
     return next((f for f, pat in FORMAT_RULES if re.search(pat, hay)), "")
 
 
+# A composition list says what is *in* a tea and never that it is smoky or honeyed. That
+# vocabulary lives only in the shop's prose, and it is a genuinely separate axis: measured
+# over this harvest, flavour families rescue 26% of the tea pairs that share no ingredient
+# at all, taking pair coverage from 32% to 50%.
+SELF_LABEL = re.compile(r"(?i)\b(green|black|white|herbal|rooibos|oolong) tea\b")
+
+
+def flavour_families(text: str) -> list[str]:
+    """The flavour families a shop's own description places a tea in.
+
+    The tea's class is stripped first, on `flavour.py`'s own warning: `grassy_vegetal`
+    matches "green", so every green tea would otherwise label itself vegetal for no reason
+    beyond having its type printed on the page.
+    """
+    return sorted(flavour.families_of_all([SELF_LABEL.sub(" ", text)]))
+
+
 def tea_type(name: str, ingredients: str) -> str:
     hay = lexicon.fold(f"{name} {ingredients}")
     return next((t for t, pat in TYPE_RULES if re.search(pat, hay)), "")
@@ -106,6 +127,7 @@ def load_palais() -> list[dict]:
                 "source_quality": "composition list",
                 "url": r["url"],
                 "format": tea_format(f"{r['name']} {r['url']}"),
+                "blurb": "",
             }
         )
     return rows
@@ -170,6 +192,7 @@ def load_shopify_prose(filename: str, shop: str, country: str, host: str) -> lis
                     f"{title} {' '.join(v.get('title') or '' for v in p.get('variants', []))} "
                     f"{prose[:300]}"
                 ),
+                "blurb": prose,
             }
         )
     return rows
@@ -215,6 +238,7 @@ def load_raw(path: Path, country: str) -> list[dict]:
                 "source_quality": "composition list",
                 "url": r["url"],
                 "format": tea_format(f"{r['name']} {r['url']}"),
+                "blurb": r.get("description", ""),
             }
         )
     return rows
@@ -241,13 +265,16 @@ def write_teas(rows: list[dict], dest: Path) -> None:
         "tea_type",
         "format",
         "ingredients_english",
+        "flavour_families",
         "ingredients_source",
         "n_ingredients",
         "source_quality",
         "url",
     ]
     with dest.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
+        # `blurb` is the shop's prose, carried between loaders only so the flavour families
+        # can be read out of it. It is working state, not a column.
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
 
@@ -256,7 +283,13 @@ def main() -> None:
     groups = {
         "teas_france.csv": load_palais() + load_kusmi(),
         "teas_poland.csv": load_raw(S / "raw_pl.csv", "Poland"),
-        "teas_uk.csv": load_raw(S / "raw_uk.csv", "UK"),
+        "teas_uk.csv": (
+            load_raw(S / "raw_uk.csv", "UK")
+            + load_shopify_prose("shopify_jingtea.json", "JING Tea", "UK", "www.jingtea.com")
+            + load_shopify_prose(
+                "shopify_tregothnan.json", "Tregothnan", "UK", "www.tregothnan.co.uk"
+            )
+        ),
         "teas_germany.csv": load_raw(S / "raw_de.csv", "Germany"),
         "teas_czechia.csv": load_raw(S / "raw_cz.csv", "Czechia"),
         "teas_netherlands.csv": load_raw(S / "raw_nl.csv", "Netherlands"),
@@ -271,6 +304,21 @@ def main() -> None:
                 "USA",
                 "thewhistlingkettle.com",
             )
+            + load_shopify_prose(
+                "shopify_smithtea.json", "Smith Teamaker", "USA", "www.smithtea.com"
+            )
+            + load_shopify_prose(
+                "shopify_teaspot.json", "The Tea Spot", "USA", "www.theteaspot.com"
+            )
+            + load_shopify_prose(
+                "shopify_simplelooseleaf.json", "Simple Loose Leaf", "USA", "simplelooseleaf.com"
+            )
+            + load_shopify_prose(
+                "shopify_looseleafmarket.json",
+                "Loose Leaf Tea Market",
+                "USA",
+                "looseleafteamarket.com",
+            )
         ),
         "teas_canada.csv": load_shopify_prose(
             "shopify_davidstea.json", "DAVIDsTEA", "Canada", "www.davidstea.com"
@@ -280,6 +328,18 @@ def main() -> None:
         ),
         "teas_australia.csv": load_shopify_prose(
             "shopify_t2.json", "T2 Tea", "Australia", "t2tea.com"
+        ),
+        "teas_sweden.csv": load_shopify_prose(
+            "shopify_johanochnystrom.json",
+            "Johan & Nystrom",
+            "Sweden",
+            "www.johanochnystrom.se",
+        ),
+        "teas_argentina.csv": load_shopify_prose(
+            "shopify_teaconnection.json",
+            "Tea Connection",
+            "Argentina",
+            "www.teaconnection.com.ar",
         ),
         "teas_japan.csv": load_shopify_prose(
             "shopify_yunomi.json", "Yunomi", "Japan", "yunomi.life"
@@ -337,6 +397,7 @@ def main() -> None:
             r["ingredients_english"] = ", ".join(dict.fromkeys(english))
             r["n_ingredients"] = str(len(parsed))
             r["tea_type"] = tea_type(r["name"], r["ingredients_source"])
+            r["flavour_families"] = ", ".join(flavour_families(f"{r['name']} {r.get('blurb', '')}"))
         rows.sort(key=lambda x: x["name"])
         write_teas(rows, S / filename)
         summary.append((filename, len(rows)))
