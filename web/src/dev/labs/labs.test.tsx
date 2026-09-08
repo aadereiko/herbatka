@@ -48,7 +48,11 @@ test('every tea carries a format or an explicit blank, never undefined', () => {
   expect(teas.every((t) => allowed.has(t.format))).toBe(true)
 })
 
-test('renders the bench with the full catalogue', () => {
+// 20s rather than the 5s default. Not padding: this renders every one of the 2,394 teas in
+// jsdom, which measured 5.7s under a loaded full-suite run and failed on the default while
+// passing in isolation. Paginating to make the test fast would test something the page
+// deliberately does not do.
+test('renders the bench with the full catalogue', { timeout: 20_000 }, () => {
   renderPage()
   expect(screen.getByRole('heading', { name: /data science bench/i })).toBeTruthy()
   expect(screen.getByText(/dev only/i)).toBeTruthy()
