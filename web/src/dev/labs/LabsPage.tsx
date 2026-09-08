@@ -5,6 +5,7 @@ import { Bars } from './Bars'
 import {
   coOccurrence,
   countBy,
+  flagFrequency,
   flavourFrequency,
   generatedOn,
   ingredientFrequency,
@@ -16,7 +17,10 @@ import { TeaTable } from './TeaTable'
 
 /** The empty string already means "any format" in the select, so "the shop did not say"
  *  needs a value of its own rather than a second empty option. */
-const NOT_STATED = '__not_stated' 
+const NOT_STATED = '__not_stated'
+
+/** Same reason as NOT_STATED: "" already means "any quality" in the select. */
+const CLEAN = '__no_flags'
 
 /**
  * The data-science bench: the vendor catalogue harvest, as a page you can interrogate.
@@ -38,6 +42,7 @@ export function LabsPage() {
   const [format, setFormat] = useState('')
   const [query, setQuery] = useState('')
   const [focus, setFocus] = useState('Hibiscus')
+  const [flag, setFlag] = useState('')
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -45,11 +50,12 @@ export function LabsPage() {
       (t) =>
         (!country || t.country === country) &&
         (!format || (format === NOT_STATED ? t.format === '' : t.format === format)) &&
+        (!flag || (flag === CLEAN ? t.flags.length === 0 : t.flags.includes(flag))) &&
         (!needle ||
           t.name.toLowerCase().includes(needle) ||
           t.ingredients.some((i) => i.toLowerCase().includes(needle))),
     )
-  }, [country, format, query])
+  }, [country, format, query, flag])
 
   const byCountry = useMemo(() => countBy(teas, (t) => t.country), [])
   const byFormat = useMemo(
@@ -59,6 +65,9 @@ export function LabsPage() {
   const byType = useMemo(() => countBy(teas, (t) => t.teaType || 'not stated'), [])
   const topIngredients = useMemo(() => ingredientFrequency(filtered, 25), [filtered])
   const topFlavours = useMemo(() => flavourFrequency(teas, 23), [])
+  const flagCounts = useMemo(() => flagFrequency(teas, 12), [])
+  const clean = teas.filter((t) => t.flags.length === 0).length
+  const usable = teas.filter((t) => t.usable).length
   const withFlavour = teas.filter((t) => t.flavours.length > 0).length
   const partners = useMemo(() => coOccurrence(teas, focus, 12), [focus])
 
@@ -85,6 +94,11 @@ export function LabsPage() {
           label="With real percentages"
           value={stats.rowsWithPercentage.toLocaleString()}
           note="the rest are presence only"
+        />
+        <Stat
+          label="Usable for similarity"
+          value={`${Math.round((usable / teas.length) * 100)}%`}
+          note={`${clean.toLocaleString()} carry no quality flag at all`}
         />
         <Stat
           label="From a composition list"
@@ -116,6 +130,15 @@ export function LabsPage() {
             teas get a family and they rescue 27% of the pairs sharing no ingredient
             (coverage 30% → 48%). On shops publishing only a one-line meta description,
             27% get a family and the rescue is ~1%.
+          </p>
+        </Panel>
+        <Panel>
+          <SectionLabel>Quality flags</SectionLabel>
+          <Bars data={flagCounts} />
+          <p className="mt-3 text-xs text-neutral-500">
+            Reasons a row might not be trustworthy — never a verdict, and nothing is dropped
+            on the strength of them. <code>maybe-not-tea</code> is the one that earns its
+            keep: it catches a soap and two books whose blurbs mention peppermint.
           </p>
         </Panel>
         <Panel>
@@ -191,6 +214,20 @@ export function LabsPage() {
             <option value="loose">Loose</option>
             <option value="powder">Powder</option>
             <option value={NOT_STATED}>Not stated</option>
+          </select>
+          <select
+            value={flag}
+            onChange={(e) => setFlag(e.target.value)}
+            aria-label="Quality"
+            className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs"
+          >
+            <option value="">Any quality</option>
+            <option value={CLEAN}>No flags</option>
+            {flagCounts.map((f) => (
+              <option key={f.label} value={f.label}>
+                {f.label}
+              </option>
+            ))}
           </select>
           <span className="text-xs text-neutral-400">
             {filtered.length.toLocaleString()} of {teas.length.toLocaleString()}

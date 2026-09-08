@@ -2,7 +2,15 @@ import { useMemo, useState } from 'react'
 
 import type { VendorTea } from './data'
 
-type SortKey = 'name' | 'shop' | 'country' | 'teaType' | 'format' | 'ingredients' | 'flavours'
+type SortKey =
+  | 'name'
+  | 'shop'
+  | 'country'
+  | 'teaType'
+  | 'format'
+  | 'ingredients'
+  | 'flavours'
+  | 'flags'
 
 const COLUMNS: { key: SortKey; label: string; className: string }[] = [
   { key: 'name', label: 'Tea', className: 'w-[24%]' },
@@ -10,8 +18,9 @@ const COLUMNS: { key: SortKey; label: string; className: string }[] = [
   { key: 'country', label: 'Country', className: 'w-[10%]' },
   { key: 'teaType', label: 'Type', className: 'w-[8%]' },
   { key: 'format', label: 'Format', className: 'w-[8%]' },
-  { key: 'ingredients', label: 'Ingredients', className: 'w-[26%]' },
-  { key: 'flavours', label: 'Flavour', className: 'w-[12%]' },
+  { key: 'ingredients', label: 'Ingredients', className: 'w-[22%]' },
+  { key: 'flavours', label: 'Flavour', className: 'w-[10%]' },
+  { key: 'flags', label: 'Flags', className: 'w-[10%]' },
 ]
 
 /**
@@ -28,7 +37,7 @@ export function TeaTable({ rows }: { rows: VendorTea[] }) {
   const sorted = useMemo(() => {
     const direction = sort.descending ? -1 : 1
     return [...rows].sort((a, b) => {
-      if (sort.key === 'ingredients' || sort.key === 'flavours') {
+      if (sort.key === 'ingredients' || sort.key === 'flavours' || sort.key === 'flags') {
         return (a[sort.key].length - b[sort.key].length) * direction
       }
       return a[sort.key].localeCompare(b[sort.key]) * direction
@@ -90,6 +99,7 @@ export function TeaTable({ rows }: { rows: VendorTea[] }) {
               <td className="px-2 py-1.5 text-neutral-400">
                 {tea.flavours.join(', ').replaceAll('_', ' ') || '—'}
               </td>
+              <td className="px-2 py-1.5 text-neutral-500">{tea.flags.join(', ') || '—'}</td>
             </tr>
           ))}
         </tbody>

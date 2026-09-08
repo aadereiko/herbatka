@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 
 import { ThemeProvider } from '../../components/ui/theme'
 import { AuthProvider } from '../../features/auth/AuthProvider'
-import { coOccurrence, countBy, flavourFrequency, teas } from './data'
+import { coOccurrence, countBy, flagFrequency, flavourFrequency, teas } from './data'
 import { LabsPage } from './LabsPage'
 
 afterEach(cleanup)
@@ -115,6 +115,27 @@ test('flavour families are a real second axis, not a copy of ingredients', () =>
   }
   expect(orthogonal).toBeGreaterThan(0)
   expect(rescued / orthogonal).toBeGreaterThan(0.1)
+})
+
+test('quality flags describe doubt without deciding anything', () => {
+  // Flags must be the exception. Including provenance facts like "came from prose" once
+  // flagged 98% of rows, which makes the column worthless — this is the guard against that.
+  const flagged = teas.filter((t) => t.flags.length > 0)
+  expect(flagged.length / teas.length).toBeLessThan(0.4)
+  expect(flagged.length).toBeGreaterThan(0)
+
+  // Nothing is dropped for being flagged: flagged rows are still in the dataset, and some
+  // are still usable — "duplicate-name" says nothing about whether the data is good.
+  expect(flagged.some((t) => t.usable)).toBe(true)
+
+  // A row with no ingredients and no flavour cannot contribute to similarity, by definition.
+  for (const tea of teas) {
+    if (tea.ingredients.length === 0 && tea.flavours.length === 0) {
+      expect(tea.usable).toBe(false)
+      expect(tea.flags).toContain('no-signal')
+    }
+  }
+  expect(flagFrequency(teas, 3).length).toBe(3)
 })
 
 test('countBy totals match the row count', () => {

@@ -152,6 +152,35 @@ markup but not the *text inside* a script element — and Simon Lévelt's inline
 Manager sits right after the ingredients block, so `var f d getelementsbytagname` parsed as
 an ingredient. Script, style, noscript and template elements are now removed whole first.
 
+## Data quality: `quality_flags` and `usable_for_similarity`
+
+Nothing is dropped for being doubtful. Two columns record doubt instead, so a notebook can
+decide and *say what it decided* rather than inheriting a filter made upstream.
+
+`usable_for_similarity` is the column to filter on — `yes` when a tea has two ingredients or
+one flavour family, which is the least that can distinguish it from any other tea. **91%** of
+rows qualify.
+
+`quality_flags` is why a row is doubtful. **77% of rows carry none.**
+
+| flag | rows | what it means |
+|---|---|---|
+| `single-ingredient` | 287 | correct for a single-origin Darjeeling, near-useless for similarity — it can only match every other tea sharing that leaf |
+| `non-latin-name` | 181 | Japanese, Thai or Korean in the name; matching by name will not work |
+| `maybe-not-tea` | 139 | the name says book, soap, mug, teapot… |
+| `maybe-multi-tea` | 112 | "Selection Box", "Assortment" — the ingredients may belong to several teas |
+| `no-signal` | 108 | no ingredients *and* no flavour family; nothing to model on |
+| `duplicate-name` | 73 | the same name is sold by more than one shop |
+| `no-ingredients` | 33 | no ingredients, but a flavour family survives |
+
+`maybe-not-tea` is the flag that earns its place. Dilmah sells books and Ceylon T Store sells
+soap, and their blurbs mention peppermint — so *Fascinating Lichens of Sri Lanka-Book* was
+sitting in the data with `Peppermint, Aniseed` as its recipe.
+
+Deliberately **not** flagged: an empty `format`, `tea_type` or `flavour_families`, and
+ingredients having come from prose. All four are already legible in their own columns, and
+including them flagged 98% of rows — a flag on everything says nothing.
+
 ## Files
 
 | File | One row per | Notes |

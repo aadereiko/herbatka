@@ -33,6 +33,7 @@ COUNTRY_FILES = {
 def main() -> None:
     ingredient_index: dict[str, int] = {}
     flavour_index: dict[str, int] = {}
+    flag_index: dict[str, int] = {}
     shop_index: dict[tuple[str, str], int] = {}
     teas: list[list] = []
 
@@ -49,6 +50,9 @@ def main() -> None:
             fams = [f.strip() for f in r["flavour_families"].split(",") if f.strip()]
             for f in fams:
                 flavour_index.setdefault(f, len(flavour_index))
+            flags = [f.strip() for f in r["quality_flags"].split(";") if f.strip()]
+            for f in flags:
+                flag_index.setdefault(f, len(flag_index))
             teas.append(
                 [
                     r["name"],
@@ -57,6 +61,8 @@ def main() -> None:
                     r["format"],
                     sorted({ingredient_index[n] for n in names}),
                     sorted({flavour_index[f] for f in fams}),
+                    sorted({flag_index[f] for f in flags}),
+                    r["usable_for_similarity"] == "yes",
                     r["source_quality"] == "composition list",
                     r["url"],
                 ]
@@ -77,12 +83,15 @@ def main() -> None:
             "format",
             "ingredients",
             "flavours",
+            "flags",
+            "usable",
             "hasCompositionList",
             "url",
         ],
         "shops": [{"name": s, "country": c} for s, c in shop_index],
         "ingredients": list(ingredient_index),
         "flavours": list(flavour_index),
+        "flags": list(flag_index),
         "teas": teas,
         "stats": {
             "ingredientRows": len(rows),

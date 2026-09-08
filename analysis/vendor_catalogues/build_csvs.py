@@ -1,3 +1,4 @@
+import collections
 import csv
 import html
 import json
@@ -56,8 +57,16 @@ SHOP_SUFFIX = re.compile(
 TRAILING_SIZE = re.compile(r"(?i),?\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|szt|ks|st[uü]ck|pcs)\b\.?$")
 
 
+# Adagio titles its pages for search, not for people: "Lemongrass Tea | Southeast Asian
+# Citrus Herbal Tea | Adagio Teas", "… | Buy Online | Free Shipping Over $49". Everything
+# from the first pipe onward is marketing, and the same is true of the format suffix other
+# shops put there ("… 20x2g | PIRAMIDKI").
+PIPE_TAIL = re.compile(r"\s*\|.*$")
+
+
 def clean_name(raw: str) -> str:
-    name = SHOP_SUFFIX.sub("", raw)
+    name = PIPE_TAIL.sub("", raw)
+    name = SHOP_SUFFIX.sub("", name)
     name = re.sub(r"®|™", "", name)
     return TRAILING_SIZE.sub("", name).strip(" ,-|")
 
@@ -298,6 +307,64 @@ def load_raw_prose(filename: str, shop: str, country: str) -> list[dict]:
     return rows
 
 
+# Words that mean a row may not be one tea. Deliberately *flags* rather than filters: "Apple
+# Strudel Tea Bag Gift" is a single tea in a gift wrapper, "Black Tea Selection Box" is five
+# teas whose ingredients belong to none of them, and no pattern separates those two honestly.
+MAYBE_MULTI_TEA = re.compile(
+    r"(?i)\b(?:selection|collection|sampler|assortment|advent|starter set|discovery|"
+    r"variety|d[aá]rkov\w*|zestaw|probier\w*|proefpakket)\b"
+)
+#: Things a tea shop sells that are not tea. Dilmah sells books; several sell teaware.
+MAYBE_NOT_TEA = re.compile(
+    r"(?i)\b(?:book|poster|calendar|mug|cup|teapot|strainer|infuser|tray|spoon|candle|soap|"
+    r"apron|voucher|t-?shirt|kettle|timer|scoop|caddy)\b"
+)
+NON_LATIN = re.compile(r"[\u3000-\u9fff\u0e00-\u0e7f\uac00-\ud7af\u0400-\u04ff]")
+
+
+def quality_flags(row: dict, duplicate_names: set[str]) -> list[str]:
+    """Why this row might not be trustworthy — never a verdict, always a reason.
+
+    Nothing is dropped on the strength of these. They exist so a notebook can say
+    `df[~df.quality_flags.str.contains("maybe-multi-tea")]` and know exactly what it excluded,
+    instead of a filter having quietly made that choice upstream.
+    """
+    ingredients = [i for i in row["ingredients_english"].split(",") if i.strip()]
+    flags = []
+    # Deliberately not flagged here: an empty `format`, `tea_type` or `flavour_families`, and
+    # the fact that ingredients came from prose. Those are already legible in their own
+    # columns, and including them flagged 98% of rows — a flag on everything says nothing.
+    if not ingredients and not row["flavour_families"].strip():
+        flags.append("no-signal")
+    elif not ingredients:
+        flags.append("no-ingredients")
+    elif len(ingredients) == 1:
+        # Correct for a single-origin Darjeeling, and near-useless for similarity: it can
+        # only ever match every other tea sharing that one leaf.
+        flags.append("single-ingredient")
+    if MAYBE_MULTI_TEA.search(row["name"]):
+        flags.append("maybe-multi-tea")
+    if MAYBE_NOT_TEA.search(row["name"]):
+        flags.append("maybe-not-tea")
+    if NON_LATIN.search(row["name"]):
+        flags.append("non-latin-name")
+    if row["name"].strip().casefold() in duplicate_names:
+        flags.append("duplicate-name")
+    return flags
+
+
+def usable_for_similarity(row: dict) -> str:
+    """Can this row contribute to a similarity model at all?
+
+    The bar is two ingredients or one flavour family — anything less can only say "is a tea",
+    which every row already says. This is the column to filter on; `quality_flags` is the
+    column that explains why a row failed.
+    """
+    ingredients = [i for i in row["ingredients_english"].split(",") if i.strip()]
+    has_flavour = bool(row["flavour_families"].strip())
+    return "yes" if len(ingredients) >= 2 or has_flavour else "no"
+
+
 def keep_in_summary(term: str, mapped: str, noise: bool) -> bool:
     """Does this ingredient belong in the tea's `ingredients_english` summary?
 
@@ -320,6 +387,8 @@ def write_teas(rows: list[dict], dest: Path) -> None:
         "format",
         "ingredients_english",
         "flavour_families",
+        "usable_for_similarity",
+        "quality_flags",
         "ingredients_source",
         "n_ingredients",
         "source_quality",
@@ -442,7 +511,7 @@ def main() -> None:
 
     ingredient_rows = []
     summary = []
-    for filename, rows in groups.items():
+    for rows in groups.values():
         for r in rows:
             parsed = lexicon.parse(r["ingredients_source"])
             english = []
@@ -470,6 +539,19 @@ def main() -> None:
             r["n_ingredients"] = str(len(parsed))
             r["tea_type"] = tea_type(r["name"], r["ingredients_source"])
             r["flavour_families"] = ", ".join(flavour_families(f"{r['name']} {r.get('blurb', '')}"))
+
+    # Duplicate names are only visible across the whole harvest — the same Genmaicha sold by
+    # five shops sits in five different country files — so flagging waits until every row of
+    # every group has its fields.
+    seen: collections.Counter[str] = collections.Counter(
+        r["name"].strip().casefold() for rows in groups.values() for r in rows
+    )
+    duplicate_names = {name for name, count in seen.items() if count > 1}
+
+    for filename, rows in groups.items():
+        for r in rows:
+            r["quality_flags"] = "; ".join(quality_flags(r, duplicate_names))
+            r["usable_for_similarity"] = usable_for_similarity(r)
         rows.sort(key=lambda x: x["name"])
         write_teas(rows, S / filename)
         summary.append((filename, len(rows)))

@@ -10,6 +10,8 @@ export type VendorTea = {
   format: TeaFormat
   ingredients: string[]
   flavours: string[]
+  flags: string[]
+  usable: boolean
   hasCompositionList: boolean
   url: string
 }
@@ -19,13 +21,14 @@ type Payload = {
   shops: { name: string; country: string }[]
   ingredients: string[]
   flavours: string[]
+  flags: string[]
   /** Positional, to keep the bundle small — see `schema` in the JSON. */
-  teas: [string, number, string, string, number[], number[], boolean, string][]
+  teas: [string, number, string, string, number[], number[], number[], boolean, boolean, string][]
   stats: { ingredientRows: number; rowsWithPercentage: number; distinctIngredients: number }
 }
 
 // TypeScript widens every row of the imported JSON to `(string | number | boolean |
-// number[])[]` — it cannot see that each is a fixed 8-tuple — so the assertion has to go
+// number[])[]` — it cannot see that each is a fixed 10-tuple — so the assertion has to go
 // through `unknown`. The shape is guaranteed by `analysis/vendor_catalogues/export_for_web.py`,
 // which writes the `schema` field beside the rows to say what the positions mean.
 const payload = raw as unknown as Payload
@@ -43,6 +46,8 @@ export const teas: VendorTea[] = payload.teas.map(
     format,
     ingredientIndexes,
     flavourIndexes,
+    flagIndexes,
+    usable,
     hasCompositionList,
     url,
   ]) => ({
@@ -53,6 +58,8 @@ export const teas: VendorTea[] = payload.teas.map(
     format: format as TeaFormat,
     ingredients: ingredientIndexes.map((i) => payload.ingredients[i]),
     flavours: flavourIndexes.map((i) => payload.flavours[i]),
+    flags: flagIndexes.map((i) => payload.flags[i]),
+    usable,
     hasCompositionList,
     url,
   }),
@@ -77,6 +84,10 @@ export function ingredientFrequency(rows: VendorTea[], limit: number) {
 
 export function flavourFrequency(rows: VendorTea[], limit: number) {
   return frequency(rows, (t) => t.flavours, limit)
+}
+
+export function flagFrequency(rows: VendorTea[], limit: number) {
+  return frequency(rows, (t) => t.flags, limit)
 }
 
 function frequency(rows: VendorTea[], pick: (t: VendorTea) => string[], limit: number) {
