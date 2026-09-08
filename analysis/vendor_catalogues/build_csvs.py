@@ -113,7 +113,8 @@ def load_palais() -> list[dict]:
 
 NOT_A_TEA_PRODUCT = re.compile(
     r"(?i)\b(?:bundle|sampler|gift set|gift box|advent|teaware|infuser|kettle|mug|teapot|"
-    r"tin only|merch|card|subscription)\b"
+    r"tin only|merch|card|subscription|teepurkki|joulukalenteri|kalenteri|purkki|"
+    r"mok|becher|tasse)\b"
 )
 
 
@@ -150,6 +151,10 @@ def load_shopify_prose(filename: str, shop: str, country: str, host: str) -> lis
                 found.append(name)
         # One match is usually just the word "tea" in a sentence, not a recipe.
         if len(found) < 2:
+            continue
+        # Shops that sell coffee beside tea reach this loader too — Sirocco's espresso
+        # descriptions name cinnamon and cocoa and would otherwise pass as blends.
+        if NOT_TEA.search(prose):
             continue
         rows.append(
             {
@@ -259,6 +264,13 @@ def main() -> None:
             load_shopify_prose("shopify_harney.json", "Harney & Sons", "USA", "www.harney.com")
             + load_shopify_prose("shopify_rishi.json", "Rishi Tea", "USA", "rishi-tea.com")
             + load_shopify_prose("shopify_artoftea.json", "Art of Tea", "USA", "www.artoftea.com")
+            + load_shopify_prose("shopify_teaforte.json", "Tea Forte", "USA", "teaforte.com")
+            + load_shopify_prose(
+                "shopify_whistlingkettle.json",
+                "The Whistling Kettle",
+                "USA",
+                "thewhistlingkettle.com",
+            )
         ),
         "teas_canada.csv": load_shopify_prose(
             "shopify_davidstea.json", "DAVIDsTEA", "Canada", "www.davidstea.com"
@@ -268,6 +280,21 @@ def main() -> None:
         ),
         "teas_australia.csv": load_shopify_prose(
             "shopify_t2.json", "T2 Tea", "Australia", "t2tea.com"
+        ),
+        "teas_japan.csv": load_shopify_prose(
+            "shopify_yunomi.json", "Yunomi", "Japan", "yunomi.life"
+        ),
+        "teas_taiwan.csv": load_shopify_prose(
+            "shopify_ecocha.json", "Eco-Cha", "Taiwan", "eco-cha.com"
+        ),
+        "teas_switzerland.csv": load_shopify_prose(
+            "shopify_sirocco.json", "Sirocco", "Switzerland", "sirocco.ch"
+        ),
+        "teas_finland.csv": load_shopify_prose(
+            "shopify_nordqvist.json", "Nordqvist", "Finland", "www.nordqvist.fi"
+        ),
+        "teas_thailand.csv": load_shopify_prose(
+            "shopify_chaidim.json", "Chaidim", "Thailand", "www.chaidim.com"
         ),
     }
 
