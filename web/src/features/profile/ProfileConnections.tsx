@@ -6,25 +6,9 @@ import { EntityImage } from '../../components/ui/image'
 import { Badge, Panel } from '../../components/ui/page'
 import type { ProfileHousehold, ProfilePerson, PublicProfile } from '../../lib/profile'
 
-type FriendState = PublicProfile['friend_state']
+import { worthShowing } from './connections-visibility'
 
-/**
- * Whether a panel has anything to say at all.
- *
- * Empty and absent are two different answers here, and telling them apart is most of the
- * work. The server has already applied the visibility rule before the lists reach us — see
- * `lib/profile.ts` — so an empty list on a stranger's profile does not mean "they have
- * none", it means "none that you may see", which is a fact about you rather than about
- * them and is not worth a box on their page. An empty list on your own profile or on a
- * friend's is the real answer, and saying it out loud is the point.
- *
- * Note what this does *not* do: work out what was filtered. It cannot. The browser is
- * never told what it was not allowed to see, and a second opinion computed here could
- * only ever disagree with the one that matters.
- */
-function worthShowing(count: number, state: FriendState): boolean {
-  return count > 0 || state === 'self' || state === 'friends'
-}
+type FriendState = PublicProfile['friend_state']
 
 /**
  * One household, at profile distance: its picture, its name, and whether you are in it.
@@ -210,8 +194,14 @@ function FriendsPanel({
  *
  * Two panels rather than one list because they answer different questions and one of them
  * is actionable — a household you share is somewhere you can go, a household you do not is
- * only a name. They sit below the reviews and share a row at `sm`, which is the whole
- * statement of their importance: the reviews are why anybody opened the page.
+ * only a name.
+ *
+ * **Stacked, not side by side, and friends first.** They used to share a row under the
+ * reviews with households leading. They now sit in the page's narrow column, which states
+ * their importance more plainly than a half-width row did: the reviews are why anybody
+ * opened the page. Friends leads because it is the one a visitor can act on from here —
+ * every row is a person whose profile you can open — where half the households on a
+ * stranger's profile are names you are deliberately not allowed to follow.
  *
  * Both can vanish entirely, and for a signed-out visitor both always do. That is the
  * difference this component exists to get right: an empty box on a stranger's profile
@@ -226,12 +216,12 @@ export function ProfileConnections({ profile }: { profile: PublicProfile }) {
   if (!showHouseholds && !showFriends) return null
 
   return (
-    <div className="mt-6 grid gap-4 sm:grid-cols-2">
-      {showHouseholds && (
-        <HouseholdsPanel households={households} state={state} name={profile.display_name} />
-      )}
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
       {showFriends && (
         <FriendsPanel friends={friends} state={state} name={profile.display_name} />
+      )}
+      {showHouseholds && (
+        <HouseholdsPanel households={households} state={state} name={profile.display_name} />
       )}
     </div>
   )

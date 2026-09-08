@@ -2,14 +2,20 @@ from pydantic import BaseModel
 
 from app.schemas.catalog import TeaSummary
 from app.schemas.friend import FeedItem, HouseholdRef
-from app.schemas.household import StockItem
+from app.schemas.household import StockItem, StockPace
 
 
 class LowTin(BaseModel):
-    """A tin running out, and which shelf it is on."""
+    """A tin worth reordering, which shelf it is on, and how long it has left.
+
+    `pace` is None when the ledger cannot forecast this tin yet — it is on the list
+    because it fell below its hand-set threshold, and the client has to say exactly that
+    rather than imply a deadline nobody computed.
+    """
 
     item: StockItem
     household: HouseholdRef
+    pace: StockPace | None
 
 
 class HomeSummary(BaseModel):

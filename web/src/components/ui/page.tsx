@@ -7,8 +7,10 @@ import type { User } from '../../lib/api'
 import { useIncomingRequestCount } from '../../features/friend/queries'
 import { useIncomingInvitationCount } from '../../features/household/queries'
 import { Avatar } from './avatar'
+import { TeaBranch, TeaSprigMark, TeapotMark } from './botanical'
 import { Button } from './button'
 import { Menu, MenuButton, MenuLink } from './menu'
+import { ThemeToggle } from './theme'
 
 /**
  * A nav entry, and the one place in the app where "where am I" is worth shouting.
@@ -24,9 +26,12 @@ import { Menu, MenuButton, MenuLink } from './menu'
  * `NavLink` sets `aria-current="page"` regardless, so it is not carried by colour alone.
  */
 function navClass({ isActive }: { isActive: boolean }): string {
-  return isActive
-    ? 'btn btn-md btn-current font-semibold'
-    : 'btn btn-md btn-quiet'
+  // `btn-sm` below `sm` and `btn-md` from there up. The bar carries one more control than
+  // it used to — the theme toggle — and at 390px the four items measured 366px against
+  // 304px of room, so it wrapped onto two lines. Everything here is a step in getting it
+  // back onto one; see the note on the `<nav>` for the arithmetic.
+  const shape = 'btn btn-sm sm:btn-md text-xs uppercase tracking-wide'
+  return isActive ? `${shape} btn-current font-semibold` : `${shape} btn-quiet font-medium`
 }
 
 /**
@@ -126,7 +131,10 @@ function AccountMenu({ user }: { user: User }) {
       align="right"
       triggerTestId="account-menu"
       menuTestId="account-menu-items"
-      triggerClassName="max-w-40"
+      // Caps are on the shared `Menu` trigger for the nav's sake, and undone here: this
+      // trigger contains a *person's name*, and shouting somebody's name at them is not a
+      // design decision. Exactly the trap `btn-primary` documents for the same reason.
+      triggerClassName="max-w-40 normal-case tracking-normal"
       trigger={
         <>
           <Avatar
@@ -177,11 +185,13 @@ function AccountMenu({ user }: { user: User }) {
  * reason to use it over `Link`. The wordmark points at /teas for a signed-out visitor:
  * sending someone to a sign-in screen for clicking a logo is a small betrayal.
  *
- * The row is `🍵 Herbatka … Activity Households Friends[badge] Catalog ▾ … [avatar] Name ▾`
- * signed in, and `🍵 Herbatka … Catalog ▾ Sign in` signed out. Activity leads because it
- * is the thing that changes without you; everything after it is somewhere you go on
- * purpose. RequireAuth guards the routes themselves — this ordering is tidiness, not
- * security.
+ * The row is `[sign] Herbatka … Households Friends[badge] Catalog ▾ … ☾ [avatar] Name ▾`
+ * signed in, and `[sign] Herbatka … Catalog ▾ ☾ Sign in` signed out. Activity used to lead
+ * it and no longer exists as a page: the home page carries the head of that timeline, and
+ * a nav entry pointing at a fuller version of what the landing page already shows was one
+ * click to see the same thing again. The lamp switch is last in both, outside the
+ * collapsing group. RequireAuth guards the routes themselves — this ordering is tidiness,
+ * not security.
  *
  * **Below `sm`** the four primary entries collapse behind a hamburger and stack full
  * width, while the wordmark and the account menu stay on the bar. Two reasons for that
@@ -210,85 +220,119 @@ function SiteNav() {
   }
 
   return (
-    // A band one step off the ground with a single 1px rule under it. It was a 3px ink
-    // underline and a drop shadow, which is what a wooden beam needs; this design draws
-    // every boundary in the app with the same hairline and the bar is not an exception.
-    <header className="border-b border-brand-200 bg-brand-100 dark:border-neutral-800 dark:bg-neutral-900">
-      <nav
-        aria-label="Main"
-        className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:px-6"
-      >
-        <Link
-          to={user ? '/' : '/teas'}
-          className="mr-auto flex items-center gap-2 text-lg font-bold text-brand-900 dark:text-brand-50"
-        >
-          <span
-            role="img"
-            aria-label="teacup"
-            // The cup gets a square tile of its own. It is the app's only logo, and a
-            // bare emoji beside bold text reads as a stray character. Square rather than
-            // the round coaster it was: a circle is the one shape this design does not
-            // own, and the wordmark is the last place to make an exception.
-            className="grid size-8 place-items-center border border-brand-800/60 bg-white text-base dark:border-neutral-700 dark:bg-neutral-800"
+    // Two rows, both pinned: a thin strip of secondary links and the bar proper.
+    //
+    // There was a third — a green band carrying the app's one line of copy — and it is
+    // gone. A coloured strip that says the same sentence on every screen is one people
+    // learn to stop seeing, and it was costing 32px of pinned height on every page to do
+    // it. The home page still says the same thing, once, where somebody is actually
+    // reading.
+    //
+    // `z-30` clears the page content and the `Menu` panels that hang off the bar.
+    <header data-testid="site-header" className="sticky top-0 z-30">
+      {/* Hidden below `sm`. Both rows are pinned, so every pixel here is a pixel of phone
+          screen the reader never gets back — and both of these links are also in the
+          Catalog menu one row down, so nothing is actually lost. */}
+      <div className="hidden border-b border-brand-100 bg-white dark:border-neutral-800 dark:bg-neutral-900 sm:block">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-5 px-4 py-1.5 sm:px-6">
+          <Link
+            to="/ingredients"
+            className="text-xs text-neutral-500 hover:text-brand-900 dark:text-neutral-400 dark:hover:text-brand-100"
           >
-            🍵
-          </span>
-          Herbatka
-        </Link>
-
-        {user && (
-          <button
-            type="button"
-            data-testid="nav-toggle"
-            aria-expanded={open}
-            aria-controls="nav-primary"
-            onClick={() => setOpen((value) => !value)}
-            className="btn btn-sm btn-secondary text-lg leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:hidden"
+            Ingredients
+          </Link>
+          <Link
+            to="/shops"
+            className="text-xs text-neutral-500 hover:text-brand-900 dark:text-neutral-400 dark:hover:text-brand-100"
           >
-            <span aria-hidden="true">☰</span>
-            <span className="sr-only">Menu</span>
-          </button>
-        )}
-
-        <div
-          id="nav-primary"
-          data-testid="nav-primary"
-          // Signed out this group is one entry with no hamburger to reveal it, so it is
-          // never collapsed and never reordered — the mobile machinery is for the four.
-          className={
-            user
-              ? `${open ? 'flex' : 'hidden'} order-last w-full basis-full flex-col items-stretch gap-1 sm:order-none sm:flex sm:w-auto sm:basis-auto sm:flex-row sm:items-center sm:gap-2`
-              : 'flex items-center gap-2'
-          }
-        >
-          {user && (
-            <NavLink to="/feed" className={navClass} data-testid="nav-feed">
-              Activity
-            </NavLink>
-          )}
-          {user && (
-            <NavLink to="/households" className={navClass} data-testid="nav-households">
-              Households
-              <InvitationsBadge />
-            </NavLink>
-          )}
-          {user && (
-            <NavLink to="/friends" className={navClass} data-testid="nav-friends">
-              Friends
-              <IncomingBadge />
-            </NavLink>
-          )}
-          <CatalogMenu />
+            Shops
+          </Link>
         </div>
+      </div>
 
-        {user ? (
-          <AccountMenu user={user} />
-        ) : (
-          <NavLink to="/login" className={navClass} data-testid="nav-sign-in">
-            Sign in
-          </NavLink>
-        )}
-      </nav>
+      <div className="border-b border-brand-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+        <nav
+          aria-label="Main"
+          // Three columns rather than a flex row with auto margins: the middle one is
+          // *centred in the page*, not centred in whatever space the other two leave, and
+          // those are different layouts the moment the wordmark and the account menu are
+          // different widths — which they always are, because one of them is a person's
+          // name. Below `lg` it collapses to the old two-row behaviour.
+          className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:px-6 lg:grid lg:grid-cols-[1fr_auto_1fr]"
+        >
+          <Link
+            to={user ? '/' : '/teas'}
+            className="mr-auto flex items-center gap-2.5 text-brand-900 dark:text-brand-50 lg:mr-0"
+          >
+            <span
+              aria-hidden="true"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-leaf-200 sm:size-9"
+            >
+              <TeaSprigMark className="size-5 text-leaf-700 sm:size-6" />
+            </span>
+            {/* The wordmark wears the heading serif, mixed case.
+                
+                It was the body sans in tracked caps, which is the same treatment the nav
+                entries beside it get — so the shop's name read as one more UI label
+                rather than as a mark. Putting it in the display face and dropping the
+                caps is what separates the two: everything else on this bar is a control,
+                and this is the only thing that is a name. */}
+            <span className="font-heading text-lg font-semibold tracking-tight sm:text-xl">
+              Herbatka
+            </span>
+          </Link>
+
+          {user && (
+            <button
+              type="button"
+              data-testid="nav-toggle"
+              aria-expanded={open}
+              aria-controls="nav-primary"
+              onClick={() => setOpen((value) => !value)}
+              className="btn btn-sm btn-secondary text-lg leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:hidden"
+            >
+              <span aria-hidden="true">☰</span>
+              <span className="sr-only">Menu</span>
+            </button>
+          )}
+
+          <div
+            id="nav-primary"
+            data-testid="nav-primary"
+            className={
+              user
+                ? `${open ? 'flex panel-in' : 'hidden'} order-last w-full basis-full flex-col items-stretch gap-1 border-t border-brand-100 pt-2 dark:border-neutral-800 lg:order-none lg:flex lg:w-auto lg:basis-auto lg:flex-row lg:items-center lg:gap-1 lg:border-0 lg:pt-0`
+                : 'flex items-center gap-1'
+            }
+          >
+            {user && (
+              <NavLink to="/households" className={navClass} data-testid="nav-households">
+                Households
+                <InvitationsBadge />
+              </NavLink>
+            )}
+            {user && (
+              <NavLink to="/friends" className={navClass} data-testid="nav-friends">
+                Friends
+                <IncomingBadge />
+              </NavLink>
+            )}
+            <CatalogMenu />
+          </div>
+
+          <span className="flex items-center justify-end gap-1">
+            <ThemeToggle />
+            {user ? (
+              <AccountMenu user={user} />
+            ) : (
+              <NavLink to="/login" className={navClass} data-testid="nav-sign-in">
+                Sign in
+              </NavLink>
+            )}
+          </span>
+        </nav>
+      </div>
+
     </header>
   )
 }
@@ -301,7 +345,7 @@ export function PageShell({ children }: { children: ReactNode }) {
   return (
     <div className="page-ground min-h-dvh">
       <SiteNav />
-      <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>
     </div>
   )
 }
@@ -359,7 +403,12 @@ export type PanelTone = 'surface' | 'inset'
  * tea house and means nothing now.
  */
 const PANEL_TONES: Record<PanelTone, string> = {
-  surface: 'border-brand-200 bg-white dark:border-neutral-700 dark:bg-neutral-900',
+  // Paper. `paper-grain` is the only thing new here and it is one word: the utility puts
+  // a masked noise tile behind the content on a `::before`, which is why thirteen card
+  // components gained a texture without any of them gaining an element.
+  surface: 'paper-grain border-brand-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900',
+  // Timber: the shelf the paper is lying on. No grain — this tone is almost always
+  // *behind* something, and two textures stacked read as dirt rather than as depth.
   inset: 'border-brand-300/70 bg-brand-50 dark:border-neutral-700 dark:bg-neutral-950',
 }
 
@@ -383,12 +432,13 @@ export function Panel({
     <Tag
       aria-label={ariaLabel}
       data-testid={testId}
-      // `rounded-2xl` and `shadow-sm` still stand here and in the twelve other card
-      // components, and both now resolve to nothing — the radius tokens are zero and the
-      // shadow tokens are transparent. Left in place on purpose: stripping dead classes
-      // out of thirteen files is a diff with no pixels in it, and the day somebody wants
-      // a corner back, one token brings all thirteen with it.
-      className={`rounded-2xl border p-4 shadow-sm ${PANEL_TONES[tone]} sm:p-6 ${className}`}
+      // `rounded-2xl` and `shadow-sm` were dead classes under the previous design — every
+      // radius token was 0 and every shadow token transparent — and were kept anyway, on
+      // the argument that the day somebody wanted a corner back, one token would bring all
+      // thirteen call sites with it. That day is this one: the radius tokens are small
+      // again and the shadows are a short warm cast, so these two words now do the work
+      // that thirteen files would otherwise have had to be edited to do.
+      className={`rounded-2xl border p-4 ${PANEL_TONES[tone]} sm:p-6 ${className}`}
     >
       {children}
     </Tag>
@@ -397,9 +447,11 @@ export function Panel({
 
 export type BadgeTone = 'brand' | 'neutral' | 'amber' | 'rose'
 
-/** Square chips with a 1px edge, like every other boundary in the app. They were 18px
- *  pills at 1.5px; a rounded badge is the one shape the reference never draws, and a tea
- *  card wears four of these at once so the shape is not a detail. */
+/** Pills with a 1px edge. They were square, which suited a design drawn with a ruler and
+ *  a pen; nothing else in this one has a hard corner any more, and a tea card wears four
+ *  of these at once, so a square badge was four hard corners per card against a page with
+ *  none. `rounded-full` rather than a token step: a badge is two lines of text tall, and
+ *  at that height anything short of a full round reads as a mistake. */
 const BADGE_TONES: Record<BadgeTone, string> = {
   brand: 'border-brand-300/60 bg-brand-100 text-brand-800 dark:border-brand-700 dark:bg-brand-900 dark:text-brand-100',
   neutral:
@@ -417,7 +469,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-block border px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}
+      className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}
     >
       {children}
     </span>
@@ -455,7 +507,7 @@ export function LoadingGrid({
       {Array.from({ length: count }, (_, index) => (
         <div
           key={index}
-          className="space-y-3 rounded-2xl border border-brand-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+          className="paper-grain space-y-3 rounded-2xl border border-brand-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
         >
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-4 w-2/3" />
@@ -481,8 +533,13 @@ export function EmptyState({
       // An empty tray rather than an empty card: timber under a chunky dashed edge, so
       // "there is nothing here yet" looks like a place waiting for something rather than
       // like a card that failed to load.
-      className="rounded-2xl border border-dashed border-brand-300 bg-brand-50 p-8 text-center dark:border-neutral-600 dark:bg-neutral-900"
+      className="rounded-2xl border border-dashed border-brand-300 bg-brand-50 p-8 text-center dark:border-neutral-600 dark:bg-neutral-950"
     >
+      {/* A pot left out on the empty shelf. The one drawing in the app that appears
+          because there is *nothing* to show, which is the place the brief asks
+          illustration to go — the empty space, not behind the paragraphs. Faint on
+          purpose: it is furniture, and the sentence under it is the message. */}
+      <TeapotMark className="mx-auto mb-3 h-12 w-14 text-brand-300 opacity-60" />
       <p className="text-base font-semibold text-brand-900 dark:text-brand-100">{title}</p>
       {children && (
         <div className="mt-2 space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
@@ -534,5 +591,85 @@ export function Pagination({
         Next →
       </Button>
     </nav>
+  )
+}
+
+/**
+ * A small stamped heading for a band of the page: `FEATURED TEAS`, `WELL THOUGHT OF`.
+ *
+ * The app already had eighteen letterspaced small-caps eyebrows written by hand as
+ * `text-xs uppercase tracking-wide`, which is why this component takes that exact recipe
+ * rather than inventing a new one — it is the existing mark, named, plus the short rule
+ * that turns a label into a section boundary.
+ *
+ * `as` exists because half the places that want this are a real heading in the document
+ * outline and half are a caption over a list that already has one. Rendering an `<h2>`
+ * for the second kind would put a heading in the outline that says "PRICE".
+ */
+export function SectionLabel({
+  children,
+  as: Tag = 'h2',
+  action,
+}: {
+  children: ReactNode
+  as?: 'h2' | 'h3' | 'p'
+  /** A link to the right of the label — "All activity →". */
+  action?: ReactNode
+}) {
+  return (
+    <div className="mb-3 flex items-baseline justify-between gap-3">
+      <Tag className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+        {children}
+        <span
+          aria-hidden="true"
+          className="h-px w-8 bg-brand-200 dark:bg-neutral-700"
+        />
+      </Tag>
+      {action}
+    </div>
+  )
+}
+
+/**
+ * A cut branch lying across the seam between two bands of a page.
+ *
+ * Decoration, and the only piece in the app that exists purely to separate. It earns its
+ * place on the long editorial pages — the signed-out home, a profile — and nowhere else;
+ * a divider between every two elements is a page with a rash.
+ *
+ * `hidden sm:block` is not a detail. The brief is explicit that architectural decoration
+ * is the first thing to go on a phone, and a 130px-wide drawing centred in a 320px column
+ * is a third of the screen spent on a garnish.
+ */
+export function SectionDivider() {
+  return (
+    <div aria-hidden="true" className="my-8 hidden items-center gap-4 sm:flex">
+      <span className="h-px flex-1 bg-gradient-to-r from-transparent to-brand-200 dark:to-neutral-800" />
+      <TeaBranch className="h-9 w-16 shrink-0 text-leaf-600 opacity-70" />
+      <span className="h-px flex-1 bg-gradient-to-l from-transparent to-brand-200 dark:to-neutral-800" />
+    </div>
+  )
+}
+
+/**
+ * The mark on something somebody suggested that no admin has vouched for yet.
+ *
+ * Teas, shops and ingredients all carry `is_approved`, and all three used to be *hidden*
+ * until it was true. They are listed now and marked instead, which is a better trade in
+ * both directions: the person who suggested it can find what they added, and a reader
+ * browsing the catalog is not quietly shown a filtered version of it.
+ *
+ * One component rather than three copies of a badge, because "pending" has to look
+ * identical everywhere it appears — a reader learns the mark once, and three different
+ * shapes for one state is three things to learn.
+ *
+ * `rose` rather than `amber`: amber is the caffeine badge, and a tea card can wear both
+ * at once.
+ */
+export function PendingBadge() {
+  return (
+    <span data-testid="pending-badge">
+      <Badge tone="rose">Awaiting review</Badge>
+    </span>
   )
 }

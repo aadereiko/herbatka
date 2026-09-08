@@ -1,0 +1,6 @@
+# Photographs are the one thing here that must not enter git: they are large, they are
+# binary, and they are pictures of somebody's kitchen.
+data/
+outputs/
+models/
+.ipynb_checkpoints/

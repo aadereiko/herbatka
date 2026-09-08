@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 
 import { EntityImage } from '../../components/ui/image'
-import { Badge } from '../../components/ui/page'
+import { Badge, PendingBadge } from '../../components/ui/page'
 import type { ShopSummary } from '../../lib/shop'
 import { pluralise } from '../catalog/format'
 import { FavouriteStar } from '../favourite/FavouriteStar'
@@ -87,7 +87,7 @@ export function ShopCard({ shop }: { shop: ShopSummary }) {
                 <Badge tone="amber">{distance}</Badge>
               </span>
             )}
-            {!shop.is_approved && <Badge tone="rose">Awaiting review</Badge>}
+            {!shop.is_approved && <PendingBadge />}
           </div>
         </div>
       </Link>

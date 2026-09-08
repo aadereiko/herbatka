@@ -17,7 +17,8 @@ import { TeaReviewsPanel } from '../review/TeaReviewsPanel'
 import { WhereToBuyPanel } from '../shop/WhereToBuyPanel'
 import { BrewingPanel } from './BrewingPanel'
 import { IngredientTasteControl } from './IngredientTasteControl'
-import { useTeaDetail } from './queries'
+import { useTeaConsumption, useTeaDetail } from './queries'
+import { TeaConsumptionPlot } from './TeaConsumptionPlot'
 
 /**
  * The row where an ingredient rating actually earns its place. A blend lists five things,
@@ -46,6 +47,36 @@ function IngredientRow({ entry }: { entry: TeaIngredient }) {
         <IngredientTasteControl ingredient={entry.ingredient} idPrefix="tea" />
       </span>
     </li>
+  )
+}
+
+/**
+ * The plot, or nothing at all.
+ *
+ * Three states collapse to "render nothing": signed out, still loading, and signed in
+ * with no history of this tea. That is deliberate rather than lazy — a public tea page
+ * is mostly read by people who have never owned the tea, and a panel saying "you have
+ * not drunk any of this" on every one of those visits is furniture that never becomes
+ * useful. The plot appears the week it has something to say.
+ *
+ * An error is swallowed for the same reason. This is a supplement to a page that is
+ * complete without it, and an error strip about a chart nobody asked for, sitting above
+ * the ingredients somebody did, is a worse page than one with no chart.
+ */
+function YourConsumption({ slug, teaName }: { slug: string; teaName: string }) {
+  const series = useTeaConsumption(slug)
+  if (!series.data || series.data.total_grams <= 0) return null
+
+  return (
+    <Panel ariaLabel="How much you drink" testId="tea-consumption">
+      <h2 className="mb-1 text-lg font-semibold text-brand-900 dark:text-brand-100">
+        How much you drink
+      </h2>
+      <p className="mb-3 text-sm text-neutral-500 dark:text-neutral-400">
+        Brewed from your own shelves.
+      </p>
+      <TeaConsumptionPlot series={series.data} teaName={teaName} />
+    </Panel>
   )
 }
 
@@ -177,11 +208,17 @@ export function TeaDetailPage() {
           <TeaReviewsPanel tea={tea} />
         </div>
 
-        {/* The catalog's numbers, and yours over the top of them where you have any.
-            The panel decides for itself whether there is anything to show — see
-            `BrewingPanel`, which is also where the "signed out means no form" rule
-            lives. */}
-        <BrewingPanel tea={tea} />
+        <div className="space-y-6">
+          {/* The catalog's numbers, and yours over the top of them where you have any.
+              The panel decides for itself whether there is anything to show — see
+              `BrewingPanel`, which is also where the "signed out means no form" rule
+              lives. */}
+          <BrewingPanel tea={tea} />
+
+          {/* And how much of it you actually get through, which is the other half of the
+              same question and the one only your own ledger can answer. */}
+          <YourConsumption slug={tea.slug} teaName={tea.name} />
+        </div>
       </div>
     </PageShell>
   )

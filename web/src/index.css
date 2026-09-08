@@ -1,56 +1,112 @@
 @import 'tailwindcss';
 
 /* ===========================================================================
-   Herbatka is a dark forest-green tea house: flat colour, square corners, thin
-   bright rules, and a chunky serif. There is no wood, no paper, no texture and
-   no drop shadow left anywhere in the app.
+   Herbatka is a tea house you can walk into: oiled timber, cream paper cards
+   pinned to it, ink linework, and a little botanical drawing wherever the room
+   has room. It comes in two lights — a daylit oak version and the same room in
+   the evening — and both are drawn from one set of parts.
    ---------------------------------------------------------------------------
-   Read this before changing a colour, because two of the decisions below are
-   load-bearing and neither is obvious from a feature file.
+   Read this before changing a colour. Three of the decisions below are
+   load-bearing and none of them is obvious from a feature file.
 
-   ## 1. The app has one scheme, and `dark:` is how you write it
+   ## 1. The app has one authored scheme, and `dark:` is how you write it
 
-   Every screen in this app was authored twice: a base class for light and a
-   `dark:` variant for night — `text-brand-900 dark:text-brand-100`,
-   `bg-white dark:bg-neutral-900`, and so on, across roughly 700 call sites.
-   The design we now want is a single dark scheme. Authoring a *light* forest
-   green to sit under the base classes would be a second, different design that
-   nobody asked for and nobody would ever see; deleting the base half of 700
-   class strings would be a 400-file diff.
+   Every screen was authored twice: a base class for light and a `dark:` variant
+   for night — `text-brand-900 dark:text-brand-100`, `bg-white
+   dark:bg-neutral-900` — across roughly 700 call sites. That pairing predates
+   the design we now want and does not describe it: the base half was written
+   for a white-and-neutral app that no longer exists.
 
-   So instead:
+   So `dark:` is redefined:
 
        @custom-variant dark (&);
 
-   `dark:` stops meaning "when the OS is dark" and starts meaning "always".
-   Tailwind emits `.dark\:text-brand-100` as a plain class at the same
-   specificity as `.text-brand-900`, and sorts variant utilities after their
-   bare counterparts, so **where a pair exists the `dark:` half wins**. Paired
-   with `color-scheme: dark` on `<html>` below, native controls, scrollbars and
-   form widgets match.
+   It stops meaning "when the OS is dark" and starts meaning "always". Tailwind
+   emits `.dark\:text-brand-100` as a plain class at the same specificity as
+   `.text-brand-900`, and sorts variant utilities after their bare counterparts,
+   so **where a pair exists the `dark:` half wins**.
 
-   The consequence, and the rule for anyone editing feature code:
+   The rule for anyone editing feature code is unchanged:
 
      > **The `dark:` half of a pair is the half that renders.** The base class
      > beside it is dead weight kept only so the diff stays small. When you edit
      > a call site, fix the `dark:` class; when you write a new one, write the
      > pair anyway, so the file still reads like its neighbours.
 
-   This was measured before it was chosen. Of ~700 coloured call sites, all but
-   two dozen already carry a `dark:` sibling — 88 `text-brand-900`, 135
-   `dark:text-neutral-400`, 50 `text-neutral-600`, 34 `dark:border-neutral-800`
-   and 16 `bg-white` are all paired. The genuinely unpaired handful is listed at
-   the bottom of this comment, and the ramps below were tuned so that those
-   *base* tokens still land somewhere sane.
+   ## 2. Two themes, one declaration each, via `light-dark()`
 
-   ## 2. The two ramps are roles, not lightness ladders
+   This is the whole theme system, and it is worth understanding before you add
+   a colour.
+
+   There is exactly **one** declaration per token, and it carries both values:
+
+       --color-neutral-900: light-dark(#ffffff, #1b1d18);
+
+   `light-dark()` resolves against the *used* element's `color-scheme`, and
+   `color-scheme` is inherited, so `<html>` decides for the whole document:
+
+       html                     { color-scheme: light dark }  ← follows the OS
+       html[data-theme='light'] { color-scheme: light }       ← explicit choice
+       html[data-theme='dark']  { color-scheme: dark }
+
+   Four things fall out of that, and every one of them is a requirement the
+   alternative (two big blocks of overrides driven by a class) fails:
+
+     - **No flash, ever, with no script.** The stylesheet itself resolves
+       correctly on first paint. `ThemeProvider` writes `data-theme` only when
+       somebody has actually chosen; until then the OS preference is honoured by
+       CSS alone. There is no pre-paint script to keep in sync, and nothing to
+       go wrong if JS is slow, blocked or broken.
+     - **No duplication.** A second copy of sixty tokens under a second selector
+       is sixty chances for the two to drift.
+     - **Native widgets follow.** `color-scheme` is the property the scrollbar,
+       the date picker, the select popup and the checkbox already read.
+     - **Opacity modifiers still work.** `bg-brand-500/35` compiles to
+       `color-mix(in oklab, var(--color-brand-500) 35%, transparent)`, and a
+       `light-dark()` inside a `color-mix()` resolves per scheme — verified in
+       the browser before this file was written, because a focus ring that
+       silently computes to `transparent` is not a thing you want to discover
+       later.
+
+   The one thing to remember: **light value first, dark value second**, always.
+
+   ### The build rewrites all of this, and the `color-scheme` lines are why
+
+   `light-dark()` needs Chrome 123 / Safari 17.5 / Firefox 120, which is newer
+   than Tailwind's default compile targets, so Lightning CSS lowers every one of
+   these declarations on the way into `dist`. What ships is not `light-dark()` at
+   all — it is a pair of switch variables:
+
+       --color-neutral-900: var(--lightningcss-light,#f4e8d0)
+                            var(--lightningcss-dark,#2e2119);
+
+   with one of the two set to `initial` and the other to a single space, so
+   exactly one value survives substitution. That is a well-worn trick and it
+   works fine. **But it is driven entirely by whatever sets `color-scheme`.**
+   Lightning CSS reads the three rules in the base layer below and emits its own
+   copies keyed to them:
+
+       html[data-theme=light]{--lightningcss-light:initial;--lightningcss-dark: }
+       html[data-theme=dark] {--lightningcss-light: ;--lightningcss-dark:initial}
+
+   So the theme switch survives the lowering only *because* the switch is written
+   as `color-scheme` on `<html>`. Rewrite those three rules to toggle a class, or
+   set the colours some other way and leave `color-scheme` off, and the
+   development server will keep working — dev serves the native `light-dark()` —
+   while the production bundle quietly stops responding to the toggle entirely.
+
+   Verified against a real `vite build` + `vite preview`, not read off the source.
+
+   ## 3. The two ramps are roles, not lightness ladders
 
    Because the `dark:` half is what renders, the meaning of a token is whatever
-   the dark half of the pairs asked for. That makes both ramps role-based:
+   the dark half of the pairs asked for. Both ramps are therefore role-based,
+   and — this is the part that makes a light theme possible at all — a role can
+   be re-pointed at a light material without renumbering anything:
 
-     `neutral-*` is **structure** — a desaturated sage/forest greyscale.
+     `neutral-*` is **structure** — the room. Timber and paper.
         950  page ground, input fill, the recess where a picture is missing
-        900  card surface, the nav bar, menu panels
+        900  card surface (paper), the nav bar, menu panels
         800  the rule inside a card, and tints (skeletons, neutral badges)
         700  the outline around a card, a panel, a field, a badge
         600  a dashed empty tray, a checkbox edge
@@ -60,9 +116,9 @@
         200  menu items, body default
         100  what you type into a field
 
-     `brand-*` is **leaf** — the accent, and every piece of type that is not
-        secondary copy.
-         50  the page title and the wordmark, palest mint
+     `brand-*` is **ink and wood** — every piece of type that is not secondary
+        copy, plus the controls that are boards rather than paper.
+         50  the page title and the wordmark
         100  every heading on every card (87 call sites)
         200  a secondary emphasis link
         300  links and prices (37 call sites)
@@ -70,309 +126,482 @@
         500  the focus ring — `focus-visible:ring-brand-500` is written into 16
              feature files, so this one has to clear 3:1 against *both* the page
              ground and a card, which pins it from below
-        600  the primary button and the active filter chip
+        600  the primary button and the active filter chip — a wooden board,
+             and the one place `text-white` sits on a fill, so it is pinned from
+             above by 4.5:1 against `--color-white`
         700  the edge of a brand badge and of an info note
         800  spare
-        900  the fill of a brand badge, darker than the card so a chip reads as
-             set into the surface rather than raised off it
+        900  the *fill* of a brand badge and of an info note
 
-   Note what is *not* monotonic about that: `brand-50`–`brand-300` are the
-   lightest text in the app and `brand-900` is a fill. That is the price of not
-   editing 400 files, and it is cheap next to the alternative.
+   Note what is not monotonic about that: in the light theme `brand-50`–`300`
+   are the darkest type on the page and `brand-900` is a pale sage wash, because
+   900 is a fill and 50 is a headline. In the dark theme the same two swap ends.
+   That is the price of not editing 400 files, and it is cheap next to the
+   alternative.
 
-   Contrast was measured (oklch → sRGB → WCAG 2.1), never eyeballed. Worst case
-   of every pairing the app actually renders:
+   `brand-*` runs warm — oak, walnut, ink — rather than green, because in this
+   room the green belongs to the *plants*. Type in a hand-drawn menu is brown
+   ink on cream, not leaf green. The leaf green lives in `--color-leaf-*`
+   (below), which paints the botanical drawings, the rule under every page
+   title, and the tea-type badges — the three places a tea house is actually
+   green.
 
-     brand-100 heading on card ........ 9.18   on the ground ........... 10.40
-     brand-300 link on card ........... 5.73   on the ground ............ 6.49
-     neutral-400 secondary on card .... 5.96   on the ground ............ 6.75
-     neutral-300 on a neutral-800 badge  4.56
-     neutral-500 faint text on card ... 4.70
-     white on brand-600 (buttons) ..... 4.97   white on rose-600 ........ 5.58
-     rose-400 error text on card ...... 4.68
-     brand-500 focus ring on card ..... 4.06   on the ground ............ 4.60  (needs 3)
-     control-edge on a field's fill ... 3.66   against the card ......... 3.23  (needs 3)
+   Contrast was measured (sRGB → WCAG 2.1), never eyeballed. Worst case of every
+   pairing the app renders, light theme / dark theme:
 
-   ## 3. What used to be here and is gone
+     brand-100 heading on card ....... 11.5 / 10.9   brand-50 on ground  13.2 / 12.4
+     brand-300 link on card ........... 5.8 /  7.4
+     neutral-400 secondary on card .... 5.5 /  6.8   on the ground ...... 4.8 / 7.5
+     neutral-500 faint text on card ... 4.7 /  4.8
+     neutral-300 on a neutral-800 badge  6.0 /  7.1
+     white on brand-600 (buttons) ..... 5.9 /  5.9   white on rose-600 .. 7.8 / 6.4
+     rose-400 error text on card ...... 7.7 /  5.8
+     amber-300 star glyph on card ..... 3.6 /  4.4  (needs 3)
+     brand-500 focus ring on card ..... 4.2 /  3.9   on the ground ...... 3.7 / 4.2
+     control-edge on a field's fill ... 3.2 /  4.0   against the card ... 3.7 / 3.7
 
-   The wooden theme overrode four Tailwind utilities — `border` was 1.5px,
-   `bg-white` and `bg-brand-50/100` painted grain, and `rounded-2xl` was
-   deliberately out of true. All four are deleted. `border` means 1px again,
-   which is what the Tailwind documentation says it means, and every corner in
-   the app is square because the radius tokens are all zero. The grain, the
-   plank seams, the night lamp and the hard offset shadows are gone with them:
-   this design is flat, and the only thing separating one surface from another
-   is a 1px rule.
+   ## 4. Texture is a token, not a decision made per component
 
-   ## The unpaired base classes, for reference
+   Grain is real here, and it is also the easiest thing in this design to
+   overdo. Both surfaces carry it through one variable each —
+   `--texture-paper-ink` and `--texture-wood-ink` — which hold a colour *and* an
+   alpha, so one token sets both what the grain is drawn in and how much of it
+   there is. The light theme is set roughly a third weaker than the dark one on
+   purpose: daylight is supposed to read as calm and airy, and the grain that is
+   atmospheric on walnut is just dirt on cream. Change those two values, not the
+   thirteen components.
 
-   These have no `dark:` sibling anywhere, so the *base* token is what renders:
-   `focus-visible:ring-brand-500` (16), `hover:border-brand-400` (5),
-   `text-white` (3, on solid rose/brand fills), `bg-rose-600` (2, nav badges),
-   `bg-brand-600`+`text-white` (the active filter chip), `text-brand-600` (the
-   checkbox accent), and the four status-dot colours in HealthCard.
+   Both textures are CSS. The paper is one 120px tiling `feTurbulence` as a data
+   URI (~400 bytes, no request); the wood is `repeating-linear-gradient`. There
+   are no image assets in this design and no `background-attachment: fixed`.
    =========================================================================== */
 
 /* ---------------------------------------------------------------------------
    `dark:` always applies. See §1 above — this one line is the whole mechanism
-   by which a two-scheme codebase renders as a single scheme.
+   by which a two-scheme codebase renders as one authored scheme, which
+   `light-dark()` then paints twice.
    --------------------------------------------------------------------------- */
 @custom-variant dark (&);
 
 /* ---------------------------------------------------------------------------
-   Fraunces, self-hosted. No CDN, no runtime request to a third party — the two
-   files below are in the repo and Vite fingerprints them into the bundle.
+   Newsreader, self-hosted. No CDN, no runtime request to a third party — the
+   two files below are in the repo and Vite fingerprints them into the bundle.
 
-   Why a webfont at all, when the previous theme deliberately had none: the
-   reference's character is more than half typographic. A chunky old-style serif
-   carrying both the headings and the body is the difference between "dark green
-   app" and the thing we are copying, and a sans-serif version of this design
-   does not read as it.
+   It replaced Fraunces, which carried this app through two designs. Fraunces is
+   a sturdy old-style serif with a low-contrast text cut, and it was exactly
+   right when it was doing *both* jobs — headings and body — in a hand-drawn tea
+   house. It has one job now: the half-dozen places a page has a title, plus the
+   wordmark. That job wants contrast and presence, which is the opposite end of
+   the serif spectrum, and a text face asked to be a display face just reads as
+   a slightly larger paragraph.
 
-   Why Fraunces specifically, over Instrument Serif, Bitter and Zilla Slab: it
-   is the only one of the four that is *variable in weight*, which means one
-   download covers 400 body copy, 600 eyebrows and 700 headings. Instrument
-   Serif ships a single weight (no bold at all); Zilla Slab would need three
-   static files; Bitter is variable but reads as a workhorse slab with much less
-   of the wonky old-style character the reference has.
+   Newsreader over the obvious alternatives: Playfair Display is what the
+   reference site itself uses and borrowing it wholesale would be copying rather
+   than answering; Instrument Serif is beautiful and ships a *single* weight,
+   which matters because nearly every heading in this app writes
+   `font-semibold`, and a browser asked to synthesise bold on a high-contrast
+   serif smears it. Newsreader is variable in weight, so 400, 600 and 700 are
+   real cuts of the same design.
 
-   How it fits in 59 KB: Google serves Fraunces as a two-axis variable font
-   (`opsz` 9–144 × `wght` 100–900) at 124 KB for latin + latin-ext, which is
-   twice the budget. It is instanced down with `fonttools` — `opsz` pinned at 20
-   and `wght` clamped to 400–750 — then subsetted to the layout features the app
-   can actually use. That lands at 31 KB latin + 28 KB latin-ext.
+   ## How 218 KB became 65 KB
 
-   `opsz` is pinned *low* on purpose. Fraunces' optical-size axis runs from a
-   sturdy, high-x-height text cut at 9 to a fine, high-contrast display cut at
-   144, and "chunky" is the low end. Most type in this app is 14px anyway.
+   Google serves Newsreader as a two-axis variable font — `opsz` 6–72 crossed
+   with `wght` 200–800 — at 128 KB latin plus 84 KB latin-ext. That is three
+   times the budget the previous face was held to, for a font now used on far
+   less of the page.
+
+   It is instanced down with `fonttools`: `opsz` pinned at 24 and `wght` clamped
+   to 400–700. Pinning the optical size is the whole saving, and it is the same
+   trade the Fraunces build made. `opsz` is a cut the browser would pick per
+   size, which is genuinely better typography and costs more than it returns
+   here — the app renders headings between about 16px and 36px, a narrow enough
+   band that one cut serves all of it. 24 sits in the middle of that band.
 
    latin-ext is not optional: the seed data alone contains Kraków, Wróbel,
    Dvořák, Zając and Herbaciarnia Pod Wierzbą.
 
-   There is no italic face — a second 59 KB for the one `italic` label in
+   There is no italic face — a second file for the one `italic` label in
    `IngredientListPage` is not worth it, so the browser synthesises an oblique.
 
    Licence: SIL Open Font License 1.1, alongside the files in
    `src/assets/fonts/OFL.txt`.
    --------------------------------------------------------------------------- */
 @font-face {
-  font-family: 'Fraunces';
+  font-family: 'Newsreader';
   font-style: normal;
-  font-weight: 400 750;
+  font-weight: 400 700;
   font-display: swap;
-  src: url('./assets/fonts/fraunces-latin.woff2') format('woff2');
+  src: url('./assets/fonts/newsreader-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
     U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: 'Fraunces';
+  font-family: 'Newsreader';
   font-style: normal;
-  font-weight: 400 750;
+  font-weight: 400 700;
   font-display: swap;
-  src: url('./assets/fonts/fraunces-latin-ext.woff2') format('woff2');
+  src: url('./assets/fonts/newsreader-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
     U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 @theme {
-  /* ------------------------------------------------------------------- leaf */
-  /* The accent, and all the type that is not secondary copy. Hue walks from 132
-     at the pale end to 149 at the dark end, which keeps the mint highlights
-     slightly yellow-green and the badge fills slightly blue-green — the same
-     drift a real leaf has between its lit face and its shadow.
+  /* ------------------------------------------------------------- ink & wood */
+  /* `brand-*`: the type ramp and the boards. Light is oak and sepia ink on
+     cream; dark is the same wood seen by lamplight, with the type running up
+     into warm parchment instead of down into ink.
 
-     500 is the awkward one, as it was in the wooden theme and for the same
-     reason: `focus-visible:ring-brand-500` is spelled out in 16 feature files
-     and is the only focus indicator most of them have, so it is pinned from
-     below by the 3:1 that WCAG 1.4.11 asks of it against *both* the ground
-     (4.60) and a card (4.06). Above ~0.72 it stops reading as green at all, so
-     the usable window is narrow and 0.665 sits in the middle of it. */
-  --color-brand-50: oklch(0.958 0.04 133); /* #e7f7dc  page title, wordmark */
-  --color-brand-100: oklch(0.912 0.065 132); /* #d2ecbf  headings (87 sites) */
-  --color-brand-200: oklch(0.865 0.092 134); /* #bbdfa5  secondary emphasis */
-  --color-brand-300: oklch(0.762 0.13 137); /* #89c571  links (37 sites) */
-  --color-brand-400: oklch(0.7 0.148 140); /* #69b458  hover / focus edge */
-  --color-brand-500: oklch(0.665 0.155 141); /* #58aa4b  focus ring */
-  --color-brand-600: oklch(0.52 0.15 143); /* #257d24  primary button */
-  --color-brand-700: oklch(0.44 0.125 145); /* #156320  badge & note edges */
-  --color-brand-800: oklch(0.368 0.1 147); /* #0d4d1c */
-  --color-brand-900: oklch(0.288 0.058 149); /* #13331a  badge fill */
+     600 is pinned from *above*: it is the only fill in the app that `text-white`
+     sits on (the primary button, the file-picker button, the active filter
+     chip), so it owes 4.5:1 against `--color-white` in both themes. It happens
+     to be the same oiled-walnut value in each, which is correct rather than
+     lazy — a wooden button is the one thing in the room that does not change
+     colour when the sun goes down, only what is around it does.
 
-  /* ---------------------------------------------------------------- structure */
-  /* Not grey. Tailwind's neutrals are chroma 0, and a chroma-0 grey on a forest
-     ground reads as a rendering fault rather than as a colour — the same reason
-     the wooden theme warmed them. These carry 0.014–0.05 of the ground's own
-     hue, which is enough to belong and not enough to compete with `brand-*`.
+     500 is pinned from *below*: `focus-visible:ring-brand-500` is spelled out
+     in 16 feature files and is the only focus indicator most of them have, so
+     WCAG 1.4.11 wants 3:1 against both the ground and a card. */
+  --color-brand-50: light-dark(#191a15, #f2f4ec); /* page title, wordmark */
+  --color-brand-100: light-dark(#1f211b, #e6eadd); /* headings (87 sites) */
+  --color-brand-200: light-dark(#3a4a2e, #cbd8b9); /* secondary emphasis */
+  --color-brand-300: light-dark(#4c6639, #a9c08e); /* links (37 sites) */
+  --color-brand-400: light-dark(#5e7c4b, #94af77); /* hover / focus edge */
+  --color-brand-500: light-dark(#5e7c4b, #8aa76c); /* focus ring */
+  --color-brand-600: light-dark(#4c6639, #4e6a3a); /* primary button */
+  --color-brand-700: light-dark(#c9d6bb, #3e5230); /* badge & note edges */
+  --color-brand-800: light-dark(#3a4a2e, #465b36);
+  --color-brand-900: light-dark(#edf1e6, #26301d); /* badge & note fill */
+
+  /* ---------------------------------------------------------------- the room */
+  /* `neutral-*`: timber and paper. Not grey — a chroma-0 grey on oak reads as a
+     rendering fault, the same way it did on forest green.
 
      The two values with no slack in them:
 
-       900 vs 950 — the card and the ground are 1.13:1 apart. That is *meant* to
-       be almost nothing: in the reference a card is not a raised panel, it is
-       the same dark green with a 1px rule drawn round it, and the separation
-       comes from the rule and from the full-bleed image at the top of the card.
+       950 vs 900 — the ground and a card. In the light theme that is beige oak
+       under cream paper (1.16:1) and in the dark theme walnut under a lit
+       panel (1.10:1). Both are meant to be small: a card here is a piece of
+       paper lying on a table, and what separates it from the table is its drawn
+       edge and the shadow under it, not a step in value.
 
        800 — the rule inside a card, and simultaneously a tint (skeletons,
        neutral badges, hover fills). Those two jobs pull in opposite directions:
-       a rule wants to be bright, a tint wants to stay dark enough for its own
-       text. 0.468 is where a neutral badge's `neutral-300` label still measures
-       4.56 and the rule still reads at 1.74 against a card. Anything that puts
-       *secondary* copy on an 800 fill will fail, which is why the two search
-       pickers had their hover fill moved to 950. */
-  --color-neutral-50: oklch(0.972 0.014 142); /* #f1f8f0 */
-  --color-neutral-100: oklch(0.945 0.018 142); /* #e6f0e5  field text */
-  --color-neutral-200: oklch(0.898 0.022 143); /* #d5e1d4  menu items, body */
-  --color-neutral-300: oklch(0.868 0.026 144); /* #cad8c9  labels, badge text */
-  --color-neutral-400: oklch(0.782 0.03 145); /* #adbdac  secondary (135 sites) */
-  --color-neutral-500: oklch(0.715 0.034 146); /* #96a997  faint text */
-  --color-neutral-600: oklch(0.605 0.046 147); /* #708a72  dashed tray, checkbox */
-  --color-neutral-700: oklch(0.535 0.05 148); /* #5a765d  card & field outline */
-  --color-neutral-800: oklch(0.468 0.044 149); /* #49614d  inner rule, tints */
-  --color-neutral-900: oklch(0.338 0.028 150); /* #2d3c30  card, nav, menu */
-  --color-neutral-950: oklch(0.305 0.024 151); /* #263329  page ground */
+       a rule wants contrast, a tint has to stay quiet enough for its own text.
+       Both values below are where `neutral-300` on a neutral badge still clears
+       6:1 and the rule is still visible against the card. */
+  --color-neutral-50: light-dark(#ffffff, #f7f8f3);
+  --color-neutral-100: light-dark(#1c1d1a, #eff1ea); /* field text */
+  --color-neutral-200: light-dark(#2c2e28, #dcdfd5); /* menu items, body */
+  --color-neutral-300: light-dark(#4a4c44, #c3c7bb); /* labels, badge text */
+  --color-neutral-400: light-dark(#5e6057, #a9aea0); /* secondary (135 sites) */
+  --color-neutral-500: light-dark(#71736a, #8c9184); /* faint text */
+  --color-neutral-600: light-dark(#b9b7ad, #565b4c); /* dashed tray, checkbox */
+  --color-neutral-700: light-dark(#dedcd4, #3a3e33); /* card & field outline */
+  --color-neutral-800: light-dark(#edece6, #2a2d25); /* inner rule, tints */
+  --color-neutral-900: light-dark(#ffffff, #1b1d18); /* card, nav, menu */
+  --color-neutral-950: light-dark(#faf9f5, #121310); /* page ground, field fill */
 
-  /* The reference's ground sits around oklch 0.25. This is 0.305 because a
-     lighter room was asked for by name — light enough to stop reading as black,
-     dark enough that a pale mint heading still measures over 10:1 on it. */
+  /* ------------------------------------------------------------------- leaf */
+  /* The only green in the interface, and it is deliberately small: the rule
+     under a page title, the botanical drawings, the tea-type badge, the leaf in
+     the wordmark. A hand-drawn tea menu is brown ink on cream with green
+     *pictures*, not green type, and the moment the green climbs into the
+     headings the whole thing starts reading as a health-food brand.
 
-  /* `bg-white` is written 16 times for "a card", and all 16 are paired with
-     `dark:bg-neutral-900`, so this token never paints a surface any more. It
-     survives for the three bare `text-white`s — the labels on the solid green
-     and solid vermilion fills — and for the button recipes below. Not pure
-     white: a hair of the leaf hue so it belongs to the palette. */
-  --color-white: oklch(0.985 0.006 140); /* #f8fbf7 */
+     Not referenced by a Tailwind utility anywhere, so it is declared outside
+     `@theme` further down — see the note there. */
 
-  /* ---------------------------------------------------------------- vermilion */
-  /* Errors, "unfriend", and the two request badges — the app's only warm colour
-     and its only loud one. Kept from the wooden theme rather than swapped for a
-     cool red: on a forest ground a blue-leaning red reads as a system alert
-     escaping from another application, and this one reads as a mark made in the
-     same box of paints. Retuned at the light end so `rose-400`, the error text,
-     clears 4.5 on a card (4.68) — on the old paper it only ever had to work
-     against near-white. */
-  --color-rose-50: oklch(0.955 0.02 32);
-  --color-rose-100: oklch(0.912 0.042 30);
-  --color-rose-200: oklch(0.855 0.075 30); /* #fdbeb3  badge text */
-  --color-rose-300: oklch(0.782 0.115 29); /* #f99b8d  note text */
-  --color-rose-400: oklch(0.735 0.15 28); /* #f98173  error text */
-  --color-rose-500: oklch(0.64 0.185 27);
-  --color-rose-600: oklch(0.53 0.19 27); /* #c22826  nav count badge */
-  --color-rose-700: oklch(0.45 0.165 26);
-  --color-rose-800: oklch(0.368 0.13 26); /* #751516  note & badge edge */
-  --color-rose-900: oklch(0.3 0.095 26);
-  --color-rose-950: oklch(0.238 0.07 26); /* #390e0c  note & badge fill */
+  /* ------------------------------------------------------------------- clay */
+  /* Errors, "unfriend", and the two request badges: the app's only loud colour.
+     A fired-clay red rather than a system red, so it reads as a mark made in
+     the same box of paints as everything else. 600 carries `text-white`; 400 is
+     the error text and owes 4.5:1 on a card. */
+  --color-rose-50: light-dark(#fbeee7, #2a100b);
+  --color-rose-100: light-dark(#f7e1d7, #33140e);
+  --color-rose-200: light-dark(#7a2716, #ebc0af); /* badge text */
+  --color-rose-300: light-dark(#8a2c1a, #dda08a); /* note text */
+  --color-rose-400: light-dark(#98301c, #e08b72); /* error text */
+  --color-rose-500: light-dark(#9e3a22, #c9603f);
+  --color-rose-600: light-dark(#a63a24, #b4402c); /* nav count badge */
+  --color-rose-700: light-dark(#a8482e, #93341f);
+  --color-rose-800: light-dark(#c98d72, #7a3324); /* note & badge edge */
+  --color-rose-900: light-dark(#efcbbb, #4a1d13);
+  --color-rose-950: light-dark(#f7e1d7, #3a1710); /* note & badge fill */
 
-  /* ------------------------------------------------------------------- amber */
+  /* ------------------------------------------------------------------ brass */
   /* The caffeine badges and the favourite star: the one thing in the interface
-     allowed to look like a light rather than like a leaf. 600 is pinned by the
-     star's hover state, which is a glyph and so owes 3:1 against a card. */
-  --color-amber-50: oklch(0.97 0.026 88);
-  --color-amber-100: oklch(0.935 0.055 87);
-  --color-amber-200: oklch(0.885 0.09 85); /* #f5d594  badge text */
-  --color-amber-300: oklch(0.828 0.118 80); /* #efbe68  a starred star */
-  --color-amber-400: oklch(0.765 0.142 72);
-  --color-amber-500: oklch(0.7 0.148 64);
-  --color-amber-600: oklch(0.622 0.14 55); /* #c66c1e  star hover, 3.06 on card */
-  --color-amber-700: oklch(0.52 0.12 50);
-  --color-amber-800: oklch(0.432 0.095 58); /* #76410f  badge edge */
-  --color-amber-900: oklch(0.348 0.072 62);
-  --color-amber-950: oklch(0.288 0.055 68); /* #3d2507  badge fill */
+     allowed to look like a light rather than like a plant. 300 is the starred
+     star, a glyph, so it owes 3:1 against a card. */
+  --color-amber-50: light-dark(#fdfaf0, #211d0e);
+  --color-amber-100: light-dark(#faf3e2, #2c2712);
+  --color-amber-200: light-dark(#6b5518, #e8d9a8); /* badge text */
+  --color-amber-300: light-dark(#8a6d1e, #d6c079); /* a starred star */
+  --color-amber-400: light-dark(#7e631b, #c4ad63);
+  --color-amber-500: light-dark(#776019, #b39c52);
+  --color-amber-600: light-dark(#6f5917, #a68f45); /* star hover */
+  --color-amber-700: light-dark(#635015, #8a7736);
+  --color-amber-800: light-dark(#d9c48d, #5f5426); /* badge edge */
+  --color-amber-900: light-dark(#f3ead1, #3a3319);
+  --color-amber-950: light-dark(#faf3e2, #2c2712); /* badge fill */
+
+  /* ---------------------------------------------------------- avatar tones */
+  /* `Avatar` derives a colour from a person's name so the same face is the same
+     colour on the feed, on their profile and in the nav. Three of the six tones
+     come from Tailwind's stock palette, which is a cool, saturated set that
+     lands on this page like three stickers from another application. Retuned
+     here into pigments that belong in the same paintbox: sage, slate-teal and a
+     dusty aubergine. Only the two ends each tone actually uses are touched. */
+  --color-emerald-200: light-dark(#33452a, #bfd3ac);
+  --color-emerald-950: light-dark(#d9e3cc, #232c1c);
+  --color-sky-200: light-dark(#2a4348, #a8c7ce);
+  --color-sky-950: light-dark(#d3e0e2, #1b2a2e);
+  --color-violet-200: light-dark(#43334a, #c9b4d0);
+  --color-violet-950: light-dark(#e0d8e0, #281f2c);
+
+  /* Not pure white in either theme — it is the label on a wooden button and on
+     a clay badge, and a pure white on oak is the one thing in the room that
+     looks printed rather than painted. `bg-white` is written 16 times for "a
+     card" and all 16 are paired, so this never paints a surface. */
+  --color-white: light-dark(#ffffff, #f7f8f3);
+  --color-black: light-dark(#1c1d1a, #080906);
 
   /* --------------------------------------------------------------- lettering */
-  /* Fraunces for everything, headings and body alike — see the `@font-face`
-     note above for the size arithmetic. `--font-sans` is what Tailwind's
-     preflight hands to `<html>`, so redefining it is what actually changes the
-     app; `--font-serif` is set to the same stack so that a future `font-serif`
-     class is not a surprise.
+  /* Fraunces for headings and body alike — see the `@font-face` note above.
+     `--font-sans` is what Tailwind's preflight hands to `<html>`, so redefining
+     it is what actually changes the app; `--font-serif` matches so a future
+     `font-serif` class is not a surprise.
 
      The fallbacks are real, not decorative: `swap` means the whole app is drawn
      in one of them for the first paint, so the chain has to be a genuine
      old-style serif on every platform — New York via `ui-serif` on Apple,
      Iowan Old Style and Charter where they exist, Georgia and Cambria on
-     Windows, and only then the generic. Emoji stay at the end because the app
-     leans on 🍵 and 🍃 and Fraunces has neither.
+     Windows, and only then the generic.
 
-     The symbol fonts before them are new, and they fix something that predates
-     this restyle: the app writes ← → ↗ ★ ☆ ▾ as literal characters, no text
-     font in the old stack covered them either, and so they fell all the way
-     through to Apple Color Emoji — which draws ↗ as a blue tile with a white
-     arrow in it. That was one odd blue square among a page of browns; on a page
-     that is one green it is the only cold thing on the screen and it sits in
-     the middle of a button. Naming a monochrome symbol font first means the
-     arrows are drawn as type, in the button's own colour. 🍵 and 🍃 are not in
-     these fonts, so they still reach the emoji font and stay in colour. */
+     The symbol fonts before the emoji fix something that predates this design:
+     the app writes ← → ↗ ★ ☆ ▾ as literal characters, and with no text font
+     covering them they fall through to Apple Color Emoji — which draws ↗ as a
+     blue tile with a white arrow in it, in the middle of a button. Naming a
+     monochrome symbol font first means the arrows are drawn as type, in the
+     button's own ink. */
+  /* Two faces now, where the tea house used one.
+     
+     The reference pairs a serif for headings with the operating system's own sans for
+     everything else, and that split is most of why it reads as clean rather than as
+     decorated: the serif carries the voice in the half-dozen places a page has a title,
+     and the sans carries the other ninety per cent — labels, prices, buttons, table
+     cells — where a serif at 13px is just harder to read.
+     
+     `--font-heading` is a display serif — see the `@font-face` note above for which one
+     and why it is not the one Fraunces used to be.
+     The body face costs nothing at all — it is whatever the reader's system already has,
+     which is also the fastest possible first paint.
+     
+     `--font-sans` is what Tailwind's preflight hands `<html>`, so *that* is the one that
+     had to become the sans; `--font-heading` is applied to h1–h6 in the base layer. */
   --font-sans:
-    'Fraunces', ui-serif, 'Iowan Old Style', 'Charter', 'Palatino Linotype', Palatino,
-    Georgia, Cambria, 'Times New Roman', serif, 'Apple Symbols', 'Segoe UI Symbol',
-    'Noto Sans Symbols 2', 'Apple Color Emoji', 'Segoe UI Emoji';
-  --font-serif: var(--font-sans);
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    'Noto Sans', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-heading:
+    'Newsreader', ui-serif, 'Iowan Old Style', 'Charter', Georgia, Cambria,
+    'Times New Roman', serif;
+  --font-serif: var(--font-heading);
 
-  /* The letterspaced small-caps eyebrow — `WATER`, `STEEP`, `CURRENT SEASON`,
-     `THE METHOD` — is one of the reference's signatures, and the app already
-     had eighteen of them: `text-xs uppercase tracking-wide` on every `<dt>` and
-     every panel sub-heading. So the eyebrow needs no new class and no new
-     markup, only a wider `tracking-wide`. 0.025em (Tailwind's default) reads as
-     a rendering accident at 12px; 0.13em reads as a decision.
-     `tracking-wider` moves with it, for the one invite code that uses it. */
+  /* The letterspaced small-caps eyebrow — `WATER`, `STEEP`, `CURRENT SEASON` —
+     is one of this design's signatures, and the app already had eighteen of
+     them: `text-xs uppercase tracking-wide` on every `<dt>` and every panel
+     sub-heading. So the eyebrow needs no new class and no new markup, only a
+     wider `tracking-wide`. 0.025em (Tailwind's default) reads as a rendering
+     accident at 12px; 0.13em reads as a decision, and on a hand-lettered label
+     it reads as a stamp. */
   --tracking-wide: 0.13em;
   --tracking-wider: 0.18em;
 
   /* --------------------------------------------------------------- corners */
-  /* Square. All of them. `rounded-lg` on a button, `rounded-2xl` on a card,
-     `rounded-xl` on a menu panel — every one of those resolves through a token,
-     so zeroing eight lines squares the whole app without touching a call site.
+  /* Generous. Eight lines set the corner of every card, panel, field, image well
+     and button in the app, because every `rounded-*` class resolves through one of
+     them — which is the whole reason the scale is tokenised rather than typed at
+     the call sites.
+
+     The ratio between them is the part worth keeping if you retune: a card at
+     `2xl` (16px) against a button at `md` (8px) reads as a button sitting *on* a
+     card. Round them to the same number and the button starts to look like a
+     smaller card.
+
      `rounded-full` does not read a token and is left alone, which is correct:
-     it is only ever on an avatar, a status dot and a two-digit count badge, and
-     those are round in the reference too. */
-  --radius-xs: 0px;
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --radius-2xl: 0px;
-  --radius-3xl: 0px;
-  --radius-4xl: 0px;
+     it is only ever on an avatar, a status dot and a two-digit count badge. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 24px;
 
   /* --------------------------------------------------------------- shadows */
-  /* Flat. The wooden theme's hard offset is gone and nothing replaces it: a
-     card is told apart from the ground by its 1px rule, and a hovered card by
-     that rule turning leaf green (`hover:border-brand-400`, already written
-     into the five card components). The thirteen `shadow-sm`s and four
-     `hover:shadow-md`s therefore resolve to nothing at all.
+  /* Warm and short. A shadow here is the small gap between a paper card and the
+     table under it, so it is cast in the wood's own brown rather than in black —
+     a black shadow on oak is a hole, not a lift. The dark theme's is deeper and
+     softer, because the light in that room is one warm lamp rather than a
+     window.
 
-     `0 0 #0000` rather than `none`, because Tailwind composes the ring and
-     shadow custom properties into one comma-separated `box-shadow`, and `none`
-     inside a shadow *list* is invalid CSS — it would silently drop the focus
-     ring next to it.
+     `--shadow-sm` is worn by thirteen card components and `--shadow-md` by the
+     four that lift on hover, so the difference between them *is* the hover
+     animation. Keep them one step apart.
 
-     Menus are the exception. A dropdown genuinely floats over the page, and
-     with every surface within 1.13:1 of every other one it needs something a
-     rule cannot give it, so `shadow-lg` keeps a soft cast. */
+     `0 0 #0000` is never used here any more, but note for anyone adding one:
+     `none` inside a shadow *list* is invalid CSS and would silently drop the
+     focus ring composed next to it. */
   --shadow-2xs: 0 0 #0000;
   --shadow-xs: 0 0 #0000;
   --shadow-sm: 0 0 #0000;
   --shadow-md: 0 0 #0000;
-  --shadow-lg: 0 14px 30px -12px oklch(0 0 0 / 0.65);
-  --shadow-xl: 0 20px 44px -16px oklch(0 0 0 / 0.7);
+  --shadow-lg: 0 12px 28px -12px light-dark(#1c1d1a29, #00000099);
+  --shadow-xl: 0 18px 40px -16px light-dark(#1c1d1a33, #000000ad);
+}
+
+/* ---------------------------------------------------------------------------
+   The green, in its own `@theme` block so it sits next to an explanation rather
+   than in the middle of the ramps it deliberately is not part of.
+
+   `leaf-*` is the botanical accent: the rule under a page title, the drawings
+   in `botanical.tsx`, the tea-type badge, the leaf in the wordmark. It is a
+   short ramp because it has three jobs — a line, a wash, and a label — and a
+   ten-step ladder would only invite it into places it does not belong.
+
+   600 is the line weight: it owes 3:1 against both paper and the ground,
+   because the title rule is sometimes the only mark separating a heading from
+   what follows it. 300 is the wash under a drawn outline and is never asked to
+   carry text.
+   --------------------------------------------------------------------------- */
+@theme {
+  /* The hero's tint. Deepened from #f3f6ee, which measured 1.04:1 against the page
+     ground — technically a tint, visually white. */
+  --color-leaf-100: light-dark(#eaf0e0, #1d2318);
+  --color-leaf-200: light-dark(#edf1e6, #26301d);
+  --color-leaf-300: light-dark(#cfdcbf, #3b4a2c); /* watercolour wash */
+  --color-leaf-400: light-dark(#a7bf8a, #5e7c4b);
+  --color-leaf-500: light-dark(#7f9c66, #7c9a62); /* accent-green */
+  --color-leaf-600: light-dark(#5e7c4b, #94af77); /* ink line, title rule */
+  --color-leaf-700: light-dark(#4c6639, #a9c08e);
+  --color-leaf-800: light-dark(#3a4a2e, #cbd8b9);
+}
+
+/* ---------------------------------------------------------------------------
+   Materials: the paint that is not a Tailwind colour.
+
+   These are plain custom properties rather than `@theme` entries because no
+   utility class reads them — they are consumed by the `@utility` blocks below
+   and by the SVG in `botanical.tsx`. Putting them in `@theme` would invite
+   Tailwind to generate `bg-texture-paper-ink` and friends, which is not a thing
+   anybody should be able to write.
+   --------------------------------------------------------------------------- */
+:root {
+  /* One 120px tile of `feTurbulence`, greyscaled, used as a *mask* rather than
+     as an image. Masking is what makes the grain themable: the shape comes from
+     this ~360-byte data URI and the colour and strength come from the two
+     `--texture-*-ink` tokens below, so the same tile draws a dark tooth on
+     cream paper and a light one on walnut. As an image it could only ever be
+     one of those.
+
+     `stitchTiles='stitch'` is not optional — without it the noise restarts at
+     every tile boundary and the surface grows a visible 120px grid. */
+  --texture-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* Strength lives in the alpha. The light theme is set roughly a third lower
+     than the dark one on purpose: the brief asks for daylight that reads calm
+     and airy, and the grain that is atmospheric on walnut is just noise on
+     cream. If the paper ever looks dirty, this is the number — not the
+     component. */
+  --texture-paper-ink: light-dark(#0000000a, #ffffff08);
+  --texture-wood-ink: light-dark(#00000005, #ffffff05);
+
+  /* Wood grain, as gradients rather than an asset. `--wood-line` is the fine
+     figure that runs along the board; `--wood-seam` is the darker line where
+     two planks meet, which is what actually makes it read as construction
+     rather than as a striped background.
+
+     Daylight runs at well under half the strength of night, and the reason is
+     not symmetry: dark timber absorbs its own figure, so at night the grain has
+     to be pushed to be visible at all, while on pale oak the identical alpha
+     reads as horizontal banding across an otherwise calm page. The brief asks
+     the light theme to stay quiet, and this is the token that decides it. */
+  --wood-line: light-dark(#00000000, #00000000);
+  --wood-seam: light-dark(#00000000, #00000000);
+
+  /* ------------------------------------------------------------------ charts */
+  /* The one place in the app with a colour of its own, and it is not an oversight.
+     `leaf-600` is the interface's green and it is deliberately muted — it is decoration
+     sitting behind type, and a saturated green would fight the words. A chart mark is the
+     opposite: it *is* the data, and nothing else on the card carries the value.
+
+     Run through the palette validator, the interface green fails outright — chroma 0.066
+     against a 0.1 floor, which the tool reports as "reads gray". These two steps pass
+     every check on their own surface: lightness band, chroma floor and 3:1 against the
+     card behind them.
+
+     The dark value is not a lightened copy of the light one, because the passing band is
+     narrower at night (L 0.48–0.67 against 0.43–0.77). Each was picked against its own
+     surface rather than derived from the other. */
+  --chart-series: light-dark(#4f7233, #86994c);
+  /* One step off the surface, for the single gridline and the zero ticks. Recessive by
+     construction: if you can read it before you read the data, it is too strong. */
+  --chart-grid: light-dark(#e2e1d9, #33372c);
+
+  /* The edge under a board. A button is a thing with thickness, and this is the
+     millimetre of end-grain you see under it — the same brown as the wood, one
+     step darker, never black. */
+  --board-edge: light-dark(#00000000, #00000000);
+  --board-edge-soft: light-dark(#00000000, #00000000);
+
+  /* The drawn outline around a framed panel: sepia ink in daylight, and a
+     lighter line at night because at night the frame is catching the lamp. */
+  --ink-line: light-dark(#00000000, #00000000);
+
+  /* How long a thing takes to move. Every interaction in this design lands
+       inside the brief's 150–350ms window, and they are named rather than typed
+       so "subtle" stays one decision. */
+  --motion-press: 90ms;
+  --motion-hover: 180ms;
+  --motion-panel: 260ms;
+  --motion-theme: 320ms;
 }
 
 @layer base {
-  /* One scheme, declared to the browser as well as to the stylesheet, so the
-     scrollbar, the date picker, the select popup and the checkbox all come up
-     dark instead of being the one white rectangle on the page. */
+  /* This is the theme switch, all of it. `light dark` means "whatever the OS
+     asks for" and is what a visitor who has never touched the toggle gets, with
+     no script involved and therefore no wrong-theme flash to prevent. The two
+     attribute rules below are the explicit choice, written by `ThemeProvider`
+     from localStorage.
+
+     Setting `color-scheme` rather than a class does two jobs. It is what makes
+     the scrollbar, the date picker, the select popup and the checkbox come up in
+     the right scheme without any of them being styled by hand — and it is the
+     only thing the production build's `light-dark()` polyfill watches. See
+     "The build rewrites all of this" in the header: change these three rules to
+     a class and the toggle keeps working in dev and silently stops working in
+     `dist`. */
   html {
+    color-scheme: light dark;
+  }
+
+  html[data-theme='light'] {
+    color-scheme: light;
+  }
+
+  html[data-theme='dark'] {
     color-scheme: dark;
   }
 
   body {
     background-color: var(--color-neutral-950);
-    /* An explicit inherited colour rather than relying on the UA's `canvastext`
-       under `color-scheme: dark`. Almost everything in the app sets its own
-       colour; this is what the handful of elements that do not will get, and
-       leaving that to the user agent is how one paragraph ends up pure white
-       among a page of sage. */
+    /* An explicit inherited colour rather than relying on the UA's `canvastext`.
+       Almost everything in the app sets its own colour; this is what the handful
+       of elements that do not will get, and leaving that to the user agent is
+       how one paragraph ends up pure black among a page of sepia. */
     color: var(--color-neutral-200);
     -webkit-font-smoothing: antialiased;
   }
@@ -383,15 +612,19 @@
      serif at 14px needs. */
   h1,
   h2,
-  h3 {
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
     letter-spacing: -0.015em;
   }
 
-  /* The user agent's placeholder under `color-scheme: dark` is a flat grey at about
-     55% opacity, which on a green field is both the wrong hue and, at 2.9:1, harder to
-     read than the hint text underneath it. Every placeholder in this app is an example
-     ("jasmine, breakfast, sencha…") rather than a label, so it wants to be quiet — but
-     quiet and unreadable are different. `neutral-500` measures 5.4 on a field's fill. */
+  /* Every placeholder in this app is an example ("jasmine, breakfast, sencha…")
+     rather than a label, so it wants to be quiet — but quiet and unreadable are
+     different, and the UA's default is a flat grey at about 55% opacity, which
+     on a warm field is both the wrong hue and harder to read than the hint text
+     underneath it. `neutral-500` measures 4.7 on a field's fill. */
   ::placeholder {
     color: var(--color-neutral-500);
     opacity: 1;
@@ -405,42 +638,317 @@
     outline: 2px solid var(--color-brand-500);
     outline-offset: 2px;
   }
+
+  /* Illustration is decoration, and decoration should never be the reason a
+     page is a second slower to be useful. Every drawing in `botanical.tsx`
+     larger than an icon carries this. */
+  img,
+  svg {
+    max-width: 100%;
+  }
+
+  /* One switch, honoured everywhere. The design leans on small movements — a
+     board depressing, a card lifting, steam drifting — and every one of them is
+     an enhancement rather than information, so all of them stop here rather
+     than being individually remembered. `0.01ms` rather than `0` because a
+     zero-length transition never fires `transitionend`, and code that waits for
+     one would hang. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The theme change itself.
+
+   `ThemeProvider` puts `theme-shifting` on `<html>` for one beat around the
+   swap and takes it off again. Without it the change is a hard cut; with it
+   permanently on, every hover in the app would inherit a 320ms colour fade and
+   the whole interface would feel like it is thinking. So it is armed only for
+   the moment it is needed.
+
+   `!important` earns its place here: it has to beat the per-component
+   `transition` shorthands that Tailwind writes, and this rule is alive for a
+   third of a second.
+
+   Reduced motion turns it into a plain cut, which is the correct reading of
+   the preference: the point is that the light changes, not that it fades.
+   --------------------------------------------------------------------------- */
+html.theme-shifting,
+html.theme-shifting *,
+html.theme-shifting *::before,
+html.theme-shifting *::after {
+  transition:
+    background-color var(--motion-theme) ease,
+    border-color var(--motion-theme) ease,
+    color var(--motion-theme) ease,
+    box-shadow var(--motion-theme) ease,
+    fill var(--motion-theme) ease,
+    stroke var(--motion-theme) ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-shifting,
+  html.theme-shifting *,
+  html.theme-shifting *::before,
+  html.theme-shifting *::after {
+    transition: none !important;
+  }
 }
 
 /* ===========================================================================
-   Custom utilities for the shared primitives in components/ui.
+   Surfaces.
+
+   Three materials, three utilities, and every card, panel and page in the app
+   is made of them. They are utilities rather than components so that the
+   thirteen existing card components pick up the material by gaining one word in
+   a class string instead of being rewritten.
    =========================================================================== */
 
-/** The ground the whole app is laid on. Applied by `PageShell`, and by the three
+/** The floor of the whole tea house. Applied by `PageShell`, and by the three
  *  full-bleed pages that render outside it (login, register, 403).
  *
- *  It is still a utility rather than a plain `bg-neutral-950` at the call site
- *  for one reason only: `body` carries the same colour so that the overscroll
- *  bounce is not a white flash, and two places holding one value want a name
- *  between them. It used to also carry grain, plank seams and a lamp; all three
- *  are gone, which is why it is now three lines instead of thirty. */
+ *  Four layers, cheapest first, and no image asset in any of them:
+ *
+ *    1. the lamp — a wide, very faint warm glow from above the fold. It is
+ *       fully transparent in daylight and only appears at night, which is the
+ *       single thing that makes the dark theme read as "the same room in the
+ *       evening" rather than as an inverted stylesheet.
+ *    2. plank seams — one darker line every 132px. This is the layer that makes
+ *       it read as construction; without it the rest is a striped background.
+ *    3. the figure — fine grain running along the plank, at irregular spacing,
+ *       because grain that is exactly even is a barcode.
+ *    4. the timber itself.
+ *
+ *  `body` carries the same base colour so the overscroll bounce is not a flash
+ *  of the wrong material.
+ *
+ *  ## Why every layer is sized
+ *
+ *  The obvious way to write layers 2 and 3 is `repeating-linear-gradient`, and
+ *  the obvious way to keep the grain from looking mechanical is to tilt it half
+ *  a degree off true. Both together will hang the tab.
+ *
+ *  A repeating gradient has no tile: the browser rasterises it across the whole
+ *  painted box. At 0deg that is merely wasteful. At 0.4deg across a 1500px-wide
+ *  page the gradient line is projected over an enormous distance, the number of
+ *  repetitions goes up by orders of magnitude, and Chrome sits there — the page
+ *  stops responding to script, which is a memorable way to find out.
+ *
+ *  So each layer is a *plain* gradient with an explicit `background-size`, and
+ *  `repeat` does the repeating. One 132px tile and one 31px tile, rasterised
+ *  once and stamped, no matter how tall the page grows. The irregularity that
+ *  the tilt was there to provide comes from uneven stop positions inside the
+ *  tile instead, which is free. */
 @utility page-ground {
   background-color: var(--color-neutral-950);
+  background-image:
+    radial-gradient(ellipse 90% 100% at 50% -12%, var(--room-light), transparent 70%),
+    linear-gradient(0deg, var(--wood-seam) 0 1px, transparent 1px),
+    linear-gradient(
+      0deg,
+      var(--wood-line) 0 0.7px,
+      transparent 0.7px 7px,
+      var(--wood-line) 7px 7.5px,
+      transparent 7.5px 18px,
+      var(--wood-line) 18px 18.6px,
+      transparent 18.6px
+    );
+  background-size:
+    100% 460px,
+    100% 132px,
+    100% 31px;
+  background-repeat: no-repeat, repeat, repeat;
+  background-position: top center, top left, top left;
 }
 
-/** A short flat rule under a page title.
+:root {
+  --room-light: light-dark(#ffffff00, #ffffff00);
+}
+
+/** Paper: the tooth of a handmade sheet, and the only place in the design where
+ *  a texture sits underneath type.
  *
- *  The one piece of ornament left in the app. It was a tapered brush stroke,
- *  which belonged to a hand-drawn tea house and would read as a smudge here;
- *  it is now a 2px leaf-green bar with square ends, which is the same mark the
- *  rest of this design makes everywhere else. `aria-hidden` is unnecessary — a
- *  `::after` with no content is not in the accessibility tree. */
+ *  It is a **mask**, not an image, and that is the whole trick. The shape comes
+ *  from one 120px `feTurbulence` tile; the colour and the strength come from
+ *  `--texture-paper-ink`, which is themed. As a background image the same tile
+ *  could only ever draw one of the two — a dark tooth on cream *or* a light one
+ *  on walnut — and the second theme would have needed a second asset.
+ *
+ *  `z-index: -1` inside an `isolation: isolate` stacking context is what keeps
+ *  it above the element's own background and below its content, with no wrapper
+ *  div and nothing for a click to land on. `border-radius: inherit` matters:
+ *  without it the grain squares off the corner the card just rounded.
+ *
+ *  Kept deliberately near the threshold of visibility. If you can see the grain
+ *  as grain rather than as warmth, it is too strong — turn down the alpha in
+ *  `--texture-paper-ink`, not the component. */
+@utility paper-grain {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: var(--texture-paper-ink);
+    -webkit-mask-image: var(--texture-noise);
+    mask-image: var(--texture-noise);
+    -webkit-mask-size: 120px 120px;
+    mask-size: 120px 120px;
+  }
+}
+
+/** The same trick over timber, for the surfaces that are boards rather than
+ *  paper: the nav bar, the frame around a display, a wooden inset. Lighter
+ *  than the paper tooth, because a planed board is smoother than a deckle sheet
+ *  and because these surfaces are usually behind something else. */
+@utility wood-grain {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: var(--texture-wood-ink);
+    -webkit-mask-image: var(--texture-noise);
+    mask-image: var(--texture-noise);
+    -webkit-mask-size: 120px 120px;
+    mask-size: 120px 120px;
+  }
+}
+
+/** Lamplight falling across a sheet of paper.
+ *
+ *  Transparent in daylight and only appears at night, which is the point: the brief asks
+ *  for "parchment illuminated against dark surroundings", and a hero panel that is simply
+ *  a *lighter* dark rectangle is not that — it is a lighter dark rectangle. A soft warm
+ *  gradient falling from one upper corner is what makes the same panel read as a lit
+ *  surface rather than as a painted one.
+ *
+ *  Off-centre on purpose. A glow centred on the panel reads as a backlight; light coming
+ *  from one side reads as a lamp somewhere in the room.
+ *
+ *  Used on the hero and nowhere else. Three lit panels on one screen is three lamps, and
+ *  a room with three lamps has none. */
+@utility lit-paper {
+  background-image: radial-gradient(ellipse 75% 95% at 18% -5%, var(--paper-lamp), transparent 66%);
+}
+
+:root {
+  --paper-lamp: light-dark(#ffffff00, #ffffff00);
+}
+
+/** A wooden frame with a drawn line set just inside it — the shelf a display is
+ *  built into, the surround on the hero, the case a product card sits in.
+ *
+ *  The inner line is an inset box-shadow rather than a second element, so the
+ *  frame is one box and nothing about it can be knocked out of alignment by the
+ *  content. Two shadows, not one: the ink line inside, and the cast underneath.
+ *
+ *  Mobile drops the frame's own padding to a hairline (see `sm:` at the call
+ *  sites) — the brief is explicit that architectural decoration is the first
+ *  thing to go on a phone, and a 12px timber surround around a 320px card is
+ *  4% of the screen spent on a border. */
+/** Was a timber surround; now a plain hairline box, kept under the same name so the six
+ *  call sites did not have to be edited to change what a frame *is*. */
+@utility wood-frame {
+  border: 1px solid var(--color-neutral-700);
+  border-radius: var(--radius-xl);
+  background-color: var(--color-neutral-900);
+}
+
+/* ===========================================================================
+   Marks: the small drawn details.
+   =========================================================================== */
+
+/** The sprig under a page title.
+ *
+ *  The app's signature mark, on every page, from one place — a signature that
+ *  half the screens are missing is not a signature. It was a flat bar; it is now
+ *  a drawn stem with two leaves off it, which is the one piece of botanical
+ *  illustration that appears on literally every screen and so has to be the
+ *  cheapest.
+ *
+ *  Drawn as a mask over `leaf-600` rather than as a coloured SVG, for the same
+ *  reason the paper grain is: one 300-byte tile, both themes, no second asset.
+ *  A `::after` with no content is not in the accessibility tree, so there is
+ *  nothing here to hide from a screen reader. */
+/** The sprig under a page title: a stem with two leaves off it.
+ *
+ *  It was a plain 2px bar for one skin and is drawn again, because the bar said nothing —
+ *  every page had a green dash under its heading and the dash could have belonged to any
+ *  product on the internet. This is the app's own mark, it appears on every screen, and
+ *  it is the one place the tea house survives into a flat design.
+ *
+ *  Drawn as a mask over `leaf-600` rather than as a coloured SVG: one 300-byte tile, both
+ *  themes, no second asset and no image request. A `::after` with no content is not in the
+ *  accessibility tree, so there is nothing here to hide from a screen reader. */
 @utility title-rule {
   position: relative;
+
   &::after {
     content: '';
     position: absolute;
     left: 0;
-    bottom: -0.3em;
-    width: 2.2em;
-    max-width: 100%;
-    height: 2px;
-    background: var(--color-brand-400);
+    bottom: -0.5em;
+    width: 4.6em;
+    max-width: 60%;
+    height: 0.72em;
+    background-color: var(--color-leaf-600);
+    -webkit-mask-image: var(--sprig-mark);
+    mask-image: var(--sprig-mark);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: left center;
+    mask-position: left center;
+  }
+}
+
+:root {
+  --sprig-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='14' viewBox='0 0 64 14'%3E%3Cpath fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' d='M1.5 10.6c10-2.5 21.5-3.1 32.5-2.3 8.2.6 20 1 29 .2'/%3E%3Cpath fill='%23000' d='M16.6 8.3c-2.4-3.5-6.7-4.1-8.7-2.5-1.7 1.3-.5 4 2.1 4.8 2.7.8 5.4-.5 6.6-2.3z'/%3E%3Cpath fill='%23000' d='M34.2 7.4c.6-3.9 4.5-5.5 6.7-4.3 1.8 1 1.5 3.8-.7 5.2-2.1 1.3-4.7.9-6-.9z'/%3E%3C/svg%3E");
+}
+
+
+/** Two small stamped marks in the top corners of a paper panel, the way a card
+ *  is pinned to a board. Opt-in, and used sparingly — on the hero and on the
+ *  section headers, not on every card in a grid of twenty, where forty pins is
+ *  a rash rather than a detail. */
+@utility pinned {
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0.62rem;
+    left: 0.62rem;
+    right: 0.62rem;
+    height: 5px;
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle at 2.5px 2.5px, var(--color-neutral-600) 0 2px, transparent 2.4px),
+      radial-gradient(
+        circle at calc(100% - 2.5px) 2.5px,
+        var(--color-neutral-600) 0 2px,
+        transparent 2.4px
+      );
+    background-repeat: no-repeat;
   }
 }
 
@@ -449,41 +957,80 @@
 
    One definition per look, in CSS, used by everything in the app that has to be
    a button: `Button`, `LinkButton`, `SubmitButton`, the nav's entries, the
-   hamburger, and the file picker inside `ImageUploadField`.
+   hamburger, the theme toggle, and the file picker inside `ImageUploadField`.
 
    They are utilities rather than an exported TS constant because most of a
    button is *state*: hover, active, disabled. As a string that means a pile of
-   `hover:` prefixes at every call site, repeated per variant; as a utility it
-   is one block, and the call site writes `btn btn-md btn-primary` and nothing
-   else. It also means a `::file-selector-button` — which no Tailwind prefix can
-   reach the states of — gets the identical look from `btn-file`.
+   `hover:` prefixes at every call site, repeated per variant; as a utility it is
+   one block, and the call site writes `btn btn-md btn-primary` and nothing else.
+   It also means a `::file-selector-button` — which no Tailwind prefix can reach
+   the states of — gets the identical look from `btn-file`.
 
-   Composition is deliberate: `btn` is shape and behaviour, `btn-sm|md|lg` is
-   size, `btn-primary|secondary|danger|ghost|quiet|current` is colour.
+   Composition is deliberate: `btn` is shape and behaviour,
+   `btn-sm|md|lg` is size, `btn-primary|secondary|danger|ghost|quiet|current` is
+   material.
+
+   ## The press
+
+   Three of these variants are *boards*: a piece of wood with a millimetre of
+   end-grain showing under it, which goes down when you push it. That is the
+   brief's "wooden button depresses 1–2px when clicked", and it is built the way
+   a real one works rather than as an animation —
+
+       rest:   translateY(0)   box-shadow: 0 2px 0 var(--board-edge)
+       active: translateY(2px) box-shadow: 0 0 0 var(--board-edge)
+
+   The board moves down by exactly the thickness it loses, so the *top face*
+   travels 2px and the *bottom edge* does not move at all. That is what makes it
+   read as a thing being pressed into the table rather than as a thing sliding
+   down it, and it is why the two numbers have to stay equal if you change them.
+
+   `btn-quiet` and `btn-current` are labels rather than boards — a nav plaque
+   nailed to the beam — so they shift by 1px and have no end-grain to lose.
+
+   The whole thing is off under `prefers-reduced-motion`, which the base layer
+   handles centrally.
    =========================================================================== */
 
-/** Shape and motion. Square, 1px, and it does not move when you press it — the
- *  wooden theme's 2px offset-and-drop press was a property of a board sitting on
- *  a table, and there is no table now. Feedback on `:active` is a colour change,
- *  which each variant owns. The transparent border is always present, including
- *  on `ghost`, so a ghost in a row of buttons is not 2px shorter than its
- *  neighbours. */
+:root {
+  /* Hover and press faces for a board. Both darken rather than lighten, in both
+     themes: `text-white` sits on this fill, and lightening is the direction
+     that ends with a label at 3:1. Measured at 7.3 and 8.4 against
+     `--color-white`, against 5.9 at rest. */
+  --board-face-hover: light-dark(#3e5230, #405831);
+  --board-face-active: light-dark(#334527, #344a29);
+  /* A pale board: the secondary button and the theme toggle. One step *up* from
+     paper, so a button sitting on a card still reads as a separate object. */
+  --board-pale: light-dark(#ffffff, #23261f);
+  --board-pale-hover: light-dark(#f3f2ec, #2c3028);
+}
+
+/** Shape, motion, and the press. The transparent border is always present,
+ *  including on `ghost`, so a ghost in a row of buttons is not 2px shorter than
+ *  its neighbours. */
 @utility btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  border-radius: 0;
+  gap: 0.45rem;
+  /* `lg` (10px), deliberately below the `2xl` (16px) a card wears. Matching them would
+     make a button read as a smaller card rather than as a control on one. */
+  border-radius: var(--radius-lg);
   border: 1px solid transparent;
   font-weight: 600;
   transition:
-    background-color 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
+    background-color var(--motion-hover) ease,
+    border-color var(--motion-hover) ease,
+    color var(--motion-hover) ease,
+    box-shadow var(--motion-press) ease,
+    transform var(--motion-press) ease;
 
   &:disabled {
     cursor: not-allowed;
     opacity: 0.55;
+    /* A disabled board is lying flat on the table, not floating above it. */
+    box-shadow: none;
+    transform: none;
   }
 }
 
@@ -508,57 +1055,57 @@
   line-height: var(--text-base--line-height);
 }
 
-/** Solid leaf green, white letterspaced caps, square. The reference's one loud
- *  control, and the only place in the app where type is transformed.
+/** Oiled walnut, cream letterspaced caps. The one loud control in the app, and
+ *  the only place type is transformed.
  *
  *  Caps are on `btn-primary` alone rather than on `btn`, for two reasons found
  *  the hard way: the account menu's trigger is a `btn` containing a person's
  *  *name*, and shouting somebody's name at them is not a design decision; and
  *  the nav used to mark its current entry with `btn-primary`, which would have
  *  made the active tab a different width from the inactive ones and shifted the
- *  whole bar on every navigation. The nav now uses `btn-current` below.
- *
- *  Hover darkens rather than lightens. On a dark ground the instinct is the
- *  other way round, but white on anything lighter than brand-600 stops clearing
- *  4.5:1 — and a hover state is not allowed to be the moment the label becomes
- *  hard to read. */
+ *  whole bar on every navigation. The nav uses `btn-current` below. */
 @utility btn-primary {
-  border-color: var(--color-brand-600);
+  border-color: var(--board-edge);
   background-color: var(--color-brand-600);
   color: var(--color-white);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-
+  /* Flat. The end-grain, the cast and the 2px press were a board sitting on a table,
+     and there is no table now — this design separates things with a rule and a gap, and
+     a button that visibly has thickness would be the one object on the page that does.
+     Feedback on press is a colour change plus a single pixel, which is enough to feel
+     and not enough to see. */
   &:hover:not(:disabled) {
-    border-color: var(--color-brand-700);
-    background-color: var(--color-brand-700);
+    background-color: var(--board-face-hover);
   }
 
   &:active:not(:disabled) {
-    background-color: var(--color-brand-800);
+    background-color: var(--board-face-active);
+    transform: translateY(1px);
   }
 }
 
-/** Outlined, not filled. The app's default, and in the reference a secondary
- *  action is a rectangle drawn on the ground rather than a second slab of
- *  colour beside the first. */
+/** A pale board: the app's default action. One step up from paper with a drawn
+ *  ink edge, so a row of them on a card reads as objects lying on it rather than
+ *  as rectangles cut out of it. */
 @utility btn-secondary {
   border-color: var(--color-neutral-700);
-  background-color: transparent;
-  color: var(--color-neutral-200);
+  background-color: var(--board-pale);
+  color: var(--color-brand-200);
 
   &:hover:not(:disabled) {
     border-color: var(--color-brand-400);
+    background-color: var(--board-pale-hover);
     color: var(--color-brand-100);
   }
 
   &:active:not(:disabled) {
-    background-color: var(--color-neutral-900);
+    transform: translateY(1px);
   }
 }
 
-/** Vermilion in outline rather than in fill: these are Unfriend, Block and
- *  Delete, and a solid red block beside a solid green one is a traffic light. */
+/** Fired clay, in outline rather than in fill: these are Unfriend, Block and
+ *  Delete, and a solid red board beside a solid brown one is a traffic light. */
 @utility btn-danger {
   border-color: var(--color-rose-800);
   background-color: transparent;
@@ -568,9 +1115,14 @@
     border-color: var(--color-rose-600);
     background-color: var(--color-rose-950);
   }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
 }
 
-/** No edge at all until you point at it. */
+/** No edge at all until you point at it. A label, not a board — no end-grain,
+ *  and a 1px shift rather than a 2px press. */
 @utility btn-ghost {
   color: var(--color-brand-300);
 
@@ -578,32 +1130,64 @@
     border-color: var(--color-neutral-700);
     color: var(--color-brand-100);
   }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
 }
 
-/** A bar item: the nav's entries that are not the current one, and the two
- *  `Menu` triggers, which are the same control with a caret on the end. Sage
- *  rather than the link green `btn-ghost` uses, so that the bar reads as
+/** A plaque on the beam: the nav's entries that are not the current one, and the
+ *  two `Menu` triggers, which are the same control with a caret on the end.
+ *  Sepia rather than the link brown `btn-ghost` uses, so the bar reads as
  *  navigation rather than as a row of links. */
 @utility btn-quiet {
   color: var(--color-neutral-300);
 
   &:hover:not(:disabled) {
-    background-color: var(--color-neutral-800);
     color: var(--color-brand-100);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
   }
 }
 
-/** Where you are. Pale mint with a 2px leaf rule under it — drawn with an inset
- *  box-shadow rather than a border, so the current entry is exactly the same
- *  size as every other entry and the bar does not shuffle sideways when you
- *  navigate. Colour alone would not be enough; `NavLink` also sets
- *  `aria-current="page"`, so the state is not carried by the rule either. */
+/** Where you are. A pale plaque with a leaf-green rule under it — drawn with an
+ *  inset box-shadow rather than a border, so the current entry is exactly the
+ *  same size as every other entry and the bar does not shuffle sideways when you
+ *  navigate. The green is the same `leaf-600` as the sprig under the page title,
+ *  which is the point: the mark that says "here" is the same mark in both
+ *  places.
+ *
+ *  Colour alone would not be enough; `NavLink` also sets `aria-current="page"`,
+ *  so the state is not carried by the rule either. */
 @utility btn-current {
+  position: relative;
   color: var(--color-brand-100);
-  box-shadow: inset 0 -2px 0 0 var(--color-brand-400);
+
+  /* A drawn bar, not an inset box-shadow.
+     
+     The shadow version was correct for years and broke the moment the corner radius went
+     up: an inset shadow is clipped to the *border box*, so on a 10px-rounded button its
+     ends curl up the corners and the underline reads as a smile. A pseudo-element has its
+     own box and stays straight at any radius.
+     
+     Inset from the sides so the bar sits under the word rather than under the padding —
+     an underline as wide as the hit target looks like a selected tab, which is a
+     different control. */
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0.55rem;
+    right: 0.55rem;
+    bottom: 0;
+    height: 2px;
+    border-radius: 1px;
+    background-color: var(--color-leaf-600);
+  }
 
   &:hover {
-    background-color: var(--color-neutral-800);
+    color: var(--color-brand-50);
   }
 }
 
@@ -615,8 +1199,8 @@
     margin-right: 0.75rem;
     display: inline-flex;
     cursor: pointer;
-    border-radius: 0;
-    border: 1px solid var(--color-brand-600);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--board-edge);
     background-color: var(--color-brand-600);
     padding: 0.4rem 0.95rem;
     font-size: var(--text-sm);
@@ -625,12 +1209,11 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--color-white);
-    transition: background-color 120ms ease;
+    transition: background-color var(--motion-hover) ease;
   }
 
   &:hover::file-selector-button {
-    border-color: var(--color-brand-700);
-    background-color: var(--color-brand-700);
+    background-color: var(--board-face-hover);
   }
 }
 
@@ -643,13 +1226,14 @@
    ends that, the same way the buttons above ended theirs.
    =========================================================================== */
 
-/** Something went wrong. A dark vermilion block with a 1px edge, and a leading
- *  bar on the inline-start edge so an alert is distinguishable from a card at a
- *  glance and not only by hue. */
+/** Something went wrong. A clay wash with a drawn edge, and a heavier bar on the
+ *  inline-start edge so an alert is distinguishable from a card at a glance and
+ *  not only by hue. */
 @utility note-error {
   border: 1px solid var(--color-rose-800);
   border-inline-start-width: 3px;
   border-inline-start-color: var(--color-rose-600);
+  border-radius: var(--radius-sm);
   background-color: var(--color-rose-950);
   padding: 0.7rem 0.85rem;
   font-size: var(--text-sm);
@@ -657,11 +1241,12 @@
   color: var(--color-rose-300);
 }
 
-/** Something worth knowing. The same strip in leaf rather than vermilion. */
+/** Something worth knowing. The same strip in sage rather than clay. */
 @utility note-info {
   border: 1px solid var(--color-brand-700);
   border-inline-start-width: 3px;
-  border-inline-start-color: var(--color-brand-500);
+  border-inline-start-color: var(--color-leaf-600);
+  border-radius: var(--radius-sm);
   background-color: var(--color-brand-900);
   padding: 0.7rem 0.85rem;
   font-size: var(--text-sm);
@@ -676,11 +1261,64 @@
  * surface and the gap around it still say so. An input has none of that — the
  * border *is* the affordance, and WCAG 1.4.11 asks for 3:1 against what
  * surrounds it for exactly that reason. Sharing the card's `neutral-700` would
- * put a field at 2.32 against the card it sits on.
+ * put a field at 1.9:1 against the card it sits on in daylight.
  *
- * Measured against both surfaces a field actually meets: 3.66 against its own
- * `neutral-950` fill, and 3.23 against the card behind it.
+ * One value for both themes, and that is not laziness: it is the mid grey halfway
+ * between a white card and a near-black one, which is the only place a single line can
+ * sit and clear 3:1 in both directions. Measured against both surfaces a field actually
+ * meets — 4.4 against white, 4.0 against the dark card.
  */
 @utility control-edge {
-  border-color: oklch(0.615 0.055 148);
+  border-color: #767a6f;
+}
+
+/* ===========================================================================
+   Motion.
+
+   Two keyframes, both small, both switched off by the reduced-motion rule in
+   the base layer. Anything more than this belongs in a component.
+   =========================================================================== */
+
+/** A panel arriving. Used by the hero and by the mobile nav panel, which is the
+ *  one thing in the app that genuinely opens — the brief asks for a drawer that
+ *  behaves like a wooden panel swinging down, and the small overshoot in the
+ *  easing is the whole difference between that and a div appearing. */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@utility panel-in {
+  animation: panel-in var(--motion-panel) cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  transform-origin: top center;
+}
+
+/** Steam off a hot cup: a slow drift up and sideways, fading out. Used by
+ *  exactly one drawing — the cup in the hero — because steam on every teacup in
+ *  a grid of twenty is a screensaver.
+ *
+ *  Eight seconds is deliberately far slower than it looks like it should be.
+ *  Real steam moves at a speed the eye reads as almost still, and anything
+ *  quicker reads as a loading spinner. */
+@keyframes steam-drift {
+  0% {
+    opacity: 0;
+    transform: translateY(2px) translateX(0) scaleX(1);
+  }
+  22% {
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0.22;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-15px) translateX(3px) scaleX(1.35);
+  }
 }

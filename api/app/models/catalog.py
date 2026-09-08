@@ -42,16 +42,38 @@ CaffeineLevelEnum = Enum(
     native_enum=False,
     create_constraint=True,
 )
+#: What a thing in a blend *is*, botanically, at the coarseness a person shopping for tea
+#: actually thinks in. Six of these existed and were doing too much work: "spice" was
+#: holding cinnamon bark, ginger root and cardamom seed, and "fruit" was holding both
+#: orange peel and whole rosehips — so a reader filtering for one always got the others.
+#:
+#: The additions are all splits of that kind rather than new territory. `other` stays,
+#: and stays last, because a vocabulary with no escape hatch is one people lie to.
 IngredientCategoryEnum = Enum(
     "leaf",
     "herb",
     "flower",
     "spice",
     "fruit",
+    "berry",
+    "peel",
+    "root",
+    "bark",
+    "seed",
+    "grain",
+    "nut",
+    "extract",
     "other",
     name="ingredient_category",
     native_enum=False,
     create_constraint=True,
+    # Pinned, and not optional. `native_enum=False` renders this as a VARCHAR whose length
+    # SQLAlchemy derives from the *longest label* — which meant VARCHAR(6), sized for
+    # "flower", until "extract" arrived and every insert failed with
+    # StringDataRightTruncationError. Naming a length decouples the column from the
+    # longest word in the list, so adding "concentrate" later is a CHECK change and not a
+    # column rewrite.
+    length=20,
 )
 
 
@@ -76,6 +98,22 @@ class Ingredient(UUIDPrimaryKey, Timestamps, Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     description: Mapped[str | None] = mapped_column(Text)
+    # Ingredients used to be admin-only, so there was nothing to moderate. Now anybody
+    # signed in can propose one — usually while typing a tea's recipe and finding the herb
+    # missing — and the same two columns Tea and Shop carry answer the same two questions:
+    # is this vouched for, and who put it here.
+    #
+    # `server_default="true"`, which matters for the migration: every ingredient that
+    # existed before this column was seeded or admin-entered, and defaulting them to
+    # unapproved would have marked the entire vocabulary as pending overnight.
+    is_approved: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        # SET NULL rather than CASCADE: somebody leaving must not delete an ingredient that
+        # half the catalog's recipes point at.
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
     # Same String(500) as Tea, Shop and Household: an uploaded path from POST /uploads/image,
     # never a blob. Still nullable, and still expected to be null for anything the seed has
     # never heard of — the UI keeps drawing a per-category illustration for those rather

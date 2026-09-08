@@ -77,7 +77,15 @@ export function StockList({ householdId }: { householdId: string }) {
       onSuccess: (item) => {
         setAdding(false)
         setFormKey((key) => key + 1)
-        setNotice(`Added “${item.tea.name}” to the shelf.`)
+        // The second sentence is owed to anybody who typed the tea in themselves: it is
+        // in the catalog now, marked, and an admin will look at it. Read off what was
+        // *sent* rather than off the response, because `TeaRef` carries no approval flag
+        // and widening it for one sentence would touch every screen that renders a tin.
+        setNotice(
+          input.new_tea
+            ? `Added “${item.tea.name}” to the shelf, and to the catalog for an admin to check.`
+            : `Added “${item.tea.name}” to the shelf.`,
+        )
       },
     })
   }

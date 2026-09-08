@@ -140,7 +140,11 @@ async def list_shops(
     q: str | None = None,
     city: str | None = None,
     country: str | None = None,
-    approved: bool | None = True,
+    #: `None` — everything, vouched for or not. Flipped from `True`: a suggested shop
+    #: is listed the moment somebody proposes it and carries `is_approved` for the client
+    #: to mark, rather than disappearing until an admin happens to look. The admin queue
+    #: passes `False` to get the moderation list.
+    approved: bool | None = None,
     near: tuple[float, float] | None = None,
     radius_km: float | None = None,
     viewer_id: uuid.UUID | None = None,
@@ -189,7 +193,10 @@ async def get_shop_by_slug(
     db: AsyncSession,
     slug: str,
     *,
-    include_unapproved: bool = False,
+    #: Default `True` — a shop is readable whether or not it has been vouched for, and
+    #: `is_approved` on the response is what says which. Flipped along with the list
+    #: default above; the pair used to hide a suggestion from the person who made it.
+    include_unapproved: bool = True,
     viewer_id: uuid.UUID | None = None,
 ) -> tuple[Shop, ShopAggregates]:
     query = select(Shop).where(Shop.slug == slug)
@@ -286,13 +293,14 @@ async def listings_for_tea(
     page: int = 1,
     size: int = 24,
 ) -> tuple[list[tuple[ShopListing, ShopAggregates]], int]:
-    """Where to buy a given tea. Only approved shops — an unapproved one is not yet part
-    of the shared catalog, and pointing people at it would sidestep the review."""
-    base = (
-        select(ShopListing)
-        .join(ShopListing.shop)
-        .where(ShopListing.tea_id == tea_id, Shop.is_approved.is_(True))
-    )
+    """Where to buy a given tea, including shops nobody has vouched for yet.
+
+    It used to be approved-only, on the argument that pointing people at an unreviewed
+    shop sidesteps the review. That argument went with the change: a suggested shop is
+    part of the catalog now, marked rather than hidden, and a listing that exists but is
+    invisible on the one page it answers a question for is worse than a marked one.
+    """
+    base = select(ShopListing).join(ShopListing.shop).where(ShopListing.tea_id == tea_id)
     total = await db.scalar(select(func.count()).select_from(base.order_by(None).subquery())) or 0
     rows = await db.execute(
         _with_extras(base.options(*_LISTING_LOADS), viewer_id)

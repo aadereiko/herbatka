@@ -1,3 +1,5 @@
+import { LeafMark } from './botanical'
+
 /**
  * A picture of a thing, or the stand-in for one.
  *
@@ -38,13 +40,19 @@ export function EntityImage({
       <div
         aria-hidden="true"
         data-testid={testId ? `${testId}-placeholder` : undefined}
-        // The ground colour rather than a tint, so a missing picture reads as a recess
-        // cut into the card rather than as a block sitting on it. It also keeps the one
-        // focus ring that lands on top of a card image — the favourite star — off
-        // `neutral-800`, which is the one surface `brand-500` does not clear 3:1 against.
-        className={`grid place-items-center bg-brand-100 text-4xl dark:bg-neutral-950 ${className}`}
+        // The ground colour rather than a tint, so a missing picture reads as a recess cut
+        // into the card — a shelf with nothing on it — rather than as a block sitting on
+        // it. It also keeps the one focus ring that lands on top of a card image, the
+        // favourite star, off `neutral-800`, which is the one surface `brand-500` does not
+        // clear 3:1 against.
+        className={`grid place-items-center bg-brand-100 dark:bg-neutral-800 ${className}`}
       >
-        🍃
+        {/* Was the 🍃 emoji, which was three problems in one glyph: it is a different
+            drawing on every platform, it is full-colour on a page whose whole point is
+            that it looks hand-painted, and at the 32px a card renders it, Apple's version
+            is a glossy green blob. `LeafMark` is the app's own leaf, inks itself from
+            `currentColor`, and is the same 500 bytes on every machine. */}
+        <LeafMark className="size-12 text-leaf-600 opacity-45" />
       </div>
     )
   }

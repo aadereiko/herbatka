@@ -89,4 +89,16 @@ export const DISPLAY_NAME_MAX_LENGTH = 80
 
 export const PRONOUNS_MAX_LENGTH = 40
 
-export const LOCATION_MAX_LENGTH = 120
+export const CITY_MAX_LENGTH = 120
+
+export const STATUS_MAX_LENGTH = 140
+
+/**
+ * A country as the API hands it out: the stored code plus a label to print.
+ *
+ * The app stores and sends the **code** (`PL`), never the name. Codes are stable and
+ * names are presentation — `Türkiye` was `Turkey` until 2022 — so a column of labels
+ * would need a data migration every time a country renamed itself. Responses carry the
+ * name alongside so that rendering one profile does not mean holding all 249.
+ */
+export type Country = components['schemas']['Country']

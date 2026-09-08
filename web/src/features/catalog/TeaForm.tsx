@@ -11,22 +11,31 @@ import {
   TextField,
 } from '../../components/ui/form'
 import { IMAGE_UPLOAD_HINT, ImageUploadField } from '../../components/ui/image-upload'
-import { Badge, Skeleton } from '../../components/ui/page'
+import { Badge, PendingBadge, Skeleton } from '../../components/ui/page'
 import { useDebouncedValue } from '../../lib/debounce'
-import type { CaffeineLevel, Ingredient, TeaInput, TeaType } from '../../lib/catalog'
+import type {
+  CaffeineLevel,
+  Ingredient,
+  IngredientCategory,
+  TeaInput,
+  TeaType,
+} from '../../lib/catalog'
 import {
   CAFFEINE_LEVELS,
   CAFFEINE_LEVEL_LABELS,
+  INGREDIENT_CATEGORIES,
   INGREDIENT_CATEGORY_LABELS,
   TEA_TYPES,
   TEA_TYPE_LABELS,
 } from '../../lib/catalog'
 import { useBrandList, useIngredientList } from './queries'
 
-/** The tea form is shared by two callers with two endpoints: a signed-in visitor
- *  suggesting a tea (`POST /catalog/teas`, comes back unapproved) and an admin creating
- *  one (`POST /admin/teas`, comes back approved). Identical body, so the form takes the
- *  submit function rather than knowing which of the two it is. */
+/** The tea form is shared by three callers: a signed-in visitor suggesting a tea
+ *  (`POST /catalog/teas`, comes back unapproved), an admin creating one
+ *  (`POST /admin/teas`, comes back approved), and the shelf form, which does not post
+ *  the `TeaInput` at all — it carries it as `new_tea` on the tin so both are written in
+ *  one transaction. The form takes the submit function rather than knowing which of the
+ *  three it is, which is why the third one costs it no request logic. */
 type PickedIngredient = {
   ingredient: Ingredient
   /** Kept as the raw string the user typed. Parsing at submit rather than on every
@@ -35,7 +44,15 @@ type PickedIngredient = {
   isPrimary: boolean
 }
 
-type FieldErrors = { name?: string; ingredients?: string }
+type FieldErrors = { name?: string; ingredients?: string; shop?: string }
+
+/** One ingredient that does not exist yet. Only what somebody mid-recipe will actually
+ *  fill in — the description and the picture are an admin's job at approval time. */
+type ProposedIngredient = {
+  name: string
+  category: IngredientCategory
+  isPrimary: boolean
+}
 
 function optionalText(raw: string): string | undefined {
   const trimmed = raw.trim()
@@ -62,6 +79,8 @@ export function TeaForm({
   pending,
   error,
   withUpload = false,
+  withShop = true,
+  initialName = '',
   onSubmit,
 }: {
   idPrefix: string
@@ -74,9 +93,18 @@ export function TeaForm({
    *  endpoint to store bytes through is a different decision from letting them type a
    *  link. An admin adds the real photo when they approve it. */
   withUpload?: boolean
+  /** Off for the shelf form, which has already asked where the tin came from and lands
+   *  the answer on the tin's own `shop_id` as well as on a listing. Asking twice on one
+   *  screen is how you get two shops with the same name and two slugs. */
+  withShop?: boolean
+  /** What was typed into the picker that found nothing. Carried in rather than left blank
+   *  for the same reason the unknown-ingredient button below carries its search text: the
+   *  name is the one thing already known, and retyping it is the sort of small insult
+   *  that makes a form feel like paperwork. */
+  initialName?: string
   onSubmit: (input: TeaInput) => void
 }) {
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
   const [teaType, setTeaType] = useState<TeaType>('green')
   const [caffeine, setCaffeine] = useState<CaffeineLevel>('medium')
   const [brandId, setBrandId] = useState('')
@@ -90,6 +118,14 @@ export function TeaForm({
   const [brewSeconds, setBrewSeconds] = useState('')
   const [grams, setGrams] = useState('')
   const [picked, setPicked] = useState<PickedIngredient[]>([])
+  /** Ingredients the catalog does not have. Proposed here rather than on a second page,
+   *  because the moment somebody finds the gap is the moment they are describing a
+   *  recipe — and sending them away to fix it loses the recipe. */
+  const [proposed, setProposed] = useState<ProposedIngredient[]>([])
+  const [shopName, setShopName] = useState('')
+  const [shopCity, setShopCity] = useState('')
+  const [shopWebsite, setShopWebsite] = useState('')
+
   const [errors, setErrors] = useState<FieldErrors>({})
 
   const [search, setSearch] = useState('')
@@ -128,6 +164,12 @@ export function TeaForm({
       return !Number.isFinite(value) || value <= 0 || value > 100
     })
     if (badPercentage) found.ingredients = 'Percentages must be between 1 and 100.'
+    // Mirrors the server's own rule and the CHECK behind it: a shop with neither a
+    // website nor a city cannot be found by anybody. Caught here so the answer is a
+    // message under the field rather than a 422 on the whole tea.
+    if (shopName.trim() && !shopCity.trim() && !shopWebsite.trim()) {
+      found.shop = 'A shop needs a city or a website, so people can find it.'
+    }
     return found
   }
 
@@ -156,6 +198,26 @@ export function TeaForm({
         percentage: optionalNumber(row.percentage),
         is_primary: row.isPrimary,
       })),
+      // Sent alongside the tea, never as follow-up requests. The server creates them in
+      // the same transaction, so a blend is never saved with half its recipe because the
+      // browser managed three calls out of four.
+      new_ingredients: proposed.map((row) => ({
+        name: row.name,
+        category: row.category,
+        is_primary: row.isPrimary,
+        // Not asked for. Somebody mid-recipe gets exactly one decision — what kind of
+        // thing it is — and an admin sets the caffeine flag when they approve it. Asking
+        // two questions per unknown ingredient is how a five-ingredient blend becomes a
+        // form nobody finishes.
+        is_caffeinated: false,
+      })),
+      new_shop: shopName.trim()
+        ? {
+            name: shopName.trim(),
+            city: optionalText(shopCity),
+            website: optionalText(shopWebsite),
+          }
+        : undefined,
     })
   }
 
@@ -314,6 +376,55 @@ export function TeaForm({
           </ul>
         )}
 
+        {proposed.length > 0 && (
+          <ul className="mb-3 space-y-2" data-testid={`${idPrefix}-proposed`}>
+            {proposed.map((row, index) => (
+              <li
+                key={`${row.name}-${index}`}
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-950"
+              >
+                <span className="font-medium text-brand-900 dark:text-brand-100">{row.name}</span>
+                <PendingBadge />
+                {/* The category is asked for *here* rather than in a dialog at the point
+                    of adding: somebody who has just typed "yuzu peel" knows what it is,
+                    and one select beside the name is cheaper than interrupting them. */}
+                <label className="sr-only" htmlFor={`${idPrefix}-proposed-${index}-category`}>
+                  Category for {row.name}
+                </label>
+                <select
+                  id={`${idPrefix}-proposed-${index}-category`}
+                  value={row.category}
+                  onChange={(event) =>
+                    setProposed((rows) =>
+                      rows.map((r, i) =>
+                        i === index
+                          ? { ...r, category: event.target.value as IngredientCategory }
+                          : r,
+                      ),
+                    )
+                  }
+                  className="rounded-lg border control-edge bg-brand-50 px-2 py-1 text-sm text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
+                >
+                  {INGREDIENT_CATEGORIES.map((value) => (
+                    <option key={value} value={value}>
+                      {INGREDIENT_CATEGORY_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
+                <span className="ml-auto">
+                  <Button
+                    variant="ghost"
+                    ariaLabel={`Remove ${row.name}`}
+                    onClick={() => setProposed((rows) => rows.filter((_, i) => i !== index))}
+                  >
+                    Remove
+                  </Button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
         {errors.ingredients && (
           <p className="text-xs text-rose-600 dark:text-rose-400">{errors.ingredients}</p>
         )}
@@ -330,11 +441,36 @@ export function TeaForm({
         {matches.isPending ? (
           <Skeleton className="h-8 w-full" />
         ) : suggestions.length === 0 ? (
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            {debouncedSearch
-              ? `No ingredient matches “${debouncedSearch}”. An admin can add it on the ingredients page.`
-              : 'No ingredients in the catalog yet.'}
-          </p>
+          <div className="text-sm text-neutral-500 dark:text-neutral-400">
+            {debouncedSearch ? (
+              <>
+                <p>No ingredient matches “{debouncedSearch}”.</p>
+                {/* The button that used to be a sentence telling somebody to go and find
+                    an admin. Adding it here keeps the recipe they were in the middle of
+                    writing; it arrives marked and an admin sorts it out later. */}
+                <div className="mt-2">
+                  <Button
+                    testId={`${idPrefix}-propose-ingredient`}
+                    onClick={() => {
+                      setProposed((rows) => [
+                        ...rows,
+                        {
+                          name: debouncedSearch.trim(),
+                          category: 'other',
+                          isPrimary: picked.length === 0 && rows.length === 0,
+                        },
+                      ])
+                      setSearch('')
+                    }}
+                  >
+                    Add “{debouncedSearch}” as a new ingredient
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <p>No ingredients in the catalog yet.</p>
+            )}
+          </div>
         ) : (
           <ul className="flex flex-wrap gap-2" data-testid={`${idPrefix}-suggestions`}>
             {suggestions.map((ingredient) => (
@@ -350,6 +486,44 @@ export function TeaForm({
       </fieldset>
 
       {error && <FormError testId={`${idPrefix}-error`}>{error}</FormError>}
+
+
+      {/* Where you bought it, if the catalog does not know the shop yet.
+
+          Optional, collapsed into three fields, and it creates a listing for this tea as
+          well as the shop — "this shop exists" without "it sells this" drops the half
+          that answers the question the tea's page asks. */}
+      {withShop && (
+        <fieldset className="space-y-3 border-t border-brand-100 pt-5 dark:border-neutral-800">
+          <legend className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            Bought it somewhere the catalog does not have? (optional)
+          </legend>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <TextField
+              id={`${idPrefix}-shop-name`}
+              label="Shop name"
+              value={shopName}
+              onChange={setShopName}
+              placeholder="Czajnik na Rogu"
+              error={errors.shop}
+            />
+            <TextField
+              id={`${idPrefix}-shop-city`}
+              label="City"
+              value={shopCity}
+              onChange={setShopCity}
+              placeholder="Gdańsk"
+            />
+            <TextField
+              id={`${idPrefix}-shop-website`}
+              label="Website"
+              value={shopWebsite}
+              onChange={setShopWebsite}
+              placeholder="https://…"
+            />
+          </div>
+        </fieldset>
+      )}
 
       <SubmitButton pending={pending}>{pending ? pendingLabel : submitLabel}</SubmitButton>
     </form>

@@ -149,7 +149,7 @@ class TestEditingYourOwn:
             json={
                 "pronouns": "they/them",
                 "bio": "Mostly oolong, occasionally persuaded otherwise.",
-                "location": "Kraków",
+                "city": "Kraków",
                 "favourite_tea_type": "oolong",
             },
         )
@@ -157,17 +157,17 @@ class TestEditingYourOwn:
         assert response.status_code == 200
         body = response.json()
         assert body["pronouns"] == "they/them"
-        assert body["location"] == "Kraków"
+        assert body["city"] == "Kraków"
         assert body["favourite_tea_type"] == "oolong"
 
     async def test_a_partial_edit_leaves_the_rest_alone(
         self, client: AsyncClient, owner: Account
     ) -> None:
-        await client.patch(ME, headers=owner.headers, json={"bio": "Tea.", "location": "Kraków"})
+        await client.patch(ME, headers=owner.headers, json={"bio": "Tea.", "city": "Kraków"})
 
-        response = await client.patch(ME, headers=owner.headers, json={"location": "Warsaw"})
+        response = await client.patch(ME, headers=owner.headers, json={"city": "Warsaw"})
 
-        assert response.json()["location"] == "Warsaw"
+        assert response.json()["city"] == "Warsaw"
         assert response.json()["bio"] == "Tea."
         assert response.json()["display_name"] == "Owner"
 
@@ -370,3 +370,100 @@ class TestWhoSeesWhichFriends:
         ]
 
         assert set(friend) == {"id", "display_name", "avatar_url"}
+
+
+class TestStatusAndPlace:
+    """The three fields M8 added: a status line, and a location split into city plus a
+    country that comes from a list."""
+
+    async def test_a_status_is_saved_and_shown(self, client: AsyncClient, owner: Account) -> None:
+        response = await client.patch(
+            ME, headers=owner.headers, json={"status": "Working through a kilo of dan cong"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "Working through a kilo of dan cong"
+
+    async def test_a_status_is_one_line_not_a_second_bio(
+        self, client: AsyncClient, owner: Account
+    ) -> None:
+        response = await client.patch(ME, headers=owner.headers, json={"status": "x" * 141})
+        assert response.status_code == 422
+
+    async def test_the_country_comes_back_with_a_name_to_print(
+        self, client: AsyncClient, owner: Account
+    ) -> None:
+        """The column stores `PL`; the response carries the label too, so rendering one
+        profile does not require the client to hold all 249 names."""
+        response = await client.patch(
+            ME, headers=owner.headers, json={"city": "Kraków", "country_code": "PL"}
+        )
+
+        body = response.json()
+        assert body["city"] == "Kraków"
+        assert body["country"] == {"code": "PL", "name": "Poland"}
+
+    async def test_a_lowercase_code_is_corrected_rather_than_refused(
+        self, client: AsyncClient, owner: Account
+    ) -> None:
+        """The case of a two-letter code is not worth failing a form over, and the
+        column's CHECK constraint wants upper-case regardless."""
+        response = await client.patch(ME, headers=owner.headers, json={"country_code": "gb"})
+
+        assert response.status_code == 200
+        assert response.json()["country"]["code"] == "GB"
+
+    async def test_a_country_that_does_not_exist_is_refused(
+        self, client: AsyncClient, owner: Account
+    ) -> None:
+        """The whole reason the country is a list and the city is not: free text produces
+        "UK", "U.K.", "United Kingdom" and "England" in one column, and no filter can ever
+        group them."""
+        response = await client.patch(ME, headers=owner.headers, json={"country_code": "ZZ"})
+        assert response.status_code == 422
+
+    async def test_a_country_can_be_cleared(self, client: AsyncClient, owner: Account) -> None:
+        await client.patch(ME, headers=owner.headers, json={"country_code": "PL"})
+
+        response = await client.patch(ME, headers=owner.headers, json={"country_code": None})
+
+        assert response.json()["country"] is None
+
+    async def test_the_public_profile_carries_them_too(
+        self, client: AsyncClient, owner: Account, outsider: Account
+    ) -> None:
+        await client.patch(
+            ME,
+            headers=owner.headers,
+            json={"status": "Brewing", "city": "Kraków", "country_code": "PL"},
+        )
+
+        body = (await client.get(profile_url(owner.id), headers=outsider.headers)).json()
+
+        assert body["status"] == "Brewing"
+        assert body["city"] == "Kraków"
+        assert body["country"]["name"] == "Poland"
+
+
+class TestCountryList:
+    async def test_the_list_is_public_and_sorted_by_name(self, client: AsyncClient) -> None:
+        """Unauthenticated on purpose: the settings form needs the list, and so would a
+        register form, before anybody has a session."""
+        response = await client.get("/api/v1/countries")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body) == 249
+        assert [c["name"] for c in body] == sorted(c["name"] for c in body)
+        assert {"code": "PL", "name": "Poland"} in body
+
+    async def test_every_code_the_list_offers_is_one_the_api_accepts(
+        self, client: AsyncClient, owner: Account
+    ) -> None:
+        """The reason the list is served rather than hardcoded in the client. A country in
+        the dropdown that the API rejects is a form nobody can submit."""
+        offered = [c["code"] for c in (await client.get("/api/v1/countries")).json()]
+
+        for code in (offered[0], offered[len(offered) // 2], offered[-1]):
+            response = await client.patch(ME, headers=owner.headers, json={"country_code": code})
+            assert response.status_code == 200, f"{code} was offered but refused"

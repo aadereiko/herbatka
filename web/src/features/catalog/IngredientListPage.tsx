@@ -1,7 +1,16 @@
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
 
 import { Button } from '../../components/ui/button'
-import { SelectField, TextField } from '../../components/ui/form'
+import {
+  CheckboxField,
+  FormError,
+  FormNote,
+  SelectField,
+  SubmitButton,
+  TextField,
+} from '../../components/ui/form'
 import {
   Badge,
   EmptyState,
@@ -11,11 +20,13 @@ import {
   PageShell,
   Pagination,
   Panel,
+  PendingBadge,
 } from '../../components/ui/page'
 import { describeApiError } from '../../lib/api'
-import type { IngredientCategory } from '../../lib/catalog'
+import type { IngredientCategory, IngredientInput } from '../../lib/catalog'
 import { INGREDIENT_CATEGORIES, INGREDIENT_CATEGORY_LABELS } from '../../lib/catalog'
 import { useDebouncedParam } from '../../lib/debounce'
+import { useAuth } from '../auth/auth-context'
 import type { IngredientFilters } from './filters'
 import {
   hasIngredientFilters,
@@ -27,7 +38,7 @@ import { IngredientCredit } from './IngredientCredit'
 import { IngredientImage } from './IngredientImage'
 import { IngredientTasteControl } from './IngredientTasteControl'
 import { pluralise } from './format'
-import { useIngredientList } from './queries'
+import { useIngredientList, useSuggestIngredient } from './queries'
 
 const categoryOptions = [
   { value: '', label: 'Every category' },
@@ -39,7 +50,80 @@ const categoryOptions = [
 
 /** The public vocabulary list. Same URL-is-the-state approach as /teas — see
  *  `filters.ts` — just with one filter instead of four. */
+/**
+ * Three fields, and no more.
+ *
+ * `IngredientCreate` also accepts a description and a picture, and this form asks for
+ * neither. Somebody suggesting a word is usually halfway through describing a blend and
+ * has stopped to fill a gap; asking them to also write a tasting note and find a
+ * photograph is how you get an abandoned form instead of a suggestion. An admin fills the
+ * rest in when they approve it.
+ */
+function SuggestIngredientForm({
+  pending,
+  error,
+  onSubmit,
+}: {
+  pending: boolean
+  error: string | null
+  onSubmit: (input: IngredientInput) => void
+}) {
+  const [name, setName] = useState('')
+  const [category, setCategory] = useState<IngredientCategory>('other')
+  const [caffeinated, setCaffeinated] = useState(false)
+  const [nameError, setNameError] = useState<string | undefined>(undefined)
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (trimmed === '') {
+      setNameError('An ingredient needs a name.')
+      return
+    }
+    setNameError(undefined)
+    onSubmit({ name: trimmed, category, is_caffeinated: caffeinated })
+  }
+
+  return (
+    <form noValidate onSubmit={handleSubmit} className="space-y-4" data-testid="suggest-ingredient-form">
+      {error && <FormError>{error}</FormError>}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          id="new-ingredient-name"
+          label="Name"
+          value={name}
+          onChange={setName}
+          placeholder="Yuzu peel"
+          error={nameError}
+        />
+        <SelectField
+          id="new-ingredient-category"
+          label="Category"
+          value={category}
+          onChange={(value) => setCategory(value as IngredientCategory)}
+          options={INGREDIENT_CATEGORIES.map((value) => ({
+            value,
+            label: INGREDIENT_CATEGORY_LABELS[value],
+          }))}
+        />
+      </div>
+      <CheckboxField
+        id="new-ingredient-caffeinated"
+        label="Contains caffeine"
+        checked={caffeinated}
+        onChange={setCaffeinated}
+      />
+      <SubmitButton pending={pending}>{pending ? 'Sending…' : 'Suggest it'}</SubmitButton>
+    </form>
+  )
+}
+
 export function IngredientListPage() {
+  const { user } = useAuth()
+  const [suggesting, setSuggesting] = useState(false)
+  // Bumped after a successful submit: remounting the form is the cheapest correct reset.
+  const [formKey, setFormKey] = useState(0)
+  const suggest = useSuggestIngredient()
   const [searchParams, setSearchParams] = useSearchParams()
   const filters = readIngredientFilters(searchParams)
 
@@ -65,8 +149,45 @@ export function IngredientListPage() {
     <PageShell>
       <PageHeading
         title="Ingredients"
-        subtitle="The shared vocabulary every tea is described with. Admins keep it tidy."
+        subtitle="The shared vocabulary every tea is described with. Anybody can add to it."
+        actions={
+          user && (
+            <Button
+              variant={suggesting ? 'ghost' : 'primary'}
+              testId="toggle-suggest-ingredient"
+              onClick={() => setSuggesting((open) => !open)}
+            >
+              {suggesting ? 'Cancel' : 'Suggest an ingredient'}
+            </Button>
+          )
+        }
       />
+
+      {user && suggesting && (
+        <Panel className="mb-6" ariaLabel="Suggest an ingredient">
+          <h2 className="mb-1 text-lg font-semibold text-brand-900 dark:text-brand-100">
+            Suggest an ingredient
+          </h2>
+          <p className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
+            It joins the list straight away, marked until an admin has looked it over.
+          </p>
+          {suggest.isSuccess && (
+            <div className="mb-4">
+              <FormNote testId="suggest-ingredient-success">
+                Thanks — “{suggest.data.name}” is in the list, awaiting review.
+              </FormNote>
+            </div>
+          )}
+          <SuggestIngredientForm
+            key={formKey}
+            pending={suggest.isPending}
+            error={suggest.isError ? describeApiError(suggest.error) : null}
+            onSubmit={(input) =>
+              suggest.mutate(input, { onSuccess: () => setFormKey((key) => key + 1) })
+            }
+          />
+        </Panel>
+      )}
 
       <Panel className="mb-6" ariaLabel="Filters">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -159,6 +280,7 @@ export function IngredientListPage() {
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     <Badge tone="neutral">{INGREDIENT_CATEGORY_LABELS[ingredient.category]}</Badge>
                     {ingredient.is_caffeinated && <Badge tone="amber">Caffeinated</Badge>}
+                    {!ingredient.is_approved && <PendingBadge />}
                   </div>
                 </div>
               </div>

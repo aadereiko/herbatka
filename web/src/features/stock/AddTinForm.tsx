@@ -3,14 +3,17 @@ import type { FormEvent } from 'react'
 
 import { Button } from '../../components/ui/button'
 import { FormError, SubmitButton, TextAreaField, TextField } from '../../components/ui/form'
+import type { NewShopInput, TeaInput } from '../../lib/catalog'
 import type { StockItemInput, TeaRef } from '../../lib/household'
 import type { ListingWithShop, ShopRef } from '../../lib/shop'
+import { TeaForm } from '../catalog/TeaForm'
 import { priceMajorInput } from '../shop/format'
 import { ShopPicker } from './ShopPicker'
 import { TeaPicker } from './TeaPicker'
 
 type FieldErrors = {
   tea?: string
+  shop?: string
   quantity?: string
   lowStock?: string
   price?: string
@@ -52,6 +55,19 @@ function readOptionalGrams(raw: string): { value?: number; error?: string } {
  * one-tap shortlist, and the listing behind the tap carries the pack size and the price.
  * See `applyListing` for what that fills in, and — more to the point — what it refuses to
  * touch.
+ *
+ * Neither picker is allowed to dead-end any more, and that is what `newTea` and `newShop`
+ * are for. A tea the catalog has never heard of is written *here*, with the real
+ * `TeaForm` — the same component the Teas page posts, so there is one tea form in the
+ * app and not two that drift — and travels as `new_tea` on the tin. A shop nobody has
+ * listed travels as `new_shop`. One POST creates all three, in one transaction, because
+ * the alternative is a browser making three calls and managing two of them.
+ *
+ * The tea form *replaces* the tin's fields while it is open rather than nesting inside
+ * them: a `<form>` inside a `<form>` is not valid HTML, and the version of this where the
+ * inner submit button quietly submits the outer form is a bug nobody would enjoy finding.
+ * Nothing is lost by the swap — every field on this screen is controlled by state that
+ * lives up here, so it all comes back untouched.
  */
 export function AddTinForm({
   pending,
@@ -63,7 +79,14 @@ export function AddTinForm({
   onSubmit: (input: StockItemInput) => void
 }) {
   const [tea, setTea] = useState<TeaRef | null>(null)
+  /** A tea written on the way past. Never set at the same time as `tea` — one tin, one
+   *  tea — which is why both setters clear the other. */
+  const [newTea, setNewTea] = useState<TeaInput | null>(null)
+  /** The name typed into the picker, held while the tea form is open so it can arrive as
+   *  the name; `null` means the form is shut. */
+  const [composing, setComposing] = useState<string | null>(null)
   const [shop, setShop] = useState<ShopRef | null>(null)
+  const [newShop, setNewShop] = useState<NewShopInput | null>(null)
   const [quantity, setQuantity] = useState('')
   const [lowStock, setLowStock] = useState('')
   const [location, setLocation] = useState('')
@@ -116,14 +139,38 @@ export function AddTinForm({
 
   function handleShop(picked: ShopRef | null, listing?: ListingWithShop) {
     setShop(picked)
+    if (picked) setNewShop(null)
     if (listing) applyListing(listing)
+  }
+
+  function handleTea(picked: TeaRef | null) {
+    setTea(picked)
+    if (picked) setNewTea(null)
+  }
+
+  /** Open the tea form on a name, or throw the draft away. Both go through here so the
+   *  two ways of naming a tea can never both be set. */
+  function handleCompose(name: string | null) {
+    if (name === null) {
+      setNewTea(null)
+      setComposing(null)
+      return
+    }
+    setTea(null)
+    setComposing(name)
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const next: FieldErrors = {}
-    if (!tea) next.tea = 'Pick which tea this tin holds.'
+    if (!tea && !newTea) next.tea = 'Pick which tea this tin holds.'
+    // Mirrors `NewShopIn.reachable_somehow` and the CHECK behind it, so the answer is a
+    // message under the field rather than a 422 on the whole tin.
+    if (newShop && !newShop.name.trim()) next.shop = 'Give the shop a name.'
+    else if (newShop && !newShop.city?.trim() && !newShop.website?.trim()) {
+      next.shop = 'A shop needs a city or a website, so people can find it.'
+    }
 
     const grams = Number(quantity.trim())
     if (quantity.trim() === '' || !Number.isFinite(grams) || grams < 0) {
@@ -144,10 +191,14 @@ export function AddTinForm({
     }
 
     setErrors(next)
-    if (Object.keys(next).length > 0 || !tea) return
+    if (Object.keys(next).length > 0 || !(tea || newTea)) return
 
     onSubmit({
-      tea_id: tea.id,
+      // Exactly one of the two, which is what the server's own validator insists on.
+      // `undefined` rather than `null` for the one that lost, so `JSON.stringify` drops
+      // the key instead of sending "definitely no tea".
+      tea_id: tea?.id,
+      new_tea: newTea ?? undefined,
       quantity_grams: grams,
       low_stock_grams: low.value,
       location: optionalText(location),
@@ -162,21 +213,73 @@ export function AddTinForm({
       // record "definitely no shop", which is not the same statement as "I did not say" —
       // and every other optional field on this body already works that way.
       shop_id: shop?.id,
+      new_shop: newShop
+        ? {
+            name: newShop.name.trim(),
+            city: optionalText(newShop.city ?? ''),
+            website: optionalText(newShop.website ?? ''),
+          }
+        : undefined,
     })
+  }
+
+  // The tea form, in place of the tin's own fields. Its `onSubmit` never reaches the
+  // network — it hands the `TeaInput` back, which is exactly what this form needs to carry
+  // on the tin. `pending={false}` for the same reason: nothing is in flight at this step.
+  if (composing !== null) {
+    return (
+      <div className="space-y-4" data-testid="add-tin-new-tea">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            A tea the catalog does not have. The tin is still here, half-filled, underneath.
+          </p>
+          <Button variant="ghost" size="sm" testId="new-tea-cancel" onClick={() => setComposing(null)}>
+            Back to the tin
+          </Button>
+        </div>
+        <TeaForm
+          idPrefix="add-tin-tea"
+          submitLabel="Use this tea"
+          pendingLabel="Use this tea"
+          pending={false}
+          initialName={composing}
+          withShop={false}
+          onSubmit={(input) => {
+            setNewTea(input)
+            setComposing(null)
+          }}
+        />
+      </div>
+    )
   }
 
   return (
     <form noValidate onSubmit={handleSubmit} data-testid="add-tin-form" className="space-y-4">
-      <TeaPicker idPrefix="add-tin" selected={tea} onSelect={setTea} error={errors.tea} />
+      <TeaPicker
+        idPrefix="add-tin"
+        selected={tea}
+        draft={newTea}
+        onSelect={handleTea}
+        onCompose={handleCompose}
+        error={errors.tea}
+      />
 
       {/* `tea?.slug ?? null` rather than a guard around the whole control: the shop is a
           question worth asking before the tea has been settled — plenty of people know
           they were in Kruka before they can remember what the tin is called — and it is
-          only the shortlist that needs a tea to have something to say. */}
+          only the shortlist that needs a tea to have something to say. A drafted tea has
+          no slug either, and nothing to shortlist: a tea the catalog has never seen has no
+          shops listed against it, by definition. */}
       <ShopPicker
         idPrefix="add-tin"
         selected={shop}
+        draft={newShop}
         onSelect={handleShop}
+        onDraft={(next) => {
+          setNewShop(next)
+          if (next) setShop(null)
+        }}
+        draftError={errors.shop}
         teaSlug={tea?.slug ?? null}
       />
 

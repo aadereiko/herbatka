@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser
-from app.schemas.auth import ProfileUpdate, UserOut
+from app.schemas.auth import ProfileUpdate, UserOut, country_ref, user_out
 from app.schemas.household import TeaRef
 from app.schemas.profile import ProfileHousehold, ProfilePerson, ProfileReview, PublicProfile
 from app.services import friend as friend_service
@@ -46,7 +46,9 @@ async def get_profile(user_id: uuid.UUID, db: DbSession, viewer: OptionalUser) -
         avatar_url=person.avatar_url,
         pronouns=person.pronouns,
         bio=person.bio,
-        location=person.location,
+        status=person.status,
+        city=person.city,
+        country=country_ref(person.country_code),
         favourite_tea_type=person.favourite_tea_type,  # type: ignore[arg-type]
         member_since=person.created_at,
         review_count=stats["review_count"],  # type: ignore[arg-type]
@@ -77,4 +79,4 @@ async def get_profile(user_id: uuid.UUID, db: DbSession, viewer: OptionalUser) -
 
 @router.patch("/auth/me", response_model=UserOut)
 async def update_me(payload: ProfileUpdate, user: CurrentUser, db: DbSession) -> UserOut:
-    return UserOut.model_validate(await profile_service.update_own(db, user, payload))
+    return user_out(await profile_service.update_own(db, user, payload))

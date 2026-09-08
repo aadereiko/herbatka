@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "icons": "node scripts/icons.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest",
@@ -13,6 +14,9 @@
     "types": "npx -y openapi-typescript@7 http://localhost:17311/openapi.json -o src/lib/generated/api.ts"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.102.5",
     "leaflet": "^1.9.4",
@@ -23,6 +27,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/leaflet": "^1.9.22",
@@ -32,8 +37,10 @@
     "@vitejs/plugin-react": "^6.1.0",
     "jsdom": "^30.0.1",
     "oxlint": "^1.79.0",
+    "tesseract.js": "^7.0.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.2",
+    "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.11"
   }
 }

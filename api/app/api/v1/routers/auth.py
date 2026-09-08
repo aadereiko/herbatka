@@ -6,7 +6,7 @@ from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
 from app.core.security import create_access_token
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserOut
+from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserOut, user_out
 from app.services import auth as auth_service
 from app.services.errors import (
     EmailAlreadyRegistered,
@@ -55,7 +55,7 @@ def _token_response(user: User, response: Response, raw_refresh: str) -> TokenRe
     return TokenResponse(
         access_token=access_token,
         expires_in=expires_in,
-        user=UserOut.model_validate(user),
+        user=user_out(user),
     )
 
 
@@ -129,4 +129,4 @@ async def logout(response: Response, db: DbSession, refresh_token: RefreshCookie
 
 @router.get("/me", response_model=UserOut)
 async def me(user: CurrentUser) -> UserOut:
-    return UserOut.model_validate(user)
+    return user_out(user)

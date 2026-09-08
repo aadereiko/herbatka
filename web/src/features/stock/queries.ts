@@ -4,6 +4,8 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { api } from '../../lib/api'
 import type { Page } from '../../lib/catalog'
 import type {
+  HouseholdConsumption,
+  HouseholdEvent,
   StockAdjustInput,
   StockEventInput,
   StockItem,
@@ -37,6 +39,14 @@ export const stockKeys = {
   items: (householdId: string) => ['stock', householdId, 'item'] as const,
   item: (householdId: string, itemId: string) =>
     ['stock', householdId, 'item', itemId] as const,
+  //   ['stock', id, 'consumption']    what the shelf gets through
+  //
+  // Under the same household prefix as everything else, which is what makes it fall out
+  // of the existing invalidations for free: recording a brew already invalidates
+  // `stockKeys.household(id)`, and the summary is downstream of exactly the events that
+  // call does.
+  consumption: (householdId: string) => ['stock', householdId, 'consumption'] as const,
+  activity: (householdId: string) => ['stock', householdId, 'activity'] as const,
 }
 
 const stockPath = (householdId: string, suffix = '') =>
@@ -55,6 +65,44 @@ export function useStockList(householdId: string, params: StockListParams) {
     enabled: householdId !== '',
     // The shelf stays on screen, dimmed, while a search or a page change lands. Tins
     // vanishing into skeletons on every keystroke is the thing this avoids.
+    placeholderData: keepPreviousData,
+    retry: false,
+  })
+}
+
+export const fetchConsumption = (householdId: string) =>
+  api<HouseholdConsumption>(
+    `/households/${encodeURIComponent(householdId)}/consumption`,
+  )
+
+/** What the shelf gets through, who drinks it, and what runs out next. A separate
+ *  request from the stock list because it is a different question about the same rows —
+ *  and because the list is paginated while this is an aggregate over all of them. */
+export function useConsumption(householdId: string) {
+  return useQuery({
+    queryKey: stockKeys.consumption(householdId),
+    queryFn: () => fetchConsumption(householdId),
+    enabled: householdId !== '',
+    retry: false,
+  })
+}
+
+export const fetchActivity = (householdId: string, params: { page: number; size: number }) =>
+  api<Page<HouseholdEvent>>(
+    `/households/${encodeURIComponent(householdId)}/stock/activity` + toQuery({ ...params }),
+  )
+
+/** The shelf's own timeline. Under the same household key prefix as the rest, so
+ *  recording a brew — which already invalidates `stockKeys.household(id)` — refreshes it
+ *  without this file knowing anything about the mutation. */
+export function useHouseholdActivity(
+  householdId: string,
+  params: { page: number; size: number },
+) {
+  return useQuery({
+    queryKey: [...stockKeys.activity(householdId), params],
+    queryFn: () => fetchActivity(householdId, params),
+    enabled: householdId !== '',
     placeholderData: keepPreviousData,
     retry: false,
   })

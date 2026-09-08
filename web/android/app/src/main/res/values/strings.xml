@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Herbatka</string>
+    <string name="title_activity_main">Herbatka</string>
+    <string name="package_name">dev.herbatka.app</string>
+    <string name="custom_url_scheme">dev.herbatka.app</string>
+</resources>

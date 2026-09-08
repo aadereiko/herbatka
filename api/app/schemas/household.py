@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.schemas.catalog import TeaType
+from app.schemas.catalog import NewShopIn, TeaCreate, TeaType
 
 if TYPE_CHECKING:
     from app.schemas.shop import ShopRef
@@ -155,6 +155,17 @@ class StockEvent(BaseModel):
     actor: ActorRef | None
 
 
+class HouseholdEvent(StockEvent):
+    """A ledger row on the household timeline.
+
+    `StockEvent` plus the tea, because on a single tin's page the heading already says
+    which tea it is and here it does not — a shelf's activity is unreadable without it.
+    """
+
+    tea: TeaRef
+    item_id: uuid.UUID
+
+
 class StockItem(BaseModel):
     id: uuid.UUID
     tea: TeaRef
@@ -170,19 +181,53 @@ class StockItem(BaseModel):
     shop: "ShopRef | None"
 
 
+class StockPace(BaseModel):
+    """How fast one tin is going, and how long that leaves.
+
+    Nullable on the tin it describes, and that is the contract: below the floors in
+    `services.consumption` there is no honest answer, and `null` says so. A client must
+    render the absence as "not enough history yet" rather than as zero — a tin nobody has
+    touched twice is not a tin being drunk at 0 g a week.
+    """
+
+    grams_per_week: float
+    #: How much real history the rate is measured over. Surfaced because "12 g a week"
+    #: deserves different confidence after nine days than after ninety.
+    days_observed: int
+    events_counted: int
+    #: None when the tin is already empty: there is nothing left to run out.
+    days_remaining: int | None
+
+
 class StockItemDetail(StockItem):
     notes: str | None
     purchased_at: date | None
     price_paid_minor: int | None
     currency: str | None
     recent_events: list[StockEvent]
+    #: None until the ledger has enough to say. See `StockPace`.
+    pace: StockPace | None
 
 
 class StockItemCreate(BaseModel):
-    tea_id: uuid.UUID
+    #: The catalog's tea. Optional only because `new_tea` is the other way to answer the
+    #: same question — see `one_tea_and_only_one`.
+    tea_id: uuid.UUID | None = None
+    #: A tea the catalog does not have yet, proposed while the shopping is being unpacked.
+    #:
+    #: The whole `TeaCreate` body, and the same schema `POST /catalog/teas` takes, because
+    #: the two ways of submitting a tea must not drift: one service call creates it — slug,
+    #: the unapproved default, any new ingredients — inside this request's transaction. The
+    #: alternative was telling somebody mid-form to go to Teas, add it there and start
+    #: again, which is how a half-filled form gets abandoned instead of finished.
+    new_tea: TeaCreate | None = None
     # Optional, and settable when adding a tin by hand — not only when the buy flow
     # sets it. A tin bought in a shop is a tin bought in a shop either way.
     shop_id: uuid.UUID | None = None
+    #: The shop half of the same problem: a tin came from wherever it came from, and the
+    #: catalog not knowing the place is not a reason to record nothing. Creating it also
+    #: creates a listing for this tin's tea — see `NewShopIn`.
+    new_shop: NewShopIn | None = None
     quantity_grams: float = Field(ge=0, le=999999)
     location: str | None = Field(default=None, max_length=120)
     opened_at: date | None = None
@@ -199,6 +244,27 @@ class StockItemCreate(BaseModel):
         # the caller gets a 422 naming the field, rather than a 500 from an IntegrityError.
         if self.price_paid_minor is not None and self.currency is None:
             raise ValueError("currency is required when price_paid_minor is given")
+        return self
+
+    @model_validator(mode="after")
+    def one_tea_and_only_one(self) -> "StockItemCreate":
+        # Neither is a tin of nothing. Both is two answers to one question, and choosing
+        # one of them on the caller's behalf is guessing which tin they meant to shelve.
+        if (self.tea_id is None) == (self.new_tea is None):
+            raise ValueError("give either tea_id or new_tea, not both")
+        return self
+
+    @model_validator(mode="after")
+    def one_shop_at_most(self) -> "StockItemCreate":
+        # Unlike the tea, neither is fine: a gift came from nowhere the catalog can name.
+        if self.shop_id is not None and self.new_shop is not None:
+            raise ValueError("give either shop_id or new_shop, not both")
+        # `TeaCreate.new_shop` exists for the Teas page, where the tea is the only thing
+        # being written and a listing is all a shop can be attached to. A tin has its own
+        # `shop_id` to fill in as well, so here the shop is proposed at this level —
+        # honouring both fields would create the same shop twice under two slugs.
+        if self.new_tea is not None and self.new_tea.new_shop is not None:
+            raise ValueError("put the shop on the tin's new_shop, not on new_tea")
         return self
 
 
@@ -244,6 +310,50 @@ def stock_event(event: Any) -> StockEvent:
     )
 
 
+def household_event(event: Any) -> HouseholdEvent:
+    return HouseholdEvent(
+        **stock_event(event).model_dump(),
+        tea=TeaRef.model_validate(event.stock_item.tea),
+        item_id=event.stock_item_id,
+    )
+
+
+class TeaWeek(BaseModel):
+    """One column of the plot on a tea's page."""
+
+    week_start: date
+    grams: float
+    brews: int
+
+
+class TeaSeries(BaseModel):
+    """Weekly grams of one tea on the viewer's own shelves.
+
+    Always exactly `weeks` entries, oldest first, including the weeks in which nothing
+    happened. A plot that silently drops empty weeks spaces the remaining ones evenly and
+    draws steady drinking out of three scattered cups — the gaps are the most informative
+    part of a consumption series, so they are transmitted rather than inferred.
+
+    `total_grams` of 0 means the viewer has genuinely brewed none of it: the client shows
+    nothing at all rather than twelve empty columns.
+    """
+
+    weeks: list[TeaWeek]
+    total_grams: float
+    total_brews: int
+
+
+def tea_series(buckets: list[Any]) -> TeaSeries:
+    return TeaSeries(
+        weeks=[
+            TeaWeek(week_start=b.week_start, grams=round(b.grams, 1), brews=b.brews)
+            for b in buckets
+        ],
+        total_grams=round(sum(b.grams for b in buckets), 1),
+        total_brews=sum(b.brews for b in buckets),
+    )
+
+
 def _stock_fields(item: Any) -> dict[str, Any]:
     from app.schemas.shop import ShopRef
 
@@ -269,7 +379,16 @@ def stock_item(item: Any) -> StockItem:
     return StockItem(**_stock_fields(item))
 
 
-def stock_item_detail(item: Any, events: list[Any]) -> StockItemDetail:
+def stock_pace(pace: Any) -> StockPace:
+    return StockPace(
+        grams_per_week=pace.grams_per_week,
+        days_observed=pace.days_observed,
+        events_counted=pace.events_counted,
+        days_remaining=pace.days_remaining,
+    )
+
+
+def stock_item_detail(item: Any, events: list[Any], pace: Any = None) -> StockItemDetail:
     return StockItemDetail(
         **_stock_fields(item),
         notes=item.notes,
@@ -277,4 +396,71 @@ def stock_item_detail(item: Any, events: list[Any]) -> StockItemDetail:
         price_paid_minor=item.price_paid_minor,
         currency=item.currency,
         recent_events=[stock_event(e) for e in events],
+        pace=stock_pace(pace) if pace is not None else None,
+    )
+
+
+class DrinkerShare(BaseModel):
+    """One person's brewing on one shelf.
+
+    `user` is nullable for the same reason the feed's actor is: `stock_event.user_id` is
+    ON DELETE SET NULL, so a departed member's brews stay in the ledger the rest of the
+    household still shares, with nobody's name on them.
+    """
+
+    user: ActorRef | None
+    grams: float
+    brews: int
+
+
+class TeaShare(BaseModel):
+    tea: TeaRef
+    grams: float
+    brews: int
+
+
+class TinForecast(BaseModel):
+    item: StockItem
+    pace: StockPace
+
+
+class HouseholdConsumption(BaseModel):
+    """What a shelf gets through, and what to buy next.
+
+    Two totals that deliberately do not match: `grams_out` counts everything that left
+    the shelf, including tea thrown away, because that is what empties a tin; the
+    `drinkers` and `teas` breakdowns count brewing only, because throwing out a stale tin
+    is not drinking it. Where they differ, something was discarded.
+    """
+
+    window_days: int
+    grams_out: float
+    grams_per_week: float
+    drinkers: list[DrinkerShare]
+    teas: list[TeaShare]
+    #: Soonest-empty first, and only tins the ledger can actually forecast.
+    running_out: list[TinForecast]
+
+
+def household_consumption(summary: Any) -> HouseholdConsumption:
+    return HouseholdConsumption(
+        window_days=summary.window_days,
+        grams_out=summary.grams_out,
+        grams_per_week=summary.grams_per_week,
+        drinkers=[
+            DrinkerShare(
+                user=ActorRef.model_validate(d.user) if d.user else None,
+                grams=round(d.grams, 1),
+                brews=d.brews,
+            )
+            for d in summary.drinkers
+        ],
+        teas=[
+            TeaShare(tea=TeaRef.model_validate(t.tea), grams=round(t.grams, 1), brews=t.brews)
+            for t in summary.teas
+        ],
+        running_out=[
+            TinForecast(item=stock_item(f.item), pace=stock_pace(f.pace))
+            for f in summary.running_out
+        ],
     )

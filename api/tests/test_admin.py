@@ -55,11 +55,13 @@ class TestModerationQueue:
 
         assert body["total"] == 2
 
-    async def test_approving_publishes_the_tea(
+    async def test_approving_clears_the_pending_mark(
         self, client: AsyncClient, admin_headers: dict[str, str], catalog_fixtures: dict[str, Any]
     ) -> None:
         pending = catalog_fixtures["pending"]
-        assert (await client.get(f"{CATALOG}/teas/secret-blend")).status_code == 404
+        # Readable before approval, and marked. Approving clears the mark rather than
+        # publishing something that was hidden.
+        assert (await client.get(f"{CATALOG}/teas/secret-blend")).json()["is_approved"] is False
 
         response = await client.post(f"{ADMIN}/teas/{pending.id}/approve", headers=admin_headers)
 

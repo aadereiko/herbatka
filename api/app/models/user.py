@@ -39,10 +39,22 @@ class User(UUIDPrimaryKey, Timestamps, Base):
     # and guessing from a name is exactly the mistake this field exists to prevent.
     pronouns: Mapped[str | None] = mapped_column(String(40))
     bio: Mapped[str | None] = mapped_column(Text)
+    # One line about *now*, where `bio` is a standing description of a person. "Working
+    # through a kilo of dan cong" is a status; "drinks mostly oolong" is a bio. Short on
+    # purpose — a status that can hold three paragraphs becomes a second bio, and then
+    # nobody updates either.
+    status: Mapped[str | None] = mapped_column(String(140))
     # "Kraków", "London", "somewhere with hard water" — a place as a person describes it,
     # not a geocoded point. Shop locations are precise because a map needs them to be;
     # a profile does not, and asking for coordinates here would be intrusive.
-    location: Mapped[str | None] = mapped_column(String(120))
+    #
+    # The country beside it *is* constrained, to ISO 3166-1 alpha-2 (see
+    # `core/countries.py`). The asymmetry is deliberate: a city is a place as you describe
+    # it and there is no canonical list of those worth arguing with, whereas a country
+    # typed freehand produces "UK", "U.K.", "United Kingdom" and "England" in one column
+    # and no filter can ever group them.
+    city: Mapped[str | None] = mapped_column(String(120))
+    country_code: Mapped[str | None] = mapped_column(String(2))
     favourite_tea_type: Mapped[str | None] = mapped_column(TeaTypeEnum)
     role: Mapped[str] = mapped_column(
         UserRole, nullable=False, default="user", server_default="user"
@@ -56,7 +68,16 @@ class User(UUIDPrimaryKey, Timestamps, Base):
         back_populates="user", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (CheckConstraint("length(display_name) >= 1", name="ck_display_name_present"),)
+    __table_args__ = (
+        CheckConstraint("length(display_name) >= 1", name="ck_display_name_present"),
+        # Shape, not membership. Pydantic checks the code is one of the 249 the app knows;
+        # this stops anything that is not even code-shaped reaching the column, including
+        # from a migration or a psql session that never passes through the API.
+        CheckConstraint(
+            "country_code IS NULL OR country_code ~ '^[A-Z]{2}$'",
+            name="ck_user_country_code_shape",
+        ),
+    )
 
 
 class AuthIdentity(UUIDPrimaryKey, Timestamps, Base):

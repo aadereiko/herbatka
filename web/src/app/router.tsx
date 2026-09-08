@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import type { Location } from 'react-router'
@@ -14,7 +15,6 @@ import { IngredientListPage } from '../features/catalog/IngredientListPage'
 import { TeaDetailPage } from '../features/catalog/TeaDetailPage'
 import { TeaListPage } from '../features/catalog/TeaListPage'
 import { FavouritesPage } from '../features/favourite/FavouritesPage'
-import { FeedPage } from '../features/feed/FeedPage'
 import { FriendsPage } from '../features/friend/FriendsPage'
 import { HomePage } from '../features/home/HomePage'
 import { HouseholdDetailPage } from '../features/household/HouseholdDetailPage'
@@ -24,8 +24,34 @@ import { SettingsPage } from '../features/profile/SettingsPage'
 import { MyReviewsPage } from '../features/review/MyReviewsPage'
 import { ShopDetailPage } from '../features/shop/ShopDetailPage'
 import { ShopListPage } from '../features/shop/ShopListPage'
+import { ConsumptionPage } from '../features/stock/ConsumptionPage'
 import { StockItemPage } from '../features/stock/StockItemPage'
 import { ForbiddenPage } from './ForbiddenPage'
+
+/**
+ * The OCR workbench, and the one route in the app that is not shipped.
+ *
+ * `import.meta.env.DEV` rather than an admin guard, and the difference matters: Vite
+ * substitutes the literal `false` here in a production build, the conditional folds away,
+ * and Rollup then drops the only `import()` of `dev/` — with it tesseract.js, a 2.9 MB
+ * WASM core and every byte of the bench. An admin-only route would still be in the bundle,
+ * just unreachable.
+ *
+ * The ternary rather than putting `lazy()` inside the JSX guard is deliberate too. A
+ * top-level `const x = lazy(() => import(…))` is a call Rollup cannot prove is pure, so it
+ * survives tree-shaking even when `x` is unreferenced — and the dynamic import inside it
+ * survives with it, emitting the chunk. `false ? lazy(…) : null` folds to `null` before
+ * that can happen.
+ */
+const OcrBenchPage = import.meta.env.DEV ? lazy(() => import('../dev/ocr/OcrBenchPage')) : null
+
+/**
+ * The data-science bench, gated the same way and for one extra reason: it imports
+ * `vendor-dataset.json`, the shops' own catalogue copy gathered to develop the similarity
+ * work. The `import.meta.env.DEV` fold is what guarantees it never reaches a public
+ * bundle — see the note on `OcrBenchPage` for why the ternary shape matters.
+ */
+const LabsPage = import.meta.env.DEV ? lazy(() => import('../dev/labs/LabsPage')) : null
 
 /** What the guards stash in router state so the login page can send you back. */
 type FromState = { from?: Location } | null
@@ -157,22 +183,19 @@ export function AppRoutes() {
         }
       />
 
-      {/* Neither of these means anything to a stranger: every M5 endpoint answers
-          relative to the caller — who *your* friends are, what *you* are allowed to
-          see — so there is no signed-out version of either page to fall back to. */}
+      {/* Means nothing to a stranger: every M5 endpoint answers relative to the caller
+          — who *your* friends are, what *you* are allowed to see — so there is no
+          signed-out version of this page to fall back to.
+
+          `/feed` used to sit beside it and is gone. The home page shows the head of the
+          same timeline, which turned out to be as much of it as anybody read; the
+          endpoint behind it is untouched, so restoring the page is a route and a
+          screen. */}
       <Route
         path="/friends"
         element={
           <RequireAuth>
             <FriendsPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/feed"
-        element={
-          <RequireAuth>
-            <FeedPage />
           </RequireAuth>
         }
       />
@@ -201,6 +224,17 @@ export function AppRoutes() {
         element={
           <RequireAuth>
             <StockItemPage />
+          </RequireAuth>
+        }
+      />
+      {/* Behind the same guard as the shelf it summarises, and the server checks
+          membership again on the endpoint. Who has been drinking what is the most private
+          thing this app computes, so it is gated in both places rather than either. */}
+      <Route
+        path="/households/:id/consumption"
+        element={
+          <RequireAuth>
+            <ConsumptionPage />
           </RequireAuth>
         }
       />
@@ -240,6 +274,28 @@ export function AppRoutes() {
 
       {/* The M0 status page, still reachable on its own and still public. */}
       <Route path="/health" element={<App />} />
+
+      {/* Dev only, and deliberately not in any menu — see the note on `OcrBenchPage`. */}
+      {OcrBenchPage && (
+        <Route
+          path="/dev/ocr"
+          element={
+            <Suspense fallback={null}>
+              <OcrBenchPage />
+            </Suspense>
+          }
+        />
+      )}
+      {LabsPage && (
+        <Route
+          path="/dev/labs"
+          element={
+            <Suspense fallback={null}>
+              <LabsPage />
+            </Suspense>
+          }
+        />
+      )}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

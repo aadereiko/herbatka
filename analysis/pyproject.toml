@@ -1,0 +1,45 @@
+[project]
+name = "herbatka-analysis"
+version = "0.1.0"
+description = "Herbatka analysis — the catalogue as data, starting with teas as ingredient vectors"
+requires-python = ">=3.13"
+# A third project alongside api/ and vision/, for the same reason vision/ exists: a
+# notebook stack has no business in the API's image or its lockfile. This one is the
+# cheap sibling — no torch, no opencv. Everything here is numpy on a matrix small
+# enough to print.
+#
+# Note what is deliberately *absent*: scikit-learn. TF-IDF over 23 documents is four
+# lines of numpy, PCA is one call to `np.linalg.svd`, and writing them by hand is the
+# entire point of notebook 01. Add it when a real model needs cross-validation, not
+# before — `TfidfVectorizer` would hide the one parameter this notebook exists to
+# think about.
+dependencies = [
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+]
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.3",
+    "matplotlib>=3.9",
+    "ruff>=0.9",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["herbatka_analysis"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

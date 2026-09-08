@@ -2,12 +2,22 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { LinkButton } from '../../components/ui/button'
-import { EmptyState, ErrorNote, PageHeading, PageShell, Panel, Skeleton } from '../../components/ui/page'
+import { TeaBranch, TeaCupMark, TeapotMark } from '../../components/ui/botanical'
+import {
+  EmptyState,
+  ErrorNote,
+  PageHeading,
+  PageShell,
+  Panel,
+  SectionLabel,
+  Skeleton,
+} from '../../components/ui/page'
 import { describeApiError } from '../../lib/api'
 import { formatGrams } from '../../lib/format'
+import { formatTimeLeft } from '../stock/format'
 import type { HomeSummary, LowTin, PublicSummary } from '../../lib/home'
 import { TeaCard } from '../catalog/TeaCard'
-import { FeedRow } from '../feed/FeedPage'
+import { FeedRow } from '../feed/FeedRow'
 import { useAuth } from '../auth/auth-context'
 import { useHomeSummary, usePublicSummary } from './queries'
 
@@ -52,7 +62,7 @@ function Stat({ label, value, to }: { label: string; value: number | string; to?
     </>
   )
   const shell =
-    'rounded-2xl border border-brand-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900'
+    'paper-grain rounded-2xl border border-brand-200 bg-white px-4 py-3 shadow-sm dark:border-neutral-700 dark:bg-neutral-900'
   return to ? (
     <Link
       to={to}
@@ -62,6 +72,33 @@ function Stat({ label, value, to }: { label: string; value: number | string; to?
     </Link>
   ) : (
     <div className={shell}>{body}</div>
+  )
+}
+
+/**
+ * Why this tin is on the list, in as few words as possible.
+ *
+ * There are two ways in and the reader has to be able to tell them apart, because they
+ * call for different reactions. A tin below its threshold is a fact — you set 20 g and
+ * there are 18. A tin above its threshold that is *forecast* to empty is a projection,
+ * and saying "about 5 days left" without saying it is an estimate would be overclaiming
+ * on a handful of ledger rows.
+ *
+ * A tin can be both, and then the forecast wins the line: "18 g, about 5 days left" is
+ * strictly more useful than "18 g, below 20 g", which the reader can see for themselves.
+ */
+function LowTinReason({ low }: { low: LowTin }) {
+  if (low.pace && low.pace.days_remaining !== null) {
+    return (
+      <span data-testid={`low-forecast-${low.item.id}`} className="text-amber-700 dark:text-amber-300">
+        {formatTimeLeft(low.pace.days_remaining)}
+      </span>
+    )
+  }
+  return (
+    <span className="text-neutral-500 dark:text-neutral-400">
+      below {formatGrams(low.item.low_stock_grams)}
+    </span>
   )
 }
 
@@ -79,6 +116,8 @@ function LowTinRow({ low }: { low: LowTin }) {
         <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">
           {household.name}
           {item.location ? ` · ${item.location}` : ''}
+          {' · '}
+          <LowTinReason low={low} />
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-3">
@@ -153,7 +192,7 @@ function SignedIn({ summary }: { summary: HomeSummary }) {
           <Panel testId="home-low-stock">
             <PanelHeader
               title="Running low"
-              description="Below the amount you asked to be warned at."
+              description="Under the amount you set, or going fast enough to run out soon."
             />
             <ul>
               {low_stock.map((low) => (
@@ -167,17 +206,12 @@ function SignedIn({ summary }: { summary: HomeSummary }) {
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section>
           <Panel testId="home-activity">
+            {/* No "all activity →" any more: this *is* all of it. The link pointed at a
+                page showing a longer version of the same stream, and the longer version
+                turned out to be the part nobody needed. */}
             <PanelHeader
               title="Lately"
-              description="Your friends' ratings, and what has landed on your shelves."
-              action={
-                <Link
-                  to="/feed"
-                  className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
-                >
-                  All activity →
-                </Link>
-              }
+              description="Your friends' ratings, and what has been landing on — and leaving — your shelves."
             />
             {recent_activity.length === 0 ? (
               <EmptyState title="Quiet so far">
@@ -222,35 +256,83 @@ function SignedIn({ summary }: { summary: HomeSummary }) {
   )
 }
 
+/**
+ * The still life beside the headline: a branch over a shelf, a pot, and a cup with steam
+ * coming off it.
+ *
+ * Everything about this is decoration, so all of it is `aria-hidden` and none of it says
+ * anything the headline does not. Three rules it follows, all of them from the brief:
+ *
+ *  - **It never sits behind the words.** The objects are in their own column at `lg`,
+ *    beside the copy rather than under it. Below `lg` the whole thing is removed rather
+ *    than shrunk: a 280px tableau stacked above a headline on a phone pushes the button
+ *    below the fold to make room for a picture of a teapot.
+ *  - **It is the only steam in the app.** `TeaCupMark` takes `steam` as an opt-in
+ *    precisely so that this can be the one place it is on. Steam on every cup in a grid
+ *    is a screensaver, and the CSS animation stops under `prefers-reduced-motion` with
+ *    everything else.
+ *  - **The shelf is what makes it a room.** Without a line under them the three objects
+ *    float, and floating objects read as clip art. One 2px rule is the whole difference.
+ */
+function ShelfStill() {
+  return (
+    <div aria-hidden="true" className="relative hidden h-60 w-72 shrink-0 lg:block">
+      <TeaBranch className="absolute -top-1 right-1 h-20 w-36 text-leaf-600 opacity-75" />
+      <span className="absolute bottom-9 left-2 right-2 h-0.5 rounded-full bg-brand-300/70 dark:bg-neutral-700" />
+      <span className="absolute bottom-2 left-7 h-7 w-1.5 bg-brand-300/50 dark:bg-neutral-800" />
+      <span className="absolute bottom-2 right-7 h-7 w-1.5 bg-brand-300/50 dark:bg-neutral-800" />
+      <TeapotMark className="absolute bottom-9 left-0 h-20 w-24 text-brand-300" />
+      <TeaCupMark steam className="absolute bottom-8 right-3 h-28 w-28 text-brand-200" />
+    </div>
+  )
+}
+
 function SignedOut({ summary }: { summary: PublicSummary }) {
   const { tea_count, shop_count, ingredient_count, featured } = summary
   return (
     <>
-      <section className="rounded-2xl border border-brand-200 bg-white px-6 py-10 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:px-10 sm:py-14">
-        <p className="text-4xl" role="img" aria-label="teacup">
-          🍵
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-brand-900 dark:text-brand-100 sm:text-4xl">
-          Know your tea, and what is left of it
-        </h1>
-        <p className="mx-auto mt-3 max-w-2xl text-neutral-600 dark:text-neutral-300">
-          Look up what is actually in a blend, rate what you drink, and keep track of how much
-          is left in the tin — shared with whoever else raids the same cupboard.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <LinkButton to="/register" variant="primary" size="lg">
-            Create an account
-          </LinkButton>
-          <LinkButton to="/teas" size="lg">
-            Browse the catalog
-          </LinkButton>
+      {/* A single flat tinted block, after the reference's promo panel.
+          
+          It was paper set inside a timber frame — two nested boxes with different corners
+          and different textures, which is a real idea when one of them is wood. With both
+          reduced to hairlines it was just a box inside a box, and the pinned-card marks in
+          the corners were pinning nothing. One tinted surface, no border, no pins. */}
+      <section>
+        <div className="rounded-3xl bg-leaf-100 px-6 py-10 dark:bg-neutral-900 sm:px-12 sm:py-14">
+          <div className="flex items-center justify-center gap-10 lg:justify-between">
+            <div className="max-w-xl text-center lg:text-left">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                Herbatka · a tea house
+              </p>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-brand-900 dark:text-brand-100 sm:text-4xl">
+                Know your tea, and what is left of it
+              </h1>
+              <p className="mx-auto mt-4 max-w-2xl text-neutral-600 dark:text-neutral-300 lg:mx-0">
+                Look up what is actually in a blend, rate what you drink, and keep track of how
+                much is left in the tin — shared with whoever else raids the same cupboard.
+              </p>
+              <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
+                <LinkButton to="/register" variant="primary" size="lg">
+                  Create an account
+                </LinkButton>
+                <LinkButton to="/teas" size="lg">
+                  Browse the catalog
+                </LinkButton>
+              </div>
+              <p className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">
+                Already have one?{' '}
+                <Link
+                  to="/login"
+                  className="font-medium text-brand-700 hover:underline dark:text-brand-300"
+                >
+                  Sign in
+                </Link>
+              </p>
+            </div>
+
+            <ShelfStill />
+          </div>
         </div>
-        <p className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">
-          Already have one?{' '}
-          <Link to="/login" className="font-medium text-brand-700 hover:underline dark:text-brand-300">
-            Sign in
-          </Link>
-        </p>
       </section>
 
       <dl className="mt-6 grid grid-cols-3 gap-3">
@@ -260,14 +342,21 @@ function SignedOut({ summary }: { summary: PublicSummary }) {
       </dl>
 
       {featured.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold text-brand-900 dark:text-brand-100">
+        <section className="mt-10">
+          <SectionLabel action={
+            <Link
+              to="/teas"
+              className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
+            >
+              All teas →
+            </Link>
+          }>
             Well thought of
-          </h2>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+          </SectionLabel>
+          <p className="-mt-1 mb-4 text-sm text-neutral-500 dark:text-neutral-400">
             The best-rated teas in the catalog. No account needed to read about them.
           </p>
-          <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {featured.map((tea) => (
               <TeaCard key={tea.id} tea={tea} />
             ))}

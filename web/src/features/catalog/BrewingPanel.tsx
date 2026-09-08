@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 
 import { Button } from '../../components/ui/button'
 import { FormError, TextAreaField, TextField } from '../../components/ui/form'
+import { BrewIcon } from '../../components/ui/botanical'
+import type { BrewGlyph } from '../../components/ui/botanical'
 import { Badge, Panel } from '../../components/ui/page'
 import { describeApiError } from '../../lib/api'
 import type { BrewingInput, BrewingNote, TeaDetail } from '../../lib/catalog'
@@ -49,13 +51,33 @@ function describeFigures(figures: Figures): string {
  * It is absent entirely when you have no note of your own, because then there is only one
  * source and labelling it every time is noise.
  */
-function SpecRow({ label, value, source }: { label: string; value: string; source?: string }) {
+function SpecRow({
+  label,
+  value,
+  source,
+  glyph,
+}: {
+  label: string
+  value: string
+  source?: string
+  /** The drawn instrument above the number. */
+  glyph: BrewGlyph
+}) {
   return (
     // A fact tile is set *into* the card, not raised off it: the fill is the page
     // ground with a 1px rule round it. It used to be `neutral-800`, which is the rule
     // colour and so has to stay bright — and the eyebrow inside it is `neutral-400`,
     // which measures 3.82 on that fill and 6.75 on this one.
-    <div className="border border-brand-200 bg-brand-50 p-3 text-center dark:border-neutral-800 dark:bg-neutral-950">
+    <div className="rounded-sm border border-brand-200 bg-brand-50 p-3 text-center dark:border-neutral-800 dark:bg-neutral-950">
+      {/* A thermometer, a sand timer and a spoon of leaf — this is the one screen in the
+          app that reads as a page out of a tea merchant's notebook, and three drawn
+          instruments over three numbers is what makes it read that way rather than as a
+          stats row.
+
+          `aria-hidden`, and the `<dt>` under it still says "Water" in words. The icon is
+          never the only thing naming the measurement: at a glance a thermometer and a
+          timer are distinguishable, and at 20px in a hurry they are not. */}
+      <BrewIcon glyph={glyph} className="mx-auto mb-1.5 size-6 text-leaf-600" />
       <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
         {label}
       </dt>
@@ -291,6 +313,7 @@ export function BrewingPanel({ tea }: { tea: TeaDetail }) {
         <dl className="grid grid-cols-3 gap-2 lg:grid-cols-1" data-testid="tea-brewing">
           {inForce.brew_temp_c !== null && (
             <SpecRow
+              glyph="temperature"
               label="Water"
               value={formatTemp(inForce.brew_temp_c)}
               source={showSources ? (mine?.brew_temp_c != null ? yours : theirs) : undefined}
@@ -298,6 +321,7 @@ export function BrewingPanel({ tea }: { tea: TeaDetail }) {
           )}
           {inForce.brew_seconds !== null && (
             <SpecRow
+              glyph="time"
               label="Steep"
               value={formatBrewTime(inForce.brew_seconds)}
               source={showSources ? (mine?.brew_seconds != null ? yours : theirs) : undefined}
@@ -305,6 +329,7 @@ export function BrewingPanel({ tea }: { tea: TeaDetail }) {
           )}
           {inForce.grams_per_100ml !== null && (
             <SpecRow
+              glyph="leaf"
               label="Leaf"
               value={formatDose(inForce.grams_per_100ml)}
               source={showSources ? (mine?.grams_per_100ml != null ? yours : theirs) : undefined}

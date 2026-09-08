@@ -138,7 +138,11 @@ async def where_to_buy(slug: str, db: DbSession, paging: PageParams) -> Page[Lis
     from app.services import catalog as catalog_service
 
     try:
-        tea, _ = await catalog_service.get_tea_by_slug(db, slug)
+        # `include_unapproved`, like every other public read of a tea: a suggested tea is
+        # in the catalog now, and "where can I buy this" 404ing on it would be the one
+        # page that still pretended it did not exist. It is also the page a suggestion
+        # most often *creates*, since adding a tea can bring a shop with it.
+        tea, _ = await catalog_service.get_tea_by_slug(db, slug, include_unapproved=True)
     except NotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tea not found") from exc
 

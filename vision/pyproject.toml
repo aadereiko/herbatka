@@ -1,0 +1,46 @@
+[project]
+name = "herbatka-vision"
+version = "0.1.0"
+description = "Herbatka vision — recognising a tea from a photo of its tin"
+requires-python = ">=3.13"
+# Deliberately separate from api/pyproject.toml. The CV stack pulls in numpy, opencv and
+# (later) torch — hundreds of megabytes that have no business in the API's image or its
+# lockfile. The two projects share a schema by copying eight enum values, not a dependency.
+dependencies = [
+    "numpy>=2.1",
+    "opencv-python-headless>=4.10",
+    "pillow>=11.0",
+    "pydantic>=2.13",
+]
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.3",
+    "matplotlib>=3.9",
+    "ruff>=0.9",
+]
+# ~90 MB of onnxruntime, but it installs cleanly on Apple Silicon and section 5 of
+# notebook 01 is the measurement the whole crop question turns on. A default group rather
+# than an optional one: a plain `uv sync` that silently removed OCR would leave the
+# notebook running end to end while quietly skipping the only cell that decides anything.
+# Use `uv sync --no-default-groups` for a lean install.
+ocr = [
+    "rapidocr-onnxruntime>=1.4",
+]
+
+[tool.uv]
+default-groups = ["dev", "ocr"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["herbatka_vision"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

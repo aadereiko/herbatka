@@ -6,6 +6,8 @@ from app.api.deps import CurrentUser, DbSession, OptionalUser, PageParams
 from app.schemas.catalog import (
     BrandOut,
     IngredientCategory,
+    IngredientCreate,
+    IngredientOut,
     IngredientRatingInput,
     IngredientTaste,
     TeaCreate,
@@ -16,9 +18,11 @@ from app.schemas.catalog import (
     tea_summary,
 )
 from app.schemas.common import Page
+from app.schemas.household import TeaSeries, tea_series
 from app.schemas.preference import BrewingNote, BrewingNoteInput, brewing_note
 from app.schemas.review import Review, ReviewInput, review_out
 from app.services import catalog as catalog_service
+from app.services import consumption as consumption_service
 from app.services import preference as preference_service
 from app.services import review as review_service
 from app.services.errors import NotFound
@@ -45,7 +49,11 @@ async def list_teas(
         tea_type=tea_type,
         ingredient_slug=ingredient,
         brand_slug=brand,
-        approved=True,
+        # Everything, vouched for or not. A suggestion used to vanish until an admin
+        # noticed, which from the suggester's side is a form that silently failed — and
+        # from a reader's side is a catalog that quietly knows about teas it will not
+        # admit to. `is_approved` rides on every row instead and the client marks it.
+        approved=None,
         viewer_id=viewer.id if viewer else None,
         page=paging.page,
         size=paging.size,
@@ -55,11 +63,27 @@ async def list_teas(
     )
 
 
+@router.get("/teas/{slug}/consumption", response_model=TeaSeries)
+async def tea_consumption(slug: str, user: CurrentUser, db: DbSession) -> TeaSeries:
+    """How much of this tea the viewer's households have been drinking, by week.
+
+    Signed-in only, and scoped to the viewer's own shelves. The tea page around it is
+    public — what is in a blend is public information — but how much of it you get
+    through is household business, and this follows the same rule the feed does rather
+    than the one the catalog does.
+    """
+    try:
+        tea, _ratings = await catalog_service.get_tea_by_slug(db, slug, include_unapproved=True)
+    except NotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such tea") from exc
+    return tea_series(await consumption_service.tea_series(db, user.id, tea.id))
+
+
 @router.get("/teas/{slug}", response_model=TeaDetail)
 async def get_tea(slug: str, db: DbSession, viewer: OptionalUser) -> TeaDetail:
     try:
         tea, ratings = await catalog_service.get_tea_by_slug(
-            db, slug, viewer_id=viewer.id if viewer else None
+            db, slug, include_unapproved=True, viewer_id=viewer.id if viewer else None
         )
     except NotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tea not found") from exc
@@ -77,7 +101,12 @@ async def get_tea(slug: str, db: DbSession, viewer: OptionalUser) -> TeaDetail:
 
 @router.post("/teas", response_model=TeaDetail, status_code=status.HTTP_201_CREATED)
 async def submit_tea(payload: TeaCreate, user: CurrentUser, db: DbSession) -> TeaDetail:
-    """A signed-in user proposes a tea; it stays invisible until an admin approves it."""
+    """A signed-in user proposes a tea.
+
+    It appears in the catalog straight away, carrying `is_approved: false` so the client
+    can mark it. It used to be invisible until an admin approved it, which meant the
+    suggester submitted a form and then could not find what they had added.
+    """
     try:
         tea, ratings = await catalog_service.create_tea(
             db, payload, created_by=user, approved=False
@@ -101,6 +130,25 @@ async def list_ingredients(
     return Page.build(
         [IngredientTaste.model_validate(i) for i in items], total, paging.page, paging.size
     )
+
+
+@router.post("/ingredients", response_model=IngredientOut, status_code=status.HTTP_201_CREATED)
+async def suggest_ingredient(
+    payload: IngredientCreate, user: CurrentUser, db: DbSession
+) -> IngredientOut:
+    """A signed-in reader proposes a word for the shared vocabulary.
+
+    The mirror of `POST /catalog/teas`, and it exists for a specific moment: somebody is
+    typing out a blend's recipe, the herb in it is not in the list, and the alternative to
+    this endpoint is abandoning the tea. It appears immediately with `is_approved: false`.
+
+    Admins have their own `POST /admin/ingredients`, which lands approved. Same service
+    call, two arguments different.
+    """
+    ingredient = await catalog_service.create_ingredient(
+        db, payload, created_by=user, approved=False
+    )
+    return IngredientOut.model_validate(ingredient)
 
 
 @router.put("/ingredients/{slug}/rating", response_model=IngredientTaste)
@@ -195,7 +243,7 @@ async def _approved_tea(db: DbSession, slug: str):
     from app.services import catalog as service
 
     try:
-        tea, _ = await service.get_tea_by_slug(db, slug)
+        tea, _ = await service.get_tea_by_slug(db, slug, include_unapproved=True)
     except NotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tea not found") from exc
     return tea

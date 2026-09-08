@@ -10,6 +10,7 @@ import {
 } from '../../lib/upload'
 import { Button } from './button'
 import { Field } from './form'
+import { LeafMark } from './botanical'
 
 /**
  * Pick a picture, see it, keep it or drop it.
@@ -109,9 +110,12 @@ export function ImageUploadField({
           <div
             aria-hidden="true"
             data-testid={`${id}-placeholder`}
-            className="grid h-28 w-28 place-items-center border border-dashed border-brand-300 bg-brand-100 text-3xl dark:border-neutral-600 dark:bg-neutral-950"
+            className="grid h-28 w-28 place-items-center rounded-xl border border-dashed border-brand-300 bg-brand-100 dark:border-neutral-600 dark:bg-neutral-950"
           >
-            🍃
+            {/* The same drawn leaf `EntityImage` uses for "no picture yet". Two different
+                stand-ins for one idea — one here and one on the card this uploads to —
+                would read as two different kinds of thing. */}
+            <LeafMark className="size-12 text-leaf-600 opacity-70" />
           </div>
         )}
 
